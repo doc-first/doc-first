@@ -106,18 +106,21 @@ test('a data value that is an object does not cross the size limit', () => {
   // String({...}) gives "[object Object]": 15 characters. Without the type check, an object with
   // megabytes inside would sail past the 200-character ceiling without ever touching it.
   const enorme = { recheio: 'x'.repeat(500_000) };
-  assert.match(overLimit({ page: 'D01', data: { extra: enorme } }) ?? '', /texto ou número/);
-  assert.match(overLimit({ page: 'D01', data: { extra: ['x'.repeat(500_000)] } }) ?? '', /texto ou número/);
+  assert.equal(overLimit({ page: 'D01', data: { extra: enorme } })?.key, 'limits.data.notScalar');
+  assert.equal(overLimit({ page: 'D01', data: { extra: ['x'.repeat(500_000)] } })?.key, 'limits.data.notScalar');
   assert.equal(overLimit({ page: 'D01', data: { extra: 'normal value', n: 7, nada: null } }), null);
 });
 
 test('limits: what comes in has a size and a shape', () => {
   assert.equal(overLimit({ page: 'UC-01', text: 'ok' }), null);
-  assert.match(overLimit({ page: '../etc' }) ?? '', /página inválida/);
-  assert.match(overLimit({ page: 'D01', text: 'x'.repeat(4001) }) ?? '', /texto/);
-  assert.match(overLimit({ page: 'D01', block: 'D01 1' }) ?? '', /caractere/);
+  // Without examples configured, the message is the one that does not promise any: a sentence
+  // ending in "like " with nothing after it is worse than no example at all.
+  assert.equal(overLimit({ page: '../etc' })?.key, 'limits.page.invalidNoExamples');
+  assert.equal(overLimit({ page: '../etc' }, 'A01')?.key, 'limits.page.invalid');
+  assert.equal(overLimit({ page: 'D01', text: 'x'.repeat(4001) })?.key, 'limits.text.tooLong');
+  assert.equal(overLimit({ page: 'D01', block: 'D01 1' })?.key, 'limits.block.badChars');
   // The message says WHICH field blew up: "invalid" without saying where makes the reviewer try again in the dark.
-  assert.match(overLimit({ page: 'D01', snapshot: 'y'.repeat(20001) }) ?? '', /foto/);
+  assert.equal(overLimit({ page: 'D01', snapshot: 'y'.repeat(20001) })?.key, 'limits.snapshot.tooLong');
 });
 
 test('limits: applied without a real commit does not pass', () => {

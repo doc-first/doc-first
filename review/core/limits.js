@@ -27,35 +27,44 @@ const longerThan = (v, max) => String(v ?? '').length > max;
  * Portuguese: they are read by whoever reviews, and translating them is waiting on the language
  * choice (i18n).
  *
+ * It returns a KEY and its parameters, never a sentence. The sentence is built at the edge, in the
+ * language of whoever is reading — see `review/core/i18n.js`. Until 2026-09-20 this function
+ * returned Portuguese prose, which made "nothing in Portuguese in the code" and "the reviewer reads
+ * in their own language" look like contradictory rules. They are not: the sentence just has to live
+ * somewhere else.
+ *
  * @param {{page?:string, text?:string|null, snapshot?:string|null, block?:string|null,
  *          fingerprint?:string|null, data?:Record<string,unknown>|null}} e
- * @returns {string|null} a mensagem do primeiro limite estourado, ou null
+ * @param {string} examples  page codes to show in the error, from the project's config
+ * @returns {{key: string, params?: Record<string, string|number>}|null} the first limit broken
  */
-export function overLimit(e, exemplos = '') {
+export function overLimit(e, examples = '') {
   if (!PAGE_FORMAT.test(e.page ?? '')) {
     // The examples come from the project (`conteudo.exemplosDePagina`). They used to be hard-coded
-    // as "D01, T03a or UC-01" — one project's taxonomy, inside an engine message.
-    const como = exemplos ? ` como ${exemplos}` : '';
-    return `página inválida: esperado um código curto${como}, veio "${short(e.page)}"`;
+    // as one project's taxonomy, inside an engine message.
+    // Two keys instead of stitching a word into a parameter. The first version built
+    // ` like ${examples}` here, and that " like " was an English word hard-coded in the engine —
+    // it showed up in the middle of the Portuguese sentence.
+    return examples
+      ? { key: 'limits.page.invalid', params: { examples, got: short(e.page) } }
+      : { key: 'limits.page.invalidNoExamples', params: { got: short(e.page) } };
   }
-  if (longerThan(e.text, LIMITS.text)) return `o texto passa de ${LIMITS.text} caracteres`;
-  if (longerThan(e.snapshot, LIMITS.snapshot)) return `a foto do trecho passa de ${LIMITS.snapshot} caracteres`;
-  if (longerThan(e.block, LIMITS.block)) return `o código do trecho passa de ${LIMITS.block} caracteres`;
-  if (longerThan(e.fingerprint, LIMITS.fingerprint)) return `a digital passa de ${LIMITS.fingerprint} caracteres`;
-  if (e.block && !ID_FORMAT.test(e.block)) {
-    return 'o código do trecho tem caractere que não é letra, número, ponto, dois-pontos, hífen ou sublinhado';
-  }
+  if (longerThan(e.text, LIMITS.text)) return { key: 'limits.text.tooLong', params: { max: LIMITS.text } };
+  if (longerThan(e.snapshot, LIMITS.snapshot)) return { key: 'limits.snapshot.tooLong', params: { max: LIMITS.snapshot } };
+  if (longerThan(e.block, LIMITS.block)) return { key: 'limits.block.tooLong', params: { max: LIMITS.block } };
+  if (longerThan(e.fingerprint, LIMITS.fingerprint)) return { key: 'limits.fingerprint.tooLong', params: { max: LIMITS.fingerprint } };
+  if (e.block && !ID_FORMAT.test(e.block)) return { key: 'limits.block.badChars' };
   if (!e.data) return null;
   const keys = Object.keys(e.data);
-  if (keys.length > LIMITS.dataKeys) return `dados tem mais de ${LIMITS.dataKeys} chaves`;
+  if (keys.length > LIMITS.dataKeys) return { key: 'limits.data.tooManyKeys', params: { max: LIMITS.dataKeys } };
   for (const k of keys) {
-    if (longerThan(k, LIMITS.dataKey)) return `a chave "${short(k)}" de dados passa de ${LIMITS.dataKey} caracteres`;
+    if (longerThan(k, LIMITS.dataKey)) return { key: 'limits.data.keyTooLong', params: { key: short(k), max: LIMITS.dataKey } };
     // Scalars only. An object or array here becomes "[object Object]" — 15 characters — and slips
     // THROUGH the size limit carrying megabytes with it, which is exactly the giant POST this
     // module exists to stop. Nothing in the project writes anything else into `data`.
     const v = e.data[k];
-    if (v !== null && typeof v === 'object') return `o valor de "${short(k)}" precisa ser texto ou número`;
-    if (longerThan(v, LIMITS.dataValue)) return `o valor de "${short(k)}" passa de ${LIMITS.dataValue} caracteres`;
+    if (v !== null && typeof v === 'object') return { key: 'limits.data.notScalar', params: { key: short(k) } };
+    if (longerThan(v, LIMITS.dataValue)) return { key: 'limits.data.valueTooLong', params: { key: short(k), max: LIMITS.dataValue } };
   }
   return null;
 }

@@ -7,6 +7,7 @@ import { doHistorico, paraOContrato, estadoAtual, estadoEmPortugues } from '../c
 import { readConfig } from '../core/config.js';
 import { createRoles } from '../core/roles.js';
 import { overLimit, validCommit } from '../core/limits.js';
+import { createI18n } from '../core/i18n.js';
 import { RegistroEmMemoria, RegistroFirestore } from './store.ts';
 import { RegistroSqlite } from './store-sqlite.ts';
 import { Pessoas } from './users.ts';
@@ -26,6 +27,16 @@ import { TIPOS_DE_EVENTO, type Evento, type NovoEvento, type Registro } from './
 // engine knows no product name, no e-mail and no cloud project — it asks.
 const raizDoProjeto = process.env.REVISAO_SITE ?? join(import.meta.dirname, '..', '..');
 const doProjeto = readConfig(raizDoProjeto, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env);
+
+// The sentences the reviewer reads. The core returns keys; here they become words, in the language
+// of whoever is reading. Logs and boot errors do NOT come through here, on purpose — a log is
+// evidence, and evidence that changes wording by locale cannot be grepped.
+const dicionarios = Object.fromEntries(
+  ['en', 'pt-BR'].map((lang) => [lang,
+    JSON.parse(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8'))]));
+const i18n = createI18n(dicionarios, 'en');
+const idioma = (req: IncomingMessage) =>
+  i18n.choose({ acceptLanguage: req.headers['accept-language'] as string, project: doProjeto.idioma });
 
 const cfg = {
   porta: Number(process.env.PORT ?? 8080),
@@ -246,7 +257,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
     // The core reads the event with its own field names; the API still speaks Portuguese.
     // Translate on the way in, here.
     const limite = overLimit(doHistorico(novo), doProjeto.pageExamples);
-    if (limite) return json(res, 400, { erro: limite });
+    if (limite) return json(res, 400, { erro: i18n.t(idioma(req), limite.key, limite.params) });
 
     if (novo.tipo === 'pedido_estado' || novo.tipo === 'complemento') {
       const pedidoId = novo.dados?.pedido;

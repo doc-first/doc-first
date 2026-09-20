@@ -53,5 +53,7 @@ export function readConfig(root, io, env = {}) {
     trimPrefix: content.recortar ?? 'front/',
     /** Only for the invalid-page error message. Empty means: give no example. */
     pageExamples: content.exemplosDePagina ?? '',
+    /** The project's default language, when the reader states no preference. */
+    idioma: file.idioma ?? env.REVISAO_IDIOMA ?? 'pt-BR',
   };
 }
