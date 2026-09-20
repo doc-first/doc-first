@@ -1,0 +1,12 @@
+# O que não entra na imagem. Sem este arquivo o contexto leva node_modules e o .git inteiro.
+.git
+.github
+node_modules
+dados
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+*.md
+!LEIA-ME.md

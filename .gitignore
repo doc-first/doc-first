@@ -1,0 +1,10 @@
+node_modules/
+dados/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+secrets.json
+.DS_Store

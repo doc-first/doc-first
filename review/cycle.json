@@ -1,0 +1,62 @@
+{
+  "_leia": [
+    "FONTE ÚNICA do ciclo do pedido. Antes desta tabela, a mesma máquina de estados estava escrita",
+    "CINCO vezes — C#, pedidos.py, revisao.js, shell.js e triagem.html — e as cinco não eram iguais,",
+    "eram parecidas: rótulos diferentes entre Python e JS, sete transições num lado e onze no outro, e",
+    "a triagem.html ignorando a regra de que pedido de admin nasce aprovado (o mesmo pedido aparecia",
+    "'Aprovado' no painel e 'Aguardando triagem' na triagem). Mudar o ciclo custava três commits em três",
+    "linguagens e nada avisava se você esquecesse uma.",
+    "Agora: a API e a ferramenta do agente leem ESTE arquivo, e o JavaScript não calcula estado nenhum —",
+    "recebe pronto da API. Mexeu aqui, mexeu em todo lugar.",
+    "",
+    "As CHAVES e os ESTADOS são em inglês desde 2026-09-19 (docs/VOCABULARIO-EN.md). Os RÓTULOS",
+    "continuam em pt-BR: quem revisa é médico e brasileiro. Evento gravado com o nome antigo do",
+    "estado continua valendo — quem traduz na leitura é review/core/legacy.js."
+  ],
+  "initial": "open",
+  "initial_for_admin": "approved",
+  "_initial_for_admin": "Owner e admin não triam a si mesmos (decisão do Ale, 2026-09-17).",
+
+  "states": {
+    "open":     { "label": "Aguardando triagem",          "short": "Para triar",       "owned_by": "owner" },
+    "approved": { "label": "Aprovado",                    "short": "Aprovado",         "owned_by": "owner" },
+    "rejected": { "label": "Recusado",                    "short": "Recusado",         "owned_by": "owner" },
+    "question": { "label": "Pergunta para quem pediu",    "short": "Pergunta",         "owned_by": "owner" },
+    "applying": { "label": "Em aplicação",                "short": "Em aplicação",     "owned_by": "agent" },
+    "waiting":  { "label": "Em aplicação · dúvida",       "short": "Aplicação·dúvida", "owned_by": "agent" },
+    "applied":  { "label": "Aplicado",                    "short": "Aplicado",         "owned_by": "agent" }
+  },
+  "_states": "label e short são pt-BR de propósito, e saem daqui quando a escolha de idioma chegar.",
+
+  "transitions": {
+    "open":     ["approved", "rejected", "question"],
+    "rejected": ["approved"],
+    "question": ["approved", "rejected"],
+    "approved": ["applying", "waiting", "applied"],
+    "applying": ["waiting", "applied"],
+    "waiting":  ["applying", "applied"],
+    "applied":  []
+  },
+  "_transitions": "Aprovado NUNCA volta a recusado: para mudar algo aprovado, novo pedido com data.related.",
+
+  "accepts_supplement": ["open", "rejected", "question"],
+  "_accepts_supplement": "Complemento em recusado ou pergunta devolve o pedido para 'open'.",
+
+  "agent_queue": ["approved", "applying", "waiting"],
+  "_agent_queue": "O que `doc-first listar` mostra como 'a aplicar'.",
+
+  "requires_reason": ["rejected", "question"],
+  "requires_commit": ["applied"],
+
+  "request_categories": {
+    "text": "Ajustar texto",
+    "term": "Trocar um termo",
+    "remove": "Remover",
+    "doubt": "Dúvida"
+  },
+  "_request_categories": [
+    "`doubt`, e não `question`, de propósito: `question` já é um ESTADO do ciclo (o dono pergunta a",
+    "quem pediu). São conceitos diferentes, e os dois viajam como texto solto — o mesmo nome nos dois",
+    "faria um grep mentir e um bug passar despercebido."
+  ]
+}

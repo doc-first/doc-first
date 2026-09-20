@@ -1,0 +1,33 @@
+# Sobe o Doc First na sua máquina.
+#
+#   REVISAO_OWNER=voce@exemplo.org docker compose up
+#
+# A senha do primeiro acesso aparece UMA vez no log. O primeiro login obriga a trocá-la.
+# Sem REVISAO_SITE, ele sobe com o exemplo (examples/ola-mundo).
+services:
+  doc-first:
+    build: .
+    ports:
+      - "${PORTA:-8080}:8080"
+    environment:
+      REVISAO_OWNER: "${REVISAO_OWNER:?defina REVISAO_OWNER com o e-mail de quem aprova}"
+      REVISAO_AMBIENTE: Production
+      # Aponte para a sua documentação montada (veja o volume comentado abaixo).
+      REVISAO_SITE: "${REVISAO_SITE:-/app/examples/ola-mundo}"
+      # A chave de IA, quando houver. Vem do ambiente ou do .env — NUNCA do doc-first.json,
+      # que é versionado. O Doc First funciona inteiro sem ela.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    volumes:
+      # Onde os eventos e as pessoas ficam.
+      #
+      # Volume NOMEADO, não pasta do host, e de propósito: o processo roda como `node` (uid 1000) e
+      # uma pasta do host chega com o dono do host — o chown da imagem não alcança bind mount, e o
+      # SQLite morre com "unable to open database file". O volume nomeado herda o dono da imagem.
+      # Se você quiser mesmo a pasta ao lado:  mkdir -p dados && sudo chown 1000:1000 dados
+      - dados:/dados
+      # A SUA documentação. Descomente, ajuste o caminho, e defina
+      # REVISAO_SITE=/conteudo no ambiente acima.
+      # - ./minha-doc:/conteudo:ro
+
+volumes:
+  dados:

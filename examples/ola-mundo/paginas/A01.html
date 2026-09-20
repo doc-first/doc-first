@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A01 · O que o Doc First exige de uma página</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+
+<!-- O painel de revisão só liga se encontrar TUDO isto. Ele se desliga em silêncio se faltar algo,
+     então cada exigência está comentada no lugar onde aparece. -->
+<main class="doc-pagina">
+
+  <!-- 1. Um elemento .doc-titulo__cod com o código da página. É a chave que liga os eventos
+          gravados a esta folha. Sem ele o painel não liga. -->
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">A01</span> O que o Doc First exige de uma página</h1>
+
+  <!-- 2. Cada trecho revisável tem data-id E data-cod, os dois.
+       3. data-cod precisa ser "seção.número". "1.tit" não recebe botão.
+       4. data-id é a chave global do trecho: é o que viaja para o registro de aprovação. -->
+  <p class="frase" data-id="A01.1.1" data-cod="1.1">
+    Esta página é o exemplo mínimo. Se ela funciona no seu Doc First, a sua documentação também vai.
+  </p>
+
+  <h2><span class="n">1</span> As regras que a página precisa seguir</h2>
+
+  <div class="bloco" data-id="A01.1.2" data-cod="1.2">
+    <p>Tudo que pode ser aprovado mora dentro de <code>&lt;main&gt;</code>. O que está fora não é
+    revisável — nem o cabeçalho, nem o rodapé, nem o menu.</p>
+  </div>
+
+  <div class="bloco" data-id="A01.1.3" data-cod="1.3">
+    <p>A aprovação vale para <b>o texto</b>, não para o trecho. O Doc First guarda uma digital do
+    texto no momento do ✓. Mude uma letra e a aprovação deixa de valer — de propósito, porque
+    ninguém aprovou o texto novo.</p>
+  </div>
+
+  <div class="bloco" data-id="A01.1.4" data-cod="1.4">
+    <p>Por isso existe a regra mais fácil de esquecer: <b>tudo que o JavaScript injetar dentro de
+    <code>&lt;main&gt;</code> precisa ter o atributo <code>data-revisao-ui</code></b>. Sem isso, o
+    texto injetado entra na conta da digital e derruba todas as aprovações da página de uma vez.</p>
+  </div>
+
+  <h2><span class="n">2</span> O que acontece quando você aprova</h2>
+
+  <div class="bloco" data-id="A01.2.1" data-cod="2.1">
+    <p>Nada se apaga. Cada ✓, cada pedido e cada recusa vira um evento novo, com autor e hora. O
+    banco recusa alterar e apagar — não por disciplina, por gatilho.</p>
+  </div>
+
+  <div class="bloco" data-id="A01.2.2" data-cod="2.2">
+    <p>Quem aprova é uma pessoa só: o <code>owner</code> do <code>doc-first.json</code>. Aprovação
+    de outra pessoa é registrada, mas não vira trava no repositório.</p>
+  </div>
+
+</main>
+
+<!-- O painel de revisão. A ordem importa: common.js define window.ARAUTOS, que os outros usam.
+     review.js é script clássico de propósito — ele monta os botões antes do primeiro paint.
+     core-web.js é módulo, e por isso chega em paralelo sem bloquear. -->
+<script src="/review/web/common.js"></script>
+<script src="/review/web/review.js"></script>
+<script type="module" src="/review/web/core-web.js"></script>
+</body>
+</html>

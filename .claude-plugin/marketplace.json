@@ -1,0 +1,11 @@
+{
+  "name": "doc-first",
+  "owner": { "name": "Alessandro Garbiati" },
+  "plugins": [
+    {
+      "name": "doc-first",
+      "source": "./plugins/doc-first",
+      "description": "A metodologia Doc First: documentação revisável, com aprovação amarrada ao texto e rastro que não se apaga."
+    }
+  ]
+}

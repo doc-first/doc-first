@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Pré-commit do Doc First: BURRO E RÁPIDO, de propósito.
+#
+# Só entra aqui o que é determinístico e roda em segundos. Teste de contrato (que sobe servidor) e
+# revisão por agente ficam no CI: hook lento é hook que se aprende a pular com --no-verify, e aí ele
+# não protege nada.
+#
+# Instalar:  git config core.hooksPath .githooks
+# Pular uma vez (e depois explicar no commit por quê):  git commit --no-verify
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)"
+INICIO=$(date +%s%N)
+FALHAS=0
+falha() { echo "  ✗ $1"; FALHAS=$((FALHAS+1)); }
+
+# Só o que está em staged: commit pequeno tem de ser rápido.
+ARQUIVOS=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$ARQUIVOS" ] && exit 0
+js=$(echo "$ARQUIVOS" | grep -E '\.(js|ts)$' || true)
+json=$(echo "$ARQUIVOS" | grep -E '\.json$' || true)
+motor=$(echo "$ARQUIVOS" | grep -E '^review/(nucleo|api|cli)/' || true)
+folhas=$(echo "$ARQUIVOS" | grep -E '^front/(telas|ds/catalogo)/.*\.html$' || true)
+
+# ------------------------------------------------------------------ 1. o código é válido?
+for f in $js; do
+  [ -f "$f" ] || continue
+  node --check "$f" 2>/dev/null || { node --check "$f" 2>&1 | head -3; falha "$f não é JavaScript válido"; }
+done
+
+# ------------------------------------------------------------------ 2. lint, só nos arquivos alterados
+# ~0,5 s. Pega o que já nos mordeu: catch mudo, variável órfã, função que não existe mais (foi assim
+# que achamos uma chamada a `textoDa` deixada para trás numa migração — quebraria ao enviar um pedido).
+if [ -n "$js" ]; then
+  npx --no-install eslint $js >/tmp/pre-commit-lint.log 2>&1 \
+    || { grep -E '^\s+[0-9]+:|error' /tmp/pre-commit-lint.log | head -8 | sed 's/^/      /'; falha "o lint acusou"; }
+fi
+
+# ------------------------------------------------------------------ 3. JSON quebrado derruba o serviço
+for f in $json; do
+  [ -f "$f" ] || continue
+  node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" 2>/dev/null || falha "$f não é JSON válido"
+done
+
+# ------------------------------------------------------------------ 4. segredo indo para o histórico
+# Segredo commitado não sai mais: reescrever histórico público é pior que o vazamento.
+PADRAO='(GOCSPX-|AIza[0-9A-Za-z_-]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[0-9A-Za-z]{30,}|xox[baprs]-[0-9A-Za-z-]{10,})'
+# O próprio hook e o workflow de CI CONTÊM esses padrões (é a definição deles), então ficam de fora
+# da varredura — senão o hook barra a si mesmo, que foi o que aconteceu na primeira vez que rodou.
+SUSPEITOS=$(echo "$ARQUIVOS" | grep -vE '^(\.githooks/|\.github/)' || true)
+if [ -n "$SUSPEITOS" ] && git diff --cached -U0 -- $SUSPEITOS | grep -nE "^\+.*$PADRAO" >/dev/null 2>&1; then
+  falha "parece haver SEGREDO no que você está commitando"
+  git diff --cached -U0 -- $SUSPEITOS | grep -nE "^\+.*$PADRAO" | sed 's/^/      /' | cut -c1-110 | head -3
+fi
+
+# ------------------------------------------------------------------ 5. o núcleo continua correto?
+# Só quando o motor muda — mexer em HTML não precisa disto. Custa ~0,4 s.
+if [ -n "$motor" ]; then
+  node --test 'review/tests/*.test.js' >/tmp/pre-commit-testes.log 2>&1 \
+    || { tail -12 /tmp/pre-commit-testes.log | sed 's/^/      /'; falha "os testes do núcleo falharam"; }
+fi
+
+# ------------------------------------------------------------------ 6. os tipos batem?
+# Só quando um .ts muda. ~3 s — é o passo mais lento do hook, e ainda assim mais barato que
+# descobrir no deploy. O Node roda .ts sem checar tipo nenhum: sem isto aqui, o tipo é decoração.
+ts=$(echo "$ARQUIVOS" | grep -E '\.ts$' || true)
+if [ -n "$ts" ]; then
+  npx --no-install tsc --noEmit >/tmp/pre-commit-tipos.log 2>&1 \
+    || { grep 'error TS' /tmp/pre-commit-tipos.log | head -5 | sed 's/^/      /'; falha "os tipos não batem"; }
+fi
+
+# ------------------------------------------------------------------ 7. a trava de validação
+# Só quando uma folha muda. É o coração do método: trecho aprovado não muda sem permissão, e não
+# existe marca de aprovação sem rastro.
+if [ -n "$folhas" ]; then
+  node review/cli/doc-first.ts conferir >/tmp/pre-commit-trava.log 2>&1 \
+    || { grep '✗' /tmp/pre-commit-trava.log | sed 's/^/      /' | head -5; \
+         falha "a trava de validação acusou (se foi de propósito, o dono precisa autorizar)"; }
+fi
+
+MS=$(( ($(date +%s%N) - INICIO) / 1000000 ))
+if [ $FALHAS -eq 0 ]; then
+  echo "✓ pré-commit ok (${MS}ms)"
+  exit 0
+fi
+echo ""
+echo "$FALHAS problema(s). Corrija, ou use --no-verify e diga no commit por quê."
+exit 1

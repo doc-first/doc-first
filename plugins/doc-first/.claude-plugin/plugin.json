@@ -1,0 +1,7 @@
+{
+  "name": "doc-first",
+  "version": "0.1.0",
+  "description": "Documentação revisável com aprovação rastreável: cada trecho tem uma digital, a aprovação cai se o texto mudar, e só o agente altera — a partir de um pedido, com análise de impacto.",
+  "author": "Alessandro Garbiati",
+  "keywords": ["documentacao", "revisao", "aprovacao", "rastreabilidade"]
+}

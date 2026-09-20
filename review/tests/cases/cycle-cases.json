@@ -1,0 +1,28 @@
+{
+  "_leia": [
+    "Casos-ouro do ciclo do pedido: o MESMO log de eventos, o MESMO estado esperado, checado em C# e",
+    "em Python. Existe porque a trava de corrida entrou no C# em 17/09 e não foi levada ao pedidos.py:",
+    "os dois calculavam estados diferentes para o mesmo histórico, e nada avisava.",
+    "Quem mexer no ciclo mexe aqui, e as duas linguagens têm de continuar concordando."
+  ],
+  "casos": [
+    { "nome": "pedido de revisor nasce aberto", "autorEhAdmin": false, "eventos": [], "esperado": "aberto" },
+    { "nome": "pedido de admin nasce aprovado", "autorEhAdmin": true, "eventos": [], "esperado": "aprovado" },
+    { "nome": "ultimo evento manda", "autorEhAdmin": false,
+      "eventos": [{"estado":"recusado","de":"aberto"},{"estado":"aprovado","de":"recusado"}], "esperado": "aprovado" },
+    { "nome": "quem perdeu a corrida e ignorado", "autorEhAdmin": false,
+      "eventos": [{"estado":"aprovado","de":"aberto"},{"estado":"pergunta","de":"aberto"}], "esperado": "aprovado" },
+    { "nome": "tres simultaneas: so a primeira vale", "autorEhAdmin": false,
+      "eventos": [{"estado":"recusado","de":"aberto"},{"estado":"aprovado","de":"aberto"},{"estado":"pergunta","de":"aberto"}],
+      "esperado": "recusado" },
+    { "nome": "evento antigo sem de continua valendo", "autorEhAdmin": false,
+      "eventos": [{"estado":"aprovado"}], "esperado": "aprovado" },
+    { "nome": "sequencia legitima ate aplicado", "autorEhAdmin": false,
+      "eventos": [{"estado":"aprovado","de":"aberto"},{"estado":"analise","de":"aprovado"},{"estado":"aplicado","de":"analise"}],
+      "esperado": "aplicado" },
+    { "nome": "complemento devolve recusado para triagem", "autorEhAdmin": false,
+      "eventos": [{"estado":"recusado","de":"aberto"},{"complemento":true}], "esperado": "aberto" },
+    { "nome": "complemento nao mexe em aprovado", "autorEhAdmin": false,
+      "eventos": [{"estado":"aprovado","de":"aberto"},{"complemento":true}], "esperado": "aprovado" }
+  ]
+}

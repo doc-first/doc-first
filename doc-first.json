@@ -1,0 +1,39 @@
+{
+  "_leia": [
+    "A configuração do PROJETO que usa o método. É o único arquivo que quem adota o Doc First",
+    "precisa editar: nome, quem aprova, e onde o conteúdo está.",
+    "O motor (review/) não conhece nada disto — ele pergunta aqui.",
+    "Variáveis de ambiente vencem este arquivo, para o mesmo repositório servir a mais de um ambiente.",
+    "",
+    "Este aqui aponta para o exemplo. Para a sua documentação, copie examples/ola-mundo/ e edite."
+  ],
+
+  "nome": "Doc First",
+  "_nome": "Aparece no título das páginas e no menu.",
+
+  "owner": "voce@exemplo.org",
+  "_owner": "UM e-mail. É o ✓ dele que vira trava no repositório. Zero ou dois não sobem o serviço.",
+
+  "admins": [],
+  "_admins": "Podem tudo o que o owner faz, menos ser owner. Vazio é o caso normal.",
+
+  "conteudo": {
+    "pastas": ["examples/ola-mundo/paginas"],
+    "registro": "examples/ola-mundo/aprovacoes.json",
+    "inicio": "/paginas/A01.html",
+    "recortar": "paginas/",
+    "exemplosDePagina": "A01 ou A02"
+  },
+  "_conteudo": [
+    "ONDE A SUA DOCUMENTAÇÃO MORA. O motor não sabe nada disto.",
+    "pastas: onde estão as páginas revisáveis. registro: o arquivo das aprovações, que é a trava.",
+    "inicio: para onde a raiz do site leva. recortar: o prefixo que não interessa no registro.",
+    "exemplosDePagina: só aparece na mensagem de erro de código de página inválido."
+  ],
+
+  "desenvolvimento": {
+    "porta": 8095,
+    "comoQuem": "voce@exemplo.org"
+  },
+  "_desenvolvimento": "Quem você finge ser ao rodar local. Só vale com NODE_ENV de desenvolvimento."
+}

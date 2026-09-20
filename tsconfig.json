@@ -1,0 +1,26 @@
+{
+  "//": [
+    "Não compila NADA: o Node 24 roda .ts direto, sem build, sem dist. Isto aqui existe só para",
+    "CONFERIR os tipos — `npm run tipos`. Antes deste arquivo, `tsc --noEmit` imprimia a ajuda do",
+    "compilador e saía com 0: um verde que nunca checou uma linha.",
+    "allowImportingTsExtensions é obrigatório porque o código importa './users.ts' com a extensão,",
+    "que é como o Node resolve de verdade — e não como o TypeScript costuma escrever."
+  ],
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["review/**/*.ts", "review/core/*.js"],
+  "exclude": ["node_modules", "publicar/site", "publicar/api", "front/telas.bak-*"]
+}

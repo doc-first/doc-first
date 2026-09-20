@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Regras da mensagem de commit. Rápido e sem julgamento de conteúdo: o que importa é que a mensagem
+# ainda faça sentido daqui a um ano, quando alguém estiver investigando um bug.
+#
+# Este repositório é a vitrine da metodologia Doc First: o histórico É documentação.
+set -uo pipefail
+ARQUIVO="$1"
+PRIMEIRA=$(head -1 "$ARQUIVO")
+CORPO=$(sed -n '2,$p' "$ARQUIVO" | grep -v '^#' | grep -v '^\s*$' || true)
+FALHAS=0
+falha() { echo "  ✗ $1"; FALHAS=$((FALHAS+1)); }
+
+# merge, revert e fixup passam sem cerimônia
+case "$PRIMEIRA" in Merge*|Revert*|fixup!*|squash!*) exit 0 ;; esac
+
+[ ${#PRIMEIRA} -ge 15 ] || falha "a primeira linha tem ${#PRIMEIRA} caracteres: diga o que mudou, não 'ajustes'"
+[ ${#PRIMEIRA} -le 72 ] || falha "a primeira linha tem ${#PRIMEIRA} caracteres (máximo 72): o resto vai no corpo"
+
+case "$PRIMEIRA" in
+  *.) falha "a primeira linha não termina em ponto" ;;
+esac
+
+# Mensagens que não dizem nada. Se a mudança é mesmo trivial, o corpo explica por que ela existe.
+VAZIAS='^(ajustes?|correç(ão|oes)|fix|wip|update|atualiza(ção|r)?|melhorias?|mudanças?|teste)s?\.?$'
+if echo "$PRIMEIRA" | grep -qiE "$VAZIAS"; then
+  falha "\"$PRIMEIRA\" não diz o que mudou nem por quê"
+fi
+
+# A segunda linha tem de ser vazia (git usa a primeira como assunto).
+SEGUNDA=$(sed -n '2p' "$ARQUIVO")
+[ -z "$SEGUNDA" ] || falha "deixe a segunda linha em branco, separando o assunto do corpo"
+
+if [ $FALHAS -gt 0 ]; then
+  echo ""
+  echo "  Uma boa mensagem aqui responde: o que mudou, e POR QUE isso era preciso."
+  echo "  Se a resposta for óbvia em um ano, a primeira linha basta."
+  exit 1
+fi
+exit 0
