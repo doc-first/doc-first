@@ -75,20 +75,21 @@ does not get automated, and it is where all the value of the rest comes from.
 ## The documentation categories
 
 The template (`examples/gabarito/`) is the skeleton a project copies. It grows as the method
-matures; today it has five sections, and the list below is the destination.
+matures; today it has eleven sections, and every one of them has a page to copy.
 
 | Section | What it holds | Status |
 |---|---|---|
+| **Kinds** | the fourteen kinds of content, each demonstrating itself | ✅ |
 | **Discovery** | why it exists, who for, what changes if it works | ✅ |
 | **Roles** | who can do what, the capability table, who approves | ✅ |
 | **Design system** | the values, the components, and what is not done here | ✅ |
 | **Screens** | what the person came to do, what they see, what they can do, the prototype | ✅ |
 | **Decisions** | what is still undecided, with an owner and a deadline | ✅ |
-| **Stack** | what the system is made of, and why | ⬜ |
-| **Data model** | the entities, the relationships, the data dictionary | ⬜ |
-| **Use cases** | the flow end to end, with what travels at each step | ⬜ |
-| **Architecture (C4)** | context, containers, components, code | ⬜ |
-| **Contracts** | the APIs, the events, what goes in and what comes out | ⬜ |
+| **Stack** | what the system is made of, and why | ✅ |
+| **Data model** | the entities, the relationships, the data dictionary | ✅ |
+| **Use cases** | the flow end to end, with what travels at each step | ✅ |
+| **Architecture (C4)** | context, containers, components, code | ✅ |
+| **Contracts** | the APIs, the events, what goes in and what comes out | ✅ |
 
 ## The diagrams
 
@@ -100,11 +101,13 @@ bytes without changing the meaning, and no change of meaning is legible in a dif
 text enters the traffic light like any other block — and it is the only way a flowchart turns 🟡
 when the flow it draws has changed.
 
-*Status:* ⬜ not started.
+*Status:* 🟨 half. `diagram` is one of the fourteen kinds, it demands to be text, and a diagram in
+text enters the lock like any other block. What does not exist is **generating** one — today a human
+draws it, and the engine only keeps it honest.
 
 ## What the prototype is, and what it is not
 
-**Ale's decision, `2026-09-20`:** the screen prototypes live in **HTML and CSS**, not in the
+**The owner's decision, `2026-09-20`:** the screen prototypes live in **HTML and CSS**, not in the
 product's framework.
 
 The reason is the same as for the diagram in text: whoever adopts the method may use React, Vue,

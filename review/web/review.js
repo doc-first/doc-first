@@ -2,7 +2,7 @@
    Entry point: the number already sitting in the corner of each box becomes a button.
    Panel: Approve (OWNER ONLY) · Request a change · Comment + the box's history.
    Approving belongs to whoever has the capability (owner or admin) because their ✓ becomes a lock in
-   the repository and tells the agent to apply it (Ale, 17/09).
+   the repository and tells the agent to apply it (decided `2026-09-17`).
    A request from someone who can approve is born approved — they do not triage themselves.
    Triage (only for those who can): Approve request · Decline · Ask. A declined one can be revisited;
    an approved one never comes back.

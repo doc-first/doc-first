@@ -1,6 +1,6 @@
 # Glossary: the concepts of the method
 
-**Ale's decision, `2026-09-20`, replacing the one from 19/09:** **nothing in Portuguese in the
+**The owner's decision, `2026-09-20`, replacing the one from `2026-09-19`:** **nothing in Portuguese in the
 code.** Identifier, comment, file name, table name, column name, data key — all English.
 
 The earlier rule said comments would stay in pt-BR "for this pass". It fell: the repository is
