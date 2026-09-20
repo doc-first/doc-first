@@ -15,6 +15,9 @@ import { fingerprintOfText } from '../core/fingerprint.js';
 export interface Trecho {
   id: string; pagina: string; arquivo: string; caminho: string;
   texto: string; digital: string; validado: string | null;
+  /** De que outros trechos este depende (`data-depende="D01.1.4 D02.3.1"`). É o que permite dizer
+   *  "o texto não mudou, mas a base mudou" — o vermelho do semáforo. */
+  depende: string[];
   /** Título e subtítulo de seção não mostram número, mas TÊM trava: entram no registro e precisam
    *  ser conferidos. Filtrá-los aqui fazia o `conferir` dizer "elemento sumiu" para os três que o
    *  o dono já validou. */
@@ -64,6 +67,7 @@ export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
         texto: texto.replace(/\s+/g, ' ').trim(),
         digital: await fingerprintOfText(texto),
         validado: el.getAttribute('data-validado'),
+        depende: (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean),
         numerado: /^\d+\.\d/.test(cod),
       });
     }

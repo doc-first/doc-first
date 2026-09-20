@@ -32,6 +32,8 @@ doc-first — ferramenta do agente da metodologia Doc First
   Trava de validação (o ✓ humano)
     sincronizar                 traz para o repositório os ✓ que o dono deu no site
     conferir                    acusa trecho validado que mudou, e marca sem registro
+    semaforo                    o estado da documentação inteira: 🟢 🟡 🔴 ⚪
+    se-eu-mexer <id>            o que mais precisa de conferência se eu editar isto
 
   Opções
     --local                     falar com o servidor local em vez da nuvem
@@ -55,6 +57,7 @@ async function principal() {
       commit: { type: 'string' },
       trechos: { type: 'string' },
       banco: { type: 'string' },
+      so: { type: 'string' },
       ajuda: { type: 'boolean', short: 'h', default: false },
     },
   });
@@ -84,6 +87,8 @@ async function principal() {
                           { commit: values.commit, caixas: values.trechos }); return 0;
     case 'sincronizar': await validacao.sincronizar(raiz, fonte); return 0;
     case 'conferir':    return (await validacao.conferir(raiz)) ? 1 : 0;
+    case 'semaforo':    await validacao.mostrarSemaforo(raiz, { so: values.so }); return 0;
+    case 'se-eu-mexer': return validacao.seEuMexer(raiz, exige(arg, 'se-eu-mexer <id>'));
     default:
       console.error(`comando desconhecido: ${comando}\n`);
       console.error(AJUDA.trim());

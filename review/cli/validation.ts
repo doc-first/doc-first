@@ -4,6 +4,7 @@ import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
 import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
 import { readConfig } from '../core/config.js';
+import { semaforo as calcular, quemDependeDe, CORES } from '../core/validity.js';
 import { Fonte } from './remote.ts';
 
 /**
@@ -15,7 +16,10 @@ import { Fonte } from './remote.ts';
 
 export interface Registro {
   [id: string]: { arquivo: string; data: string; digital_texto: string; digital?: string;
-                  origem?: string; evento?: string; texto?: string; migrado_de?: string[] };
+                  origem?: string; evento?: string; texto?: string; migrado_de?: string[];
+                  /** A digital que CADA dependência tinha no momento do ✓. Sem isto não há como
+                   *  saber depois que a base mudou — a digital do próprio trecho não denuncia. */
+                  depende?: Record<string, string> };
 }
 
 /**
@@ -87,7 +91,8 @@ export async function orfaos(raiz: string, reg: Registro, arquivos?: string[]): 
 
 /** Grava a trava de um trecho: marca o HTML e registra a digital. */
 export async function marcar(raiz: string, reg: Registro, id: string, quando: string,
-                             origem: string, evento?: string): Promise<string | null> {
+                             origem: string, evento?: string,
+                             digitaisAgora?: Map<string, string>): Promise<string | null> {
   const achado = acharArquivoDoTrecho(raiz, id);
   if (!achado) { console.log(`  ✗ ${id}: não encontrado`); return null; }
 
@@ -103,11 +108,23 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
   const texto = copia.textContent ?? '';
   const digital = await fingerprintOfText(texto);
 
+  // De que este trecho depende, e como cada dependência estava AGORA. Guardar a foto das
+  // dependências é o que permite, meses depois, dizer "o texto continua igual mas a base mudou".
+  // Sem isto o vermelho do semáforo não teria com o que comparar.
+  const declaradas = (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean);
+  const depende: Record<string, string> = {};
+  for (const outro of declaradas) {
+    const d = digitaisAgora?.get(outro);
+    if (d) depende[outro] = d;
+    else console.log(`  ⚠ ${id} declara depender de ${outro}, que não existe`);
+  }
+
   const antigo = reg[id];
   reg[id] = {
     arquivo: nomeCurto(raiz, achado.caminho),
     data: quando, digital_texto: digital, origem,
     texto: texto.replace(/\s+/g, ' ').trim().slice(0, 120),
+    ...(Object.keys(depende).length ? { depende } : {}),
     ...(evento ? { evento } : {}),
     ...(antigo?.migrado_de ? { migrado_de: antigo.migrado_de } : {}),
     ...(antigo?.digital ? { digital: antigo.digital } : {}),
@@ -140,6 +157,7 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
 
   const reg = carregar(raiz);
   const trechos = await lerTrechos(raiz);
+  const digitaisAgora = new Map([...trechos].map(([id, t]) => [id, t.digital]));
   let novos = 0, iguais = 0, vencidas = 0;
 
   for (const e of doDono.sort((a, b) => a.quando.localeCompare(b.quando))) {
@@ -153,7 +171,7 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
       vencidas++; continue;
     }
     if (reg[id]?.digital_texto === t.digital) { iguais++; continue; }
-    if (await marcar(raiz, reg, id, quando, 'site', e.id)) {
+    if (await marcar(raiz, reg, id, quando, 'site', e.id, digitaisAgora)) {
       console.log(`  ✓ ${id} validado por você no site em ${quando}`);
       novos++;
     }
@@ -161,4 +179,71 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
   salvar(raiz, reg);
   console.log(`${novos} novo(s) · ${iguais} já estavam · ${vencidas} ✓ vencido(s) · ${Object.keys(reg).length} validados no total`);
   return { novos, iguais, vencidas, offline: false };
+}
+
+/**
+ * O semáforo da documentação: onde cada trecho está, e o que precisa de olho humano.
+ *
+ * É o comando que responde "posso confiar nesta documentação hoje?". `conferir` responde uma
+ * pergunta menor e mais antiga — se alguém adulterou uma marca. Este responde a pergunta do dia.
+ */
+export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}) {
+  const trechos = await lerTrechos(raiz);
+  const reg = carregar(raiz);
+  const { porTrecho, placar } = calcular(trechos as never, reg as never);
+
+  const total = trechos.size;
+  const linha = (e: 'valid' | 'stale' | 'broken' | 'none', nome: string) =>
+    `  ${CORES[e]} ${String(placar[e]).padStart(4)}  ${nome}`;
+
+  console.log(`\nDocumentação: ${total} trecho(s)\n`);
+  console.log(linha('valid',  'validados, e nada mudou desde então'));
+  console.log(linha('stale',  'o texto mudou depois do ✓ — reaprovar'));
+  console.log(linha('broken', 'o texto está igual, mas a base mudou — CONFERIR'));
+  console.log(linha('none',   'ninguém validou ainda'));
+
+  // O vermelho vem primeiro e com nome: é o único estado que ninguém descobre sozinho lendo a
+  // página, porque nada nela mudou.
+  const vermelhos = [...porTrecho].filter(([, r]) => r.estado === 'broken');
+  if (vermelhos.length) {
+    console.log(`\n🔴 Precisam de conferência — mudou o chão, não o texto:\n`);
+    for (const [id, r] of vermelhos) {
+      console.log(`  ${id}`);
+      console.log(`     depende de: ${r.culpados.join(', ')} — e isso mudou desde o ✓`);
+    }
+  }
+
+  const amarelos = [...porTrecho].filter(([, r]) => r.estado === 'stale');
+  if (amarelos.length && opcoes.so !== 'vermelho') {
+    console.log(`\n🟡 Reaprovar (o texto mudou):\n  ${amarelos.map(([id]) => id).join('  ')}`);
+  }
+
+  if (!vermelhos.length && !amarelos.length) {
+    console.log(`\n✓ nada pendente de conferência.`);
+  }
+  console.log('');
+  return placar;
+}
+
+/** O que mais preciso olhar se eu mexer aqui? A pergunta que se faz ANTES de editar. */
+export async function seEuMexer(raiz: string, id: string) {
+  const trechos = await lerTrechos(raiz);
+  if (!trechos.has(id)) { console.log(`✗ não achei o trecho ${id}`); return 1; }
+
+  const dependentes = quemDependeDe(id, trechos as never);
+  const reg = carregar(raiz);
+
+  console.log(`\nSe você mexer em ${id}:\n`);
+  if (!dependentes.length) {
+    console.log('  nada declara depender deste trecho.');
+    console.log('  (o que não quer dizer que nada dependa — só que ninguém declarou)\n');
+    return 0;
+  }
+  console.log(`  ${dependentes.length} trecho(s) vão ficar 🔴 e precisar de conferência:\n`);
+  for (const d of dependentes) {
+    const validado = reg[d] ? `✓ validado em ${reg[d].data}` : 'nunca validado';
+    console.log(`  ${d.padEnd(14)} ${validado}`);
+  }
+  console.log('');
+  return 0;
 }
