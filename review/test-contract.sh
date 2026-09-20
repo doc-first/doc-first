@@ -135,7 +135,7 @@ kill $PID 2>/dev/null; wait $PID 2>/dev/null
 # O evento gravado tem de sobreviver ao desligamento — é a diferença entre sqlite e memória.
 espera "o evento continua lá depois de desligar" 1 "$(node -e "
   const {DatabaseSync}=require('node:sqlite');
-  console.log(new DatabaseSync('$DADOS/eventos.db').prepare('SELECT COUNT(*) c FROM eventos').get().c)")"
+  console.log(new DatabaseSync('$DADOS/eventos.db').prepare('SELECT COUNT(*) c FROM events').get().c)")"
 rm -rf $DADOS $LOGIN
 
 echo "sem configuração, não sobe:"

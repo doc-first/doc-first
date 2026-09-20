@@ -36,41 +36,79 @@ export class RegistroSqlite implements Registro {
     this.#db.exec('PRAGMA journal_mode = WAL');
     this.#db.exec('PRAGMA foreign_keys = ON');
     this.#db.exec(`
-      CREATE TABLE IF NOT EXISTS eventos (
-        id       TEXT PRIMARY KEY,
-        tipo     TEXT NOT NULL,
-        pagina   TEXT NOT NULL,
-        caixa    TEXT,
-        digital  TEXT,
-        texto    TEXT,
-        foto     TEXT,
-        autor    TEXT NOT NULL,
-        quando   TEXT NOT NULL,
-        dados    TEXT
+      CREATE TABLE IF NOT EXISTS events (
+        id           TEXT PRIMARY KEY,
+        type         TEXT NOT NULL,
+        page         TEXT NOT NULL,
+        block        TEXT,
+        fingerprint  TEXT,
+        text         TEXT,
+        snapshot     TEXT,
+        author       TEXT NOT NULL,
+        happened_at  TEXT NOT NULL,
+        data         TEXT
       );
-      CREATE INDEX IF NOT EXISTS eventos_por_pagina ON eventos (pagina, quando);
+      CREATE INDEX IF NOT EXISTS events_by_page ON events (page, happened_at);
 
-      -- O ÍNDICE da documentação (trechos, dependências, pendências) NÃO mora aqui: ele é
-      -- derivado e refeito a cada "doc-first indexar", enquanto esta tabela é fato e o banco
-      -- recusa apagar. Ver review/api/index-store.ts — uma definição só, e a diferença explícita.
+      -- The documentation INDEX (blocks, dependencies, issues) does NOT live here: it is derived
+      -- and rebuilt on every "doc-first index", while this table is fact and the database refuses
+      -- to erase it. See review/api/index-store.ts — one definition, and the difference explicit.
     `);
 
-    // Um gatilho que RECUSA alterar e apagar. A regra "nada se apaga" deixa de depender de o código
-    // nunca chamar UPDATE: o banco recusa, inclusive para quem abrir o arquivo com outro programa.
+    this.#migrarDoPortugues();
+
+    // Triggers that REFUSE to alter and to delete. "Nothing is erased" stops depending on the code
+    // never calling UPDATE: the database refuses, even for someone opening the file with another
+    // program.
     this.#db.exec(`
-      CREATE TRIGGER IF NOT EXISTS eventos_sem_update BEFORE UPDATE ON eventos
-        BEGIN SELECT RAISE(ABORT, 'evento nao se altera: o rastro e o produto'); END;
-      CREATE TRIGGER IF NOT EXISTS eventos_sem_delete BEFORE DELETE ON eventos
-        BEGIN SELECT RAISE(ABORT, 'evento nao se apaga: o rastro e o produto'); END;
+      CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events
+        BEGIN SELECT RAISE(ABORT, 'an event is not altered: the trail is the product'); END;
+      CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
+        BEGIN SELECT RAISE(ABORT, 'an event is not deleted: the trail is the product'); END;
     `);
+  }
+
+  /**
+   * Carries over a database written before 2026-09-20, when the table was `eventos` and the
+   * columns were in Portuguese.
+   *
+   * ⚠️ It COPIES, it does not move: the old table stays where it is. Renaming a table that holds
+   * human approvals is the kind of migration you only get to run wrong once — and the old triggers
+   * would refuse a DELETE anyway.
+   *
+   * Runs before the new triggers exist, because INSERT into a table guarded by them is fine but
+   * there is no reason to make the migration fight the guard.
+   */
+  #migrarDoPortugues() {
+    const velha = this.#db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='eventos'").get();
+    if (!velha) return;
+
+    const quantos = this.#db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number };
+    if (quantos.n > 0) return;                       // já migrado: não duplica
+
+    const linhas = this.#db.prepare('SELECT COUNT(*) AS n FROM eventos').get() as { n: number };
+    if (linhas.n === 0) return;
+
+    this.#db.exec(`
+      INSERT INTO events (id, type, page, block, fingerprint, text, snapshot, author, happened_at, data)
+      SELECT id, tipo, pagina, caixa, digital, texto, foto, autor, quando, dados FROM eventos;
+    `);
+    console.warn(JSON.stringify({
+      nivel: 'AVISO', evento: 'banco_migrado', de: 'eventos', para: 'events', linhas: linhas.n,
+      mensagem: 'A tabela antiga foi COPIADA, não movida. Ela continua no arquivo — confira os '
+        + 'dados e só então apague à mão, se quiser.',
+    }));
   }
 
   async incluir(novo: NovoEvento, autor: string): Promise<Evento> {
     const e: Evento = {
       ...novo, id: crypto.randomUUID().replace(/-/g, ''), autor, quando: new Date().toISOString(),
     };
+    // The column names are English; the `Evento` object is still the API contract, in Portuguese.
+    // The seam lives here, in one place, and dies when review/api/ is translated.
     this.#db.prepare(
-      `INSERT INTO eventos (id, tipo, pagina, caixa, digital, texto, foto, autor, quando, dados)
+      `INSERT INTO events (id, type, page, block, fingerprint, text, snapshot, author, happened_at, data)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(e.id, e.tipo, e.pagina, e.caixa ?? null, e.digital ?? null, e.texto ?? null,
           e.foto ?? null, e.autor, e.quando, e.dados ? JSON.stringify(e.dados) : null);
@@ -79,12 +117,12 @@ export class RegistroSqlite implements Registro {
 
   async listar(pagina?: string | null): Promise<Evento[]> {
     const linhas = pagina == null
-      ? this.#db.prepare('SELECT * FROM eventos ORDER BY quando').all()
-      : this.#db.prepare('SELECT * FROM eventos WHERE pagina = ? ORDER BY quando').all(pagina);
+      ? this.#db.prepare('SELECT * FROM events ORDER BY happened_at').all()
+      : this.#db.prepare('SELECT * FROM events WHERE page = ? ORDER BY happened_at').all(pagina);
     return (linhas as Record<string, string | null>[]).map((l) => ({
-      id: l.id!, tipo: l.tipo!, pagina: l.pagina!, caixa: l.caixa, digital: l.digital,
-      texto: l.texto, foto: l.foto, autor: l.autor!, quando: l.quando!,
-      dados: l.dados ? JSON.parse(l.dados) : null,
+      id: l.id!, tipo: l.type!, pagina: l.page!, caixa: l.block, digital: l.fingerprint,
+      texto: l.text, foto: l.snapshot, autor: l.author!, quando: l.happened_at!,
+      dados: l.data ? JSON.parse(l.data) : null,
     }));
   }
 

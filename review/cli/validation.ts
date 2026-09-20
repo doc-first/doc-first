@@ -274,33 +274,33 @@ export async function seEuMexer(raiz: string, id: string) {
  * "todos os diagramas do projeto", "toda decisão sem dono", "o que quebra se eu mexer aqui".
  */
 export async function indexar(raiz: string, caminhoDoBanco?: string) {
-  const { Indice } = await import('../api/index-store.ts');
-  const banco = caminhoDoBanco ?? process.env.REVISAO_SQLITE ?? join(raiz, 'dados', 'eventos.db');
+  const { Index } = await import('../api/index-store.ts');
+  const banco = caminhoDoBanco ?? process.env.REVISAO_SQLITE ?? join(raiz, 'dados', 'events.db');
   const trechos = await lerTrechos(raiz);
 
-  const idx = new Indice(banco);
+  const idx = new Index(banco);
   try {
-    const quantos = idx.reindexar([...trechos.values()].map((t) => ({
-      id: t.id, pagina: t.pagina, tipo: t.tipo, arquivo: t.arquivo, cod: t.cod || null,
-      numerado: t.numerado, digital: t.digital, texto: t.texto.slice(0, 400),
-      depende: t.depende, falta: t.falta,
+    const quantos = idx.rebuild([...trechos.values()].map((t) => ({
+      id: t.id, page: t.pagina, kind: t.tipo, file: t.arquivo, code: t.cod || null,
+      numbered: t.numerado, fingerprint: t.digital, text: t.texto.slice(0, 400),
+      dependsOn: t.depende, missing: t.falta,
     })));
 
     console.log(`\nIndexados ${quantos} trecho(s) em ${banco}\n`);
-    for (const { tipo, quantos: n } of idx.porTipo()) {
-      console.log(`  ${String(n).padStart(4)}  ${tipo}`);
+    for (const { kind, count } of idx.byKind()) {
+      console.log(`  ${String(count).padStart(4)}  ${kind}`);
     }
 
-    const quebradas = idx.dependenciasQuebradas();
+    const quebradas = idx.brokenDependencies();
     if (quebradas.length) {
       console.log(`\n✗ ${quebradas.length} dependência(s) apontam para trecho que não existe:`);
-      for (const q of quebradas) console.log(`    ${q.trecho} → ${q.depende}`);
+      for (const q of quebradas) console.log(`    ${q.block} → ${q.dependsOn}`);
     }
 
-    const faltas = idx.pendencias();
+    const faltas = idx.issues();
     if (faltas.length) {
       console.log(`\n⚠ ${faltas.length} pendência(s) de tipo:\n`);
-      for (const f of faltas.slice(0, 20)) console.log(`  ${f.id.padEnd(14)} ${f.falta}`);
+      for (const f of faltas.slice(0, 20)) console.log(`  ${f.id.padEnd(14)} ${f.missing}`);
       if (faltas.length > 20) console.log(`  … e mais ${faltas.length - 20}`);
     } else {
       console.log('\n✓ nenhuma pendência de tipo.');
@@ -308,7 +308,7 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
     console.log('');
     return { quantos, faltas: faltas.length, quebradas: quebradas.length };
   } finally {
-    idx.fechar();
+    idx.close();
   }
 }
 

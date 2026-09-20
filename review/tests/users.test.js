@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { rmSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { Pessoas } from '../api/users.ts';
 import { IdentidadeSenha } from '../api/identity-password.ts';
 import { RegistroSqlite } from '../api/store-sqlite.ts';
@@ -86,9 +87,9 @@ test('o banco RECUSA alterar e apagar evento', async () => {
     // Abre por fora, como faria quem tem acesso ao disco.
     const { DatabaseSync } = await import('node:sqlite');
     const db = new DatabaseSync(caminho);
-    assert.throws(() => db.exec('DELETE FROM eventos'), /rastro/, 'apagar tem de ser recusado');
-    assert.throws(() => db.exec("UPDATE eventos SET autor='outro@x'"), /rastro/, 'alterar tem de ser recusado');
-    assert.equal(db.prepare('SELECT COUNT(*) c FROM eventos').get().c, 1);
+    assert.throws(() => db.exec('DELETE FROM events'), /trail/, 'apagar tem de ser recusado');
+    assert.throws(() => db.exec("UPDATE events SET author='outro@x'"), /trail/, 'alterar tem de ser recusado');
+    assert.equal(db.prepare('SELECT COUNT(*) c FROM events').get().c, 1);
     db.close();
   } finally {
     for (const s of ['', '-wal', '-shm']) rmSync(caminho + s, { force: true });
@@ -103,4 +104,53 @@ test('o registro em sqlite guarda e devolve o evento inteiro', async () => {
   assert.deepEqual({ ...lido }, { ...e }, 'o que sai tem de ser o que entrou');
   assert.deepEqual(lido.dados, { categoria: 'termo' }, 'dados voltam como objeto, não como texto');
   assert.equal((await r.listar('A02')).length, 0, 'o filtro por página funciona');
+});
+
+/**
+ * A migration you only get to run wrong once.
+ *
+ * Renaming the table that holds human approvals is not a rename — it is a move of the one thing in
+ * this project that cannot be recreated. This test builds a database in the OLD shape, opens it
+ * with today's code, and checks the events survived.
+ */
+test('a database written in Portuguese still opens, and nothing is lost', async () => {
+  const caminho = `/tmp/teste-migracao-${process.pid}.db`;
+  rmSync(caminho, { force: true });
+  try {
+    // o banco como era antes de 2026-09-20
+    const velho = new DatabaseSync(caminho);
+    velho.exec(`
+      CREATE TABLE eventos (
+        id TEXT PRIMARY KEY, tipo TEXT NOT NULL, pagina TEXT NOT NULL, caixa TEXT,
+        digital TEXT, texto TEXT, foto TEXT, autor TEXT NOT NULL, quando TEXT NOT NULL, dados TEXT);
+      INSERT INTO eventos VALUES
+        ('e1','aprovacao','D01','D01.1.1','abc123','aprovado','o texto de então',
+         'dono@exemplo.org','2026-09-16T10:00:00Z','{"origem":"site"}');
+    `);
+    velho.close();
+
+    // hoje
+    const r = new RegistroSqlite(caminho);
+    const eventos = await r.listar();
+    assert.equal(eventos.length, 1, 'a aprovação tem de sobreviver à migração');
+    const e = eventos[0];
+    assert.equal(e.id, 'e1');
+    assert.equal(e.tipo, 'aprovacao');
+    assert.equal(e.caixa, 'D01.1.1');
+    assert.equal(e.digital, 'abc123', 'a digital é o que faz a aprovação valer — não pode se perder');
+    assert.equal(e.autor, 'dono@exemplo.org');
+    assert.equal(e.quando, '2026-09-16T10:00:00Z');
+    assert.deepEqual(e.dados, { origem: 'site' });
+    r.fechar();
+
+    // e a tabela antiga continua lá: copiar, nunca mover
+    const db = new DatabaseSync(caminho);
+    assert.equal(db.prepare('SELECT COUNT(*) c FROM eventos').get().c, 1,
+      'a tabela antiga fica no arquivo, para conferência');
+    db.close();
+  } finally {
+    rmSync(caminho, { force: true });
+    rmSync(`${caminho}-wal`, { force: true });
+    rmSync(`${caminho}-shm`, { force: true });
+  }
 });

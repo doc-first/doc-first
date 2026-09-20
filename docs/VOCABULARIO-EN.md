@@ -1,9 +1,16 @@
 # Vocabulário: como cada conceito se chama em inglês
 
-**Decisão de desenho, `2026-09-19`:** o código do Doc First é em **inglês** — nomes de variável, classe,
-função, arquivo e chave de dado. O **conteúdo** continua em pt-BR: as telas da documentação, os
-rótulos do painel de revisão e as mensagens que o revisor lê, porque quem revisa é brasileiro.
-Os **comentários** ficam em pt-BR nesta passada e serão traduzidos depois, em separado.
+**Decisão do Ale, `2026-09-20`, que substitui a de 19/09:** **nada em português no código.**
+Identificador, comentário, nome de arquivo, nome de tabela, nome de coluna, chave de dado — tudo
+em inglês.
+
+A regra anterior dizia que os comentários ficariam em pt-BR "nesta passada". Ela caiu: o
+repositório é público e MIT, e comentário é a parte do código que alguém de fora mais lê para
+decidir se adota. Comentário que essa pessoa não entende vale menos que nenhum.
+
+O **conteúdo** segue outra regra: as páginas de documentação de cada projeto são escritas no idioma
+de quem as revisa. As mensagens da ferramenta ficam pendentes da escolha de idioma (i18n) —
+traduzi-las antes disso deixaria quem revisa em português sem português.
 
 Este arquivo existe para o mesmo conceito não virar dois nomes em dois arquivos. **Antes de inventar
 um nome novo, procure aqui.** Se faltar, acrescente na mesma linha em que escrever o código.
@@ -96,6 +103,27 @@ compatibilidade** para os eventos gravados antes de `2026-09-19` (ver `review/co
 | `autor` | `author` |
 | `quando` | `when` |
 | `dados` | `data` |
+
+## O banco
+
+| pt-BR | inglês |
+|---|---|
+| tabela `eventos` | `events` |
+| tabela `trechos` | `blocks` |
+| tabela `dependencias` | `dependencies` |
+| tabela `pendencias` | `issues` |
+| coluna `tipo` | `type` |
+| coluna `pagina` | `page` |
+| coluna `caixa` | `block` |
+| coluna `digital` | `fingerprint` |
+| coluna `texto` | `text` |
+| coluna `foto` | `snapshot` |
+| coluna `autor` | `author` |
+| coluna `quando` | `when` |
+| coluna `dados` | `data` |
+
+⚠️ Renomear tabela e coluna **quebra dado gravado**. Toda mudança aqui precisa de migração que leia
+o formato velho — o mesmo princípio de `review/core/legacy.js`: o histórico não se reescreve.
 
 ## O que NÃO muda
 
