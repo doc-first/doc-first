@@ -24,6 +24,76 @@ function Selo({ situacao, validadoEm }) {
   return null;
 }
 
+const ROTULO = {
+  aberto: 'Aguardando triagem', aprovado: 'Aprovado', recusado: 'Recusado',
+  pergunta: 'Pergunta para quem pediu', analise: 'Em aplicação',
+  aguardando: 'Em aplicação · dúvida', aplicado: 'Aplicado',
+};
+
+/**
+ * A triagem do dono: decidir o destino de um pedido que alguém fez.
+ *
+ * Os botões vêm de `situacao.triagem`, que o SERVIDOR calcula — não uma lista escrita aqui. É o que
+ * impede o front e o servidor de discordarem: num pedido já aprovado a triagem vem vazia, e o
+ * botão "Aprovar" simplesmente não existe, em vez de existir e falhar no clique.
+ */
+function Triagem({ pedido, aoDecidir }) {
+  const [destino, setDestino] = useState(null);
+  const [motivo, setMotivo] = useState('');
+  const [indo, setIndo] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const s = pedido.situacao ?? {};
+  const destinos = s.triagem ?? [];
+  if (!destinos.length) return null;
+
+  const precisaMotivo = destino && (s.exigeMotivo ?? []).includes(destino);
+
+  async function decidir() {
+    if (precisaMotivo && !motivo.trim()) { setErro('diga o motivo ou a pergunta'); return; }
+    setIndo(true); setErro('');
+    try {
+      await aoDecidir({
+        tipo: 'pedido_estado', pagina: pedido.pagina, caixa: pedido.caixa,
+        texto: motivo.trim() || null,
+        dados: { pedido: pedido.id, estado: destino },
+      });
+      setDestino(null); setMotivo('');
+    } catch (e) {
+      setErro(String(e.message ?? e));
+    } finally {
+      setIndo(false);
+    }
+  }
+
+  return (
+    <div className="rv-triagem">
+      <p className="rv-estado">
+        Pedido de {pedido.autor}: <b>{ROTULO[s.estado] ?? s.estado}</b>
+      </p>
+      {destinos.map((d) => (
+        <button key={d} type="button" data-t={d}
+                className={destino === d ? 'rv-ativa' : ''}
+                onClick={() => setDestino(destino === d ? null : d)}>
+          {ROTULO[d] ?? d}
+        </button>
+      ))}
+      {destino ? (
+        <div className="rv-form">
+          {precisaMotivo ? (
+            <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
+                      placeholder={destino === 'pergunta' ? 'O que você quer perguntar?' : 'Por que está recusando?'} />
+          ) : null}
+          <button type="button" className="rv-enviar" onClick={decidir} disabled={indo}>
+            {indo ? 'registrando…' : `Confirmar: ${ROTULO[destino] ?? destino}`}
+          </button>
+        </div>
+      ) : null}
+      {erro ? <p className="rv-aviso">{erro}</p> : null}
+    </div>
+  );
+}
+
 function Historico({ eventos, eu }) {
   if (!eventos.length) return null;
   return (
@@ -126,6 +196,11 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
       ) : null}
 
       {erro ? <p className="rv-aviso">{erro}</p> : null}
+
+      {/* A triagem só aparece para quem pode triar, e só nos pedidos que ainda têm destino. */}
+      {podeAprovar
+        ? situacao.pedidos.map((p) => <Triagem key={p.id} pedido={p} aoDecidir={aoRegistrar} />)
+        : null}
 
       <Historico eventos={situacao.eventos} eu={eu} />
     </dialog>

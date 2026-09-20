@@ -82,9 +82,9 @@ A separação de poderes é testada: **o agente aplica, mas não aprova.** Triag
 
 Honestidade sobre o estado, em `2026-09-20`:
 
-- **O menu lateral e a fila de triagem não vieram ainda.** O `shell.js` do projeto de origem traz o
-  nome do produto e as rotas dele escritos no código. A triagem funciona dentro do painel, em cada
-  trecho; a fila consolidada volta quando o menu virar configuração.
+- **O menu lateral e a fila de triagem consolidada não vieram ainda.** O `shell.js` do projeto de
+  origem traz o nome do produto e as rotas dele escritos no código. A triagem em si funciona, no
+  painel, trecho a trecho — o que falta é a visão de "todos os pedidos abertos do projeto".
 - **Os geradores ainda são Python** e ficaram no projeto de origem: numerar trechos, gerar índice,
   gerar PDF. A numeração (`marcar_ids.py`) é a que mais falta aqui.
 - **A ajuda de IA está desenhada, não construída.** O `.env.example` já reserva o lugar da chave.

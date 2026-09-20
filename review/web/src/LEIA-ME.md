@@ -27,8 +27,20 @@ janela, num `<div>` no fim do `<body>`.
 e a digital é o que decide se uma aprovação humana ainda vale. Esquecer isso derruba todas as
 aprovações da página de uma vez, sem erro nenhum.
 
+## A triagem, e por que os botões não estão escritos aqui
+
+Quem pode triar vê, em cada pedido, os destinos possíveis — e essa lista vem de `situacao.triagem`,
+calculada pelo **servidor**. Não há lista de estados escrita no front.
+
+É o que impede front e servidor de discordarem: num pedido já aprovado a triagem vem vazia, e o
+botão "Aprovar" simplesmente não existe, em vez de existir e falhar no clique. E um pedido do
+próprio dono nasce aprovado — ele não tria a si mesmo —, então a triagem não aparece.
+
+Recusar e perguntar exigem motivo, e o painel barra antes de chamar a API.
+
 ## O que ainda não faz
 
-Comparado ao painel clássico (`review/web/review.js`), falta a triagem do dono — aprovar, recusar
-e perguntar sobre um pedido existente, com os botões vindo de `situacao.triagem`. Os dois convivem
-hoje: `ola-mundo` usa o clássico, `gabarito` usa o React.
+O menu lateral e a fila de triagem consolidada. Hoje a triagem acontece dentro do painel, trecho a
+trecho, o que basta para revisar; falta a visão de "todos os pedidos abertos do projeto".
+
+Os dois painéis convivem: `ola-mundo` usa o clássico (`review.js`), `gabarito` usa o React.
