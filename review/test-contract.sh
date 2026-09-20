@@ -50,7 +50,11 @@ GRANDE=$(node -e "console.log('x'.repeat(500))")
 espera "caixa gigante → 400"           400 "$(post $DONO "{\"tipo\":\"aprovacao\",\"pagina\":\"D01\",\"caixa\":\"$GRANDE\",\"digital\":\"a\"}")"
 espera "página inválida → 400"         400 "$(post $DONO '{"tipo":"comentario","pagina":"../etc","texto":"oi"}')"
 espera "UC-01 é página válida → 201"   201 "$(post $DONO '{"tipo":"comentario","pagina":"UC-01","texto":"oi"}')"
-espera "erro diz QUAL campo"           0 "$(corpo $DONO "{\"tipo\":\"comentario\",\"pagina\":\"D01\",\"texto\":\"oi\",\"foto\":\"$(node -e "console.log('y'.repeat(20001))")\"}" | grep -qi foto; echo $?)"
+# O erro tem de dizer QUAL campo estourou, não só "campo grande demais": com sete limites, uma
+# mensagem genérica obriga quem chamou a adivinhar. Procura `snapshot`, a palavra do motor.
+# ⚠️ O contrato ainda recebe o campo como `foto` (pt-BR) e o erro já responde `snapshot` (inglês) —
+# quem chama vê um nome que não mandou. Fecha no passo 5, quando o contrato virar inglês.
+espera "erro diz QUAL campo"           0 "$(corpo $DONO "{\"tipo\":\"comentario\",\"pagina\":\"D01\",\"texto\":\"oi\",\"foto\":\"$(node -e "console.log('y'.repeat(20001))")\"}" | grep -qi snapshot; echo $?)"
 
 echo "ciclo do pedido:"
 P=$(novo $KAM '{"tipo":"pedido","pagina":"D02","caixa":"D02.1.1","digital":"x","texto":"trocar termo","foto":"texto de então"}')

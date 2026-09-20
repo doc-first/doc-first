@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, extname, normalize, sep } from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createCycle } from '../core/cycle.js';
 import { doHistorico, paraOContrato, estadoAtual, estadoEmPortugues } from '../core/legacy.js';
 import { readConfig } from '../core/config.js';
@@ -31,9 +31,15 @@ const doProjeto = readConfig(raizDoProjeto, { readFile: (p: string) => readFileS
 // The sentences the reviewer reads. The core returns keys; here they become words, in the language
 // of whoever is reading. Logs and boot errors do NOT come through here, on purpose — a log is
 // evidence, and evidence that changes wording by locale cannot be grepped.
+//
+// ⚠️ Discovered, not listed. A hard-coded list made the README lie — it promises that adding a
+// language is copying one file into review/locales/, when it was copying a file AND editing this
+// line. It also killed the server the day pt-BR.json moved out to examples/, and not one of the 61
+// unit tests noticed, because none of them boot the server. Reading the folder fixes both.
+const pastaDeIdiomas = new URL('../locales/', import.meta.url);
 const dicionarios = Object.fromEntries(
-  ['en', 'pt-BR'].map((lang) => [lang,
-    JSON.parse(readFileSync(new URL(`../locales/${lang}.json`, import.meta.url), 'utf8'))]));
+  readdirSync(pastaDeIdiomas).filter((f) => f.endsWith('.json')).map((f) =>
+    [f.slice(0, -5), JSON.parse(readFileSync(new URL(f, pastaDeIdiomas), 'utf8'))]));
 const i18n = createI18n(dicionarios, 'en');
 const idioma = (req: IncomingMessage) =>
   i18n.choose({ acceptLanguage: req.headers['accept-language'] as string, project: doProjeto.idioma });
