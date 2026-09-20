@@ -93,7 +93,7 @@ test('digital: espaços não contam, 16 caracteres, texto diferente muda', async
 });
 
 test('digital: compatível com o que já está validado', () => {
-  // Os 17 trechos aprovados pelo Ale foram conferidos contra o Python em 2026-09-19: 17 de 17.
+  // Os trechos aprovados no primeiro projeto foram conferidos contra o parser anterior em 2026-09-19: 17 de 17.
   // Este teste guarda o contrato: se alguém mudar a definição da digital, toda aprovação existente cai.
   assert.equal(SIZE, 16, 'mudar o tamanho invalida as aprovações gravadas');
 });
@@ -135,13 +135,13 @@ test('a ponte do navegador entrega ao front os nomes que ele chama', async () =>
   Object.assign(globalThis, { window: janela, document: doc, CustomEvent: class { constructor() {} } });
   try {
     await import('../web/core-web.js');
-    const nucleo = janela.ARAUTOS?.nucleo ?? {};
+    const nucleo = janela.DOC_FIRST?.nucleo ?? {};
     // Os nomes que front/js/review.js chama hoje. Mudou aqui? Mude lá — ou o botão some.
     for (const nome of ['digitalDoElemento', 'digitalDoTexto', 'textoDoElemento', 'normalizar']) {
       assert.equal(typeof nucleo[nome], 'function', `A.nucleo.${nome} precisa existir`);
     }
     assert.equal(nucleo.TAMANHO, 16);
-    assert.equal(typeof janela.ARAUTOS.digital, 'function');
+    assert.equal(typeof janela.DOC_FIRST.digital, 'function');
     assert.equal(await nucleo.digitalDoTexto('  a   b '), await nucleo.digitalDoTexto('a b'),
       'a ponte precisa usar a MESMA digital do núcleo, não uma cópia');
   } finally {

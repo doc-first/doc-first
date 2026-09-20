@@ -1,7 +1,7 @@
 /* O painel de revisão do Doc First — o CSS que o motor precisa.
  *
- * Saiu de front/css/doc.css do Arautos (linhas 319-468), onde vivia junto com a tipografia do
- * documento. Eram dois arquivos num: 318 linhas de conteúdo e 150 de motor.
+ * Saiu de dentro do CSS do documento do projeto de origem, onde vivia junto com a tipografia da
+ * folha. Eram dois arquivos num: as linhas do conteúdo e as do motor, no mesmo lugar.
  *
  * Um projeto que adote o Doc First carrega ESTE arquivo e escreve o seu próprio CSS de documento.
  * As classes aqui são as que review/web/review.js cria — mudar um nome aqui quebra o painel.
@@ -9,8 +9,8 @@
 
 /* ------------------------------------------------ revisão Doc First (review/web/review.js)
    Só ativa com a API (body.rv-ativa). O número da quina vira botão; nada novo aparece na página. */
-/* Genérico de propósito: era uma lista das sete classes de caixa do Arautos, e num projeto com
-   outros nomes o selo estático ficava por baixo do botão real. */
+/* Genérico de propósito: era uma lista fixa de sete classes de caixa, e num projeto com outros
+   nomes o selo estático ficava por baixo do botão real. */
 body.rv-ativa main [data-cod]::after { content: none !important; }
 /* #5F6E7C, não #8795A3: o selo tem ~9,6px e o antigo dava 3,06:1 sobre branco, abaixo dos 4,5:1 da
    WCAG 1.4.3 — e este é o elemento que o revisor clica em cada trecho. O novo dá 5,24:1 sobre branco
@@ -19,7 +19,7 @@ body.rv-ativa main [data-cod]::after { content: none !important; }
   font: 500 .6rem/1 ui-monospace, Menlo, monospace; letter-spacing: .02em; color: #5F6E7C;
   background: #FFF; border: 1px solid var(--borda); border-radius: 6px; padding: .28rem .45rem; min-height: 22px;
   display: inline-flex; align-items: center; gap: .3rem; }
-/* Área de toque de 44px no celular, sem engordar o selo. O Ale valida pelo telefone, e o selo tem
+/* Área de toque de 44px no celular, sem engordar o selo. quem valida costuma validar pelo telefone, e o selo tem
    28px de altura — abaixo dos 44 que a WCAG 2.5.5 e o guia da Apple pedem, e ele é justamente o que
    se precisa acertar para abrir cada trecho. O ::after invisível estende só a área sensível; medido
    162px de folga entre selos vizinhos, então não há risco de um roubar o toque do outro.
@@ -94,10 +94,10 @@ body.rv-ativa main [data-cod]::after { content: none !important; }
 .rv-estado--aprovado, .rv-estado--analise, .rv-estado--aguardando { background: #EEF6FC; color: #0A6FA6; }
 .rv-estado--pergunta { background: #FDF2E3; color: #8A5A12; }
 
-/* O menu lateral (.sh-*) e a fila de triagem NÃO vieram nesta fase: o shell.js do Arautos traz o
-   nome do produto, os grupos D/T/C e dois PDFs escritos no código. Levar isso seria levar o
-   Arautos junto. Entram quando o menu virar configuração — Fase 8 do plano de separação.
-   A triagem continua funcionando: ela acontece dentro do painel, em cada trecho. */
+/* O menu lateral (.sh-*) e a fila de triagem consolidada ainda não vieram: o shell do projeto de
+   origem trazia o nome do produto, os grupos de páginas e dois PDFs escritos no código. Levar
+   isso seria levar um projeto inteiro junto. Entram quando o menu virar configuração.
+   A triagem funciona: ela acontece dentro do painel, em cada trecho. */
 
 /* .rv-alerta existia no JavaScript (review.js cria o aviso "não deu para carregar o estado") e em
    CSS nenhum. O aviso nascia sem estilo desde sempre. */

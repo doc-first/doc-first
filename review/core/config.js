@@ -42,8 +42,8 @@ export function readConfig(root, io, env = {}) {
 
     // ONDE O CONTEÚDO MORA. Era isto que o motor sabia de cor, e que o prendia a um projeto só:
     // `front/telas` estava escrito dentro de pages.ts, e `docs/validacoes.json` dentro de
-    // validation.ts. Quem adotasse o método teria de nomear as pastas como o Arautos as nomeia.
-    // Os padrões são os do Arautos, para nada quebrar enquanto os dois ainda moram juntos.
+    // validation.ts. Quem adotasse o método teria de nomear as pastas como o primeiro projeto.
+    // Os padrões são os do primeiro projeto que usou o método — servem de exemplo de forma.
     sheetFolders: content.pastas ?? ['front/telas', 'front/ds/catalogo'],
     registry: content.registro ?? 'docs/validacoes.json',
     home: content.inicio ?? '/front/index.html',

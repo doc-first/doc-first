@@ -1,6 +1,6 @@
 # Vocabulário: como cada conceito se chama em inglês
 
-**Decisão do Ale, `2026-09-19`:** o código do Doc First é em **inglês** — nomes de variável, classe,
+**Decisão de desenho, `2026-09-19`:** o código do Doc First é em **inglês** — nomes de variável, classe,
 função, arquivo e chave de dado. O **conteúdo** continua em pt-BR: as telas da documentação, os
 rótulos do painel de revisão e as mensagens que o revisor lê, porque quem revisa é brasileiro.
 Os **comentários** ficam em pt-BR nesta passada e serão traduzidos depois, em separado.

@@ -3,7 +3,7 @@
  *
  * O código passou a ser inteiro em inglês (docs/VOCABULARIO-EN.md), e isso inclui os valores que
  * viajam gravados: o tipo do evento, o estado do pedido, os campos. Mas **o histórico não se
- * reescreve** — foi decisão do Ale, e é a decisão certa: o registro é append-only por construção
+ * reescreve** — foi decisão de desenho, e é a certa: o registro é append-only por construção
  * (o SQLite recusa UPDATE e DELETE por trigger), e uma aprovação humana com data é prova, não dado.
  *
  * Então a tradução acontece **na leitura**, aqui, numa direção só. O núcleo nunca vê pt-BR.

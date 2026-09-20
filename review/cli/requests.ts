@@ -23,21 +23,21 @@ export function carregarCiclo(raiz: string) {
 }
 
 /**
- * O rótulo que o Ale lê. Mora aqui, e não no núcleo: desde 2026-09-19 a regra não carrega texto de
+ * O rótulo que a pessoa lê. Mora aqui, e não no núcleo: desde 2026-09-19 a regra não carrega texto de
  * interface — ela devolve a chave, e cada borda resolve no idioma de quem está lendo.
  */
 const rotuloDe = (ciclo: ReturnType<typeof createCycle>, estado: string) =>
   ciclo.table.states[estado]?.label ?? estado;
 
 export function papeisDoAmbiente() {
-  return createRoles(process.env.REVISAO_OWNER ?? process.env.ARAUTOS_DONO, process.env.REVISAO_ADMINS);
+  return createRoles(process.env.REVISAO_OWNER, process.env.REVISAO_ADMINS);
 }
 
 /** Reduz os eventos a pedidos com estado — usando o MESMO núcleo que o servidor e o navegador. */
 export function pedidos(raiz: string, eventos: Evento[]): Pedido[] {
   const ciclo = carregarCiclo(raiz);
   const papeis = papeisDoAmbiente();
-  // O núcleo fala inglês, e `Pedido.estado` também — quem traduz para o que o Ale lê é a impressão,
+  // O núcleo fala inglês, e `Pedido.estado` também — quem traduz para o que a pessoa lê é a impressão,
   // logo abaixo. Ver review/core/legacy.js.
   const paraONucleo = eventos.map(doHistorico);
   return eventos.filter((e) => e.tipo === 'pedido').map((p) => ({
@@ -171,7 +171,7 @@ export async function estado(raiz: string, fonte: Fonte, prefixo: string, novo: 
   const eventos = await fonte.eventos();
   const p = achar(pedidos(raiz, eventos), prefixo);
 
-  // O Ale digita o estado na linha de comando, e ele aprendeu a digitar `analise`. O nome antigo
+  // A pessoa digita o estado na linha de comando, e aprendeu a digitar `analise`. O nome antigo
   // continua valendo — quem migra a língua do código não faz o usuário remigrar o dedo.
   const alvo = estadoAtual(novo);
   if (!ciclo.agentStates.includes(alvo)) {

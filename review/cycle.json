@@ -15,7 +15,7 @@
   ],
   "initial": "open",
   "initial_for_admin": "approved",
-  "_initial_for_admin": "Owner e admin não triam a si mesmos (decisão do Ale, 2026-09-17).",
+  "_initial_for_admin": "Owner e admin não triam a si mesmos (decisão de desenho, 2026-09-17).",
 
   "states": {
     "open":     { "label": "Aguardando triagem",          "short": "Para triar",       "owned_by": "owner" },

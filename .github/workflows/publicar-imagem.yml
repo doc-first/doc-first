@@ -5,8 +5,8 @@
 # Quando estabilizar, acrescente `push: tags: ['v*']` aqui e publique por tag de versão.
 #
 # Depois da primeira publicação, o pacote nasce PRIVADO. Para que outro repositório consiga
-# `docker pull` sem credencial — o caso do CI do Arautos —, torne o pacote público em:
-#   github.com/users/Garbiati/packages/container/doc-first/settings
+# `docker pull` sem credencial — o caso do CI de quem consome a imagem —, torne o pacote público em:
+#   github.com/orgs/doc-first/packages/container/doc-first/settings
 name: Publicar imagem
 
 on:
@@ -65,7 +65,7 @@ jobs:
           docker build -t ghcr.io/${{ steps.dono.outputs.nome }}/doc-first:${{ inputs.versao }} \
                        -t ghcr.io/${{ steps.dono.outputs.nome }}/doc-first:latest .
 
-      # A imagem sobe e serve? É a mesma prova que o ensaio do Arautos faz, e pelo mesmo motivo:
+      # A imagem sobe e serve? É a mesma prova que o ensaio de publicação faz, e pelo mesmo motivo:
       # "o build passou" nunca foi "o serviço funciona".
       - name: A imagem sobe e responde?
         run: |

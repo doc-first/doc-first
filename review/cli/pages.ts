@@ -8,7 +8,7 @@ import { fingerprintOfText } from '../core/fingerprint.js';
  * Leitura das folhas do repositório: quais trechos existem, o texto de cada um e a digital.
  *
  * ⚠️ O texto tem de sair EXATAMENTE como o navegador o vê, senão a digital diverge e toda aprovação
- * cai em silêncio. O `linkedom` foi conferido contra os 17 trechos já validados pelo Ale (calculados
+ * cai em silêncio. O `linkedom` foi conferido contra os trechos já validados no primeiro projeto (calculados
  * antes com lxml e com o DOM real): 17 de 17 batem. Trocar de parser exige refazer essa conferência.
  */
 
@@ -17,7 +17,7 @@ export interface Trecho {
   texto: string; digital: string; validado: string | null;
   /** Título e subtítulo de seção não mostram número, mas TÊM trava: entram no registro e precisam
    *  ser conferidos. Filtrá-los aqui fazia o `conferir` dizer "elemento sumiu" para os três que o
-   *  Ale já validou. */
+   *  o dono já validou. */
   numerado: boolean;
 }
 
@@ -28,7 +28,7 @@ function doProjeto(raiz: string) {
 
 /**
  * As pastas de folhas vêm do `doc-first.json` (`conteudo.pastas`), não do código.
- * Estavam escritas aqui, e era o acoplamento mais duro que existia entre o motor e o Arautos: quem
+ * Estavam escritas aqui, e era o acoplamento mais duro entre o motor e o projeto de origem: quem
  * adotasse o método teria de nomear as pastas exatamente como este projeto as nomeia.
  */
 export function pastasDeFolhas(raiz: string): string[] {

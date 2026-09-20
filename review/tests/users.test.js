@@ -81,7 +81,7 @@ test('o banco RECUSA alterar e apagar evento', async () => {
   const caminho = '/tmp/teste-eventos.db';
   try {
     const r = new RegistroSqlite(caminho);
-    await r.incluir({ tipo: 'aprovacao', pagina: 'D01', caixa: 'D01.1.1', digital: 'abc', texto: null, foto: null, dados: null }, 'ale@exemplo.org');
+    await r.incluir({ tipo: 'aprovacao', pagina: 'A01', caixa: 'A01.1.1', digital: 'abc', texto: null, foto: null, dados: null }, 'ale@exemplo.org');
     r.fechar();
     // Abre por fora, como faria quem tem acesso ao disco.
     const { DatabaseSync } = await import('node:sqlite');
@@ -97,10 +97,10 @@ test('o banco RECUSA alterar e apagar evento', async () => {
 
 test('o registro em sqlite guarda e devolve o evento inteiro', async () => {
   const r = new RegistroSqlite(':memory:');
-  const e = await r.incluir({ tipo: 'pedido', pagina: 'D01', caixa: 'D01.1.1', digital: 'x',
+  const e = await r.incluir({ tipo: 'pedido', pagina: 'A01', caixa: 'A01.1.1', digital: 'x',
     texto: 'trocar termo', foto: 'texto de então', dados: { categoria: 'termo' } }, 'revisora@exemplo.org');
-  const [lido] = await r.listar('D01');
+  const [lido] = await r.listar('A01');
   assert.deepEqual({ ...lido }, { ...e }, 'o que sai tem de ser o que entrou');
   assert.deepEqual(lido.dados, { categoria: 'termo' }, 'dados voltam como objeto, não como texto');
-  assert.equal((await r.listar('D02')).length, 0, 'o filtro por página funciona');
+  assert.equal((await r.listar('A02')).length, 0, 'o filtro por página funciona');
 });

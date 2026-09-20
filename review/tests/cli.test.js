@@ -1,9 +1,9 @@
 /**
  * Testes da ferramenta do agente — do MOTOR, contra `examples/ola-mundo`.
  *
- * Eles rodavam contra as folhas do Arautos, e por isso só passavam dentro deste projeto: um teste
- * que exige `D01.0.titulo` não é teste de motor, é teste de conteúdo. O que prova o conteúdo do
- * Arautos mudou para `content.test.js`, que se ausenta sozinho onde não há conteúdo.
+ * Eles rodavam contra as folhas do projeto de origem, e por isso só passavam lá dentro: um teste
+ * que exige um código de trecho específico não é teste de motor, é teste de conteúdo. A prova do
+ * conteúdo mora no projeto que tem conteúdo, e se ausenta onde não há.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

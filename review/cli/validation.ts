@@ -20,7 +20,7 @@ export interface Registro {
 
 /**
  * Onde o registro de aprovações mora. Vem do `doc-first.json` (`conteudo.registro`), não do código:
- * `docs/validacoes.json` era uma decisão do Arautos escrita dentro do motor.
+ * `docs/validacoes.json` era uma decisão do projeto de origem, escrita dentro do motor.
  */
 const caminhoRegistro = (raiz: string) =>
   join(raiz, ...readConfig(raiz, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env)
@@ -117,8 +117,8 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
 
 /** Traz para o repositório os ✓ que o dono deu no site. Só os dele: aprovação de revisor não trava. */
 export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: string } = {}) {
-  const dono = (opcoes.dono ?? process.env.ARAUTOS_DONO ?? process.env.REVISAO_OWNER ?? '').toLowerCase();
-  if (!dono) throw new Error('defina REVISAO_OWNER (ou ARAUTOS_DONO): é o ✓ dele que vira trava.');
+  const dono = (opcoes.dono ?? process.env.REVISAO_OWNER ?? '').toLowerCase();
+  if (!dono) throw new Error('defina REVISAO_OWNER: é o ✓ dele que vira trava.');
 
   // A nuvem fora do ar não pode derrubar a retomada. O registro no repositório é a fonte do que já
   // está validado; a nuvem só acrescenta o que veio do site. Sem ela, o placar local ainda vale —

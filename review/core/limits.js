@@ -33,7 +33,7 @@ const longerThan = (v, max) => String(v ?? '').length > max;
 export function overLimit(e, exemplos = '') {
   if (!PAGE_FORMAT.test(e.page ?? '')) {
     // Os exemplos vêm do projeto (`conteudo.exemplosDePagina`). Estavam fixos como "D01, T03a ou
-    // UC-01" — a taxonomia do Arautos, dentro de uma mensagem do motor.
+    // UC-01" — a taxonomia de um projeto, dentro de uma mensagem do motor.
     const como = exemplos ? ` como ${exemplos}` : '';
     return `página inválida: esperado um código curto${como}, veio "${short(e.page)}"`;
   }

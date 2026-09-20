@@ -14,7 +14,7 @@
   if (!pagina || location.protocol === 'file:') return;
 
   var eu = null, podeAprovar = false, eventos = [], caixas = [];   // capacidade, não papel
-  var C = window.ARAUTOS;                                    // esc, quando, porQuando, rótulos (js/common.js)
+  var C = window.DOC_FIRST;                                    // esc, quando, porQuando, rótulos (js/common.js)
   var CATEGORIAS = C.CATEGORIAS;
   var ESTADOS_PEDIDO = C.ESTADOS_PEDIDO;
   /* mesmo ciclo da API (CicloDoPedido) */
@@ -81,7 +81,7 @@
   dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
 
   function abrir(caixa, aba) {
-    try { localStorage.setItem('arautos:abriu', JSON.stringify({ id: caixa.id, cod: caixa.cod, pagina: pagina, quando: Date.now() })); }
+    try { localStorage.setItem('doc-first:abriu', JSON.stringify({ id: caixa.id, cod: caixa.cod, pagina: pagina, quando: Date.now() })); }
     catch { /* "continue de onde parou" é conveniência: sem localStorage, apenas não lembra */ }
     var s = estadoDa(caixa);
     var aprovEu = s.valendo.some(function (e) { return e.autor === eu; });
@@ -132,7 +132,7 @@
         '<button type="button" class="rv-fechar" aria-label="Fechar">✕</button></div>' +
       '<p class="rv-resumo">' + esc(caixa.resumo) + '</p>' +
       '<div class="rv-situacao">' +
-        (caixa.validadoRepo ? '<span class="rv-selo rv-selo--repo">✓ validado pelo Ale em ' + esc(caixa.validadoRepo.split('-').reverse().join('/')) + '</span>' : '') +
+        (caixa.validadoRepo ? '<span class="rv-selo rv-selo--repo">✓ validado pelo dono em ' + esc(caixa.validadoRepo.split('-').reverse().join('/')) + '</span>' : '') +
         (s.valendo.length ? '<span class="rv-selo rv-selo--ok">✓ aprovada por ' + s.valendo.map(function (e) { return esc(quem(e.autor)); }).join(', ') + '</span>' : '') +
         (s.abertos.length ? '<span class="rv-selo rv-selo--pedido">' + s.abertos.length + ' pedido' + (s.abertos.length > 1 ? 's' : '') + ' em andamento</span>' : '') +
         (!caixa.validadoRepo && !s.valendo.length && !s.abertos.length ? '<span class="rv-selo">ainda não revisada</span>' : '') +
@@ -234,7 +234,7 @@
   }
 
   /* ------------------------------------------------------------ início */
-  /* ORDEM IMPORTA (piscada relatada pelo Ale, 17/09). Este script roda na última linha do <body>,
+  /* ORDEM IMPORTA (piscada relatada em 17/09). Este script roda na última linha do <body>,
      ANTES do primeiro paint. Se a estrutura for montada aqui, de forma síncrona, a página nasce pronta.
      Antes era o contrário: esperava duas chamadas de API e uma digital POR CAIXA, e só então punha
      `rv-ativa` — o CSS já tinha pintado as 52 etiquetas ::after, que sumiam todas de uma vez enquanto

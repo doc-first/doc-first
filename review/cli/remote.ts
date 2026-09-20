@@ -50,7 +50,7 @@ export class Fonte {
 
   /**
    * Primeira conta do gcloud que realmente emite token.
-   * A conta era fixa no código, e quando a credencial dela expirou — com o Ale remoto, sem como
+   * A conta era fixa no código, e quando a credencial dela expirou — com o dono em acesso remoto, sem como
    * refazer o login — a ferramenta parou, embora OUTRA conta autenticada na mesma máquina tivesse
    * acesso ao projeto.
    */

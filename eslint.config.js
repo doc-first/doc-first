@@ -13,7 +13,7 @@ export default [
   js.configs.recommended,
 
   {
-    // A ponte é o único módulo do front: ela importa o núcleo e expõe em window.ARAUTOS.
+    // A ponte é o único módulo do front: ela importa o núcleo e expõe em window.DOC_FIRST.
     files: ['front/js/core-web.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'module',
       globals: { window: 'readonly', document: 'readonly', CustomEvent: 'readonly' } },

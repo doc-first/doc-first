@@ -1,4 +1,4 @@
-/* O que TODA página do Arautos precisa, num lugar só. Carregado antes dos outros scripts.
+/* O que TODA página revisável precisa, num lugar só. Carregado antes dos outros scripts.
 
    Por que existe (revisão de dívida, 2026-09-17): cinco arquivos independentes resolviam cada um por
    si os mesmos quatro problemas — escapar HTML, formatar data, ordenar evento e conhecer os rótulos
@@ -11,7 +11,7 @@
 (function () {
   'use strict';
 
-  var A = window.ARAUTOS = window.ARAUTOS || {};
+  var A = window.DOC_FIRST = window.DOC_FIRST || {};
 
   /* O núcleo compartilhado (review/core/) chega por módulo, em paralelo — ver js/core-web.js.
      A promessa nasce aqui para que quem carregue antes dele não perca o aviso. */

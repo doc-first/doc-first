@@ -1,6 +1,6 @@
 /**
  * Papéis do sistema. Da METODOLOGIA vêm só `owner` e a tag `founder`; `admin`, `gestor médico` e os
- * demais são papéis do PROJETO que adota o método (decisão do Ale, 2026-09-17).
+ * demais são papéis do PROJETO que adota o método (decisão de desenho, 2026-09-17).
  *
  *   owner   um só, sempre o mesmo: o arquiteto fundador. Pode tudo, inclusive criar as roles.
  *   admin   pode tudo o que o owner faz, menos ser owner.

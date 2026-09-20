@@ -10,7 +10,7 @@ letra e a aprovação deixa de valer, porque ninguém aprovou o texto novo.
 ## Em dois minutos
 
 ```bash
-git clone https://github.com/Garbiati/doc-first
+git clone https://github.com/doc-first/doc-first
 cd doc-first
 REVISAO_OWNER=voce@exemplo.org docker compose up
 ```

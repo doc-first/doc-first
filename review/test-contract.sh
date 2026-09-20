@@ -4,7 +4,7 @@
 set -uo pipefail
 RAIZ=$(cd "$(dirname "$0")" && pwd); cd "$RAIZ/.."
 PORTA=${PORTA:-18095}; B=http://127.0.0.1:$PORTA; FALHAS=0
-DONO=dono@exemplo.org; KAM=revisora@exemplo.org
+export DONO=dono@exemplo.org; export KAM=revisora@exemplo.org
 
 espera() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FALHA $1 — esperado $2, veio $3"; FALHAS=$((FALHAS+1)); fi; }
 
@@ -29,6 +29,7 @@ est()   { post "$1" "{\"tipo\":\"pedido_estado\",\"pagina\":\"D02\",\"texto\":\"
 # requisição sem cabeçalho passaria a ser identificada — que é o certo para abrir o navegador, mas
 # esconderia o teste de que sem identidade NENHUMA a resposta é 401.
 REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER=$DONO REVISAO_DEV_EMAIL= PORT=$PORTA \
+  REVISAO_SITE="$PWD/examples/ola-mundo" \
   node review/api/server.ts >/tmp/node-testes.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
@@ -67,25 +68,25 @@ espera "já nasce aprovado → 409"       409 "$(est $DONO $P2 aprovado 'redunda
 espera "o agente aplica direto → 201"  201 "$(est agente@teste $P2 analise 'vendo')"
 
 echo "situação calculada pelo servidor:"
-espera "pedido do owner: aprovado"     analise "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor.includes('garbiati'));console.log(e.situacao.estado)})")"
-espera "triagem vazia em aprovado"     0 "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor.includes('garbiati'));console.log(e.situacao.triagem.length)})")"
+espera "pedido do owner: aprovado"     analise "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.DONO);console.log(e.situacao.estado)})")"
+espera "triagem vazia em aprovado"     0 "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.DONO);console.log(e.situacao.triagem.length)})")"
 
 echo "contrato e site:"
 ID=$(novo $DONO '{"tipo":"comentario","pagina":"D01","texto":"achar por id"}')
 espera "GET /api/eventos/{id} → 200"   200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eventos/$ID)"
 espera "id inexistente → 404"          404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eventos/naoexiste)"
-espera "site estático serve"           200 "$(curl -s -o /dev/null -w '%{http_code}' $B/front/telas/D01-tenancy.html)"
+espera "site estático serve"           200 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
 espera "raiz redireciona"              302 "$(curl -s -o /dev/null -w '%{http_code}' $B/)"
 # O `new URL()` do Node já normaliza `../`, então esse vetor chega como /etc/passwd e dá 404 (não
 # vaza, mas por outro motivo). O que a guarda de prefixo realmente pega é o `..` CODIFICADO, que
 # sobrevive ao parse e só vira `..` no decodeURIComponent.
 espera "travessia codificada → 403"    403 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is "$B/%2e%2e%2f%2e%2e%2fetc/passwd")"
 espera "travessia crua não vaza"       404 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/front/../../../etc/passwd)"
-espera "fonte com cache imutável"      0 "$(curl -s -D- -o /dev/null $B/front/tema/fontes/rawline-400.woff | grep -qi immutable; echo $?)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
 echo "modo local NÃO liga fora de desenvolvimento:"
 REVISAO_MODO=local REVISAO_AMBIENTE=Production REVISAO_OWNER=$DONO REVISAO_AUDIENCIA=/projects/0/x PORT=$PORTA \
+  REVISAO_SITE="$PWD/examples/ola-mundo" \
   node review/api/server.ts >/tmp/node-prod.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 espera "X-Dev-Email ignorado → 401"    401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eu)"
@@ -99,6 +100,7 @@ echo "sobe sem nuvem nenhuma (usuário, senha e um arquivo):"
 DADOS=$(mktemp -d); LOGIN=/tmp/cookies-contrato.txt; rm -f $LOGIN
 REVISAO_AMBIENTE=Production REVISAO_OWNER=$DONO REVISAO_IDENTIDADE=senha REVISAO_BANCO=sqlite \
   REVISAO_PESSOAS=$DADOS/pessoas.db REVISAO_SQLITE=$DADOS/eventos.db PORT=$PORTA \
+  REVISAO_SITE="$PWD/examples/ola-mundo" \
   node review/api/server.ts >/tmp/node-senha.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
@@ -110,9 +112,9 @@ entra() { curl -s -c $LOGIN -o /dev/null -w '%{http_code}' -H 'Content-Type: app
 espera "sem sessão → 401"                401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/eu)"
 # Aqui não há IAP na borda: se o site estático não exigir sessão, a documentação inteira fica aberta
 # a quem alcançar a porta — e quem subiu a imagem acreditando ter configurado login nem desconfia.
-espera "a doc NÃO abre sem sessão"       302 "$(curl -s -o /dev/null -w '%{http_code}' $B/front/telas/D01-tenancy.html)"
-espera "e manda para a tela de entrada"  0 "$(curl -s -D- -o /dev/null $B/front/telas/D01-tenancy.html | grep -qi 'location: /entrar'; echo $?)"
-espera "guardando para onde ela ia"      0 "$(curl -s -D- -o /dev/null $B/front/telas/D01-tenancy.html | grep -q 'destino=%2Ffront%2Ftelas'; echo $?)"
+espera "a doc NÃO abre sem sessão"       302 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
+espera "e manda para a tela de entrada"  0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -qi 'location: /entrar'; echo $?)"
+espera "guardando para onde ela ia"      0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -q 'destino=%2Fpaginas%2FA01'; echo $?)"
 espera "a tela de entrada abre → 200"    200 "$(curl -s -o /dev/null -w '%{http_code}' $B/entrar)"
 espera "e ela não pede nada de fora"     1 "$(curl -s $B/entrar | grep -qE '<link|src=\"/front'; echo $?)"
 espera "X-Dev-Email não vale aqui → 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eu)"
@@ -121,7 +123,10 @@ espera "senha certa → 200"               200 "$(entra "$SENHA")"
 espera "e a sessão identifica o owner"   owner "$(curl -s -b $LOGIN $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
 espera "e o owner aprova de verdade"     201 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}' $B/api/eventos)"
 espera "a senha do primeiro acesso pede troca" true "$(curl -s -b $LOGIN $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).precisaTrocarSenha))")"
-espera "agora a doc abre → 200"          200 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/front/telas/D01-tenancy.html)"
+espera "agora a doc abre → 200"          200 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
+# O HTML NÃO pode ser cacheado: senão uma correção de texto não chega a quem já abriu a página —
+# e, pior, a digital que o navegador calcula passa a ser de um texto que já mudou no disco.
+espera "HTML não é cacheado"             0 "$(curl -s -b $LOGIN -D- -o /dev/null $B/paginas/A01.html | grep -qi 'cache-control: no-cache'; echo $?)"
 espera "e /entrar já não tem o que fazer" 302 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/entrar)"
 espera "sair → 200"                      200 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' -X POST $B/api/sair)"
 espera "e depois de sair → 401"          401 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/api/eu)"
