@@ -1,18 +1,20 @@
 /**
- * Papéis do sistema. Da METODOLOGIA vêm só `owner` e a tag `founder`; `admin`, `gestor médico` e os
- * demais são papéis do PROJETO que adota o método (decisão de desenho, 2026-09-17).
+ * System roles. The METHOD defines only `owner` and the `founder` tag; `admin`, `clinical lead`
+ * and everything else are roles of the PROJECT adopting the method (design decision, 2026-09-17).
  *
- *   owner   um só, sempre o mesmo: o arquiteto fundador. Pode tudo, inclusive criar as roles.
- *   admin   pode tudo o que o owner faz, menos ser owner.
- *   outro   qualquer outra identidade liberada.
+ *   owner   exactly one, always the same: the founding architect. Can do everything, including
+ *           creating the roles.
+ *   admin   can do everything the owner does, except be the owner.
+ *   other   any other allowed identity.
  *
- * O motor fala em CAPACIDADE — "pode aprovar?", "pode triar?" —, não em nome de papel de produto.
+ * The engine speaks in CAPABILITY — "can approve?", "can triage?" — never in the name of a role
+ * from somebody's product. Role names change with every company; capabilities do not.
  * @module
  */
 
 /**
- * @param {string|undefined|null} owner  UM e-mail. Zero ou mais de um é erro de configuração.
- * @param {string|undefined|null} admins e-mails separados por vírgula; pode ser vazio.
+ * @param {string|undefined|null} owner  ONE e-mail. Zero or more than one is a config error.
+ * @param {string|undefined|null} admins comma-separated e-mails; may be empty.
  */
 export function createRoles(owner, admins) {
   const split = (s) =>
@@ -21,11 +23,12 @@ export function createRoles(owner, admins) {
   const list = [...new Set(split(owner))];
   if (list.length !== 1) {
     throw new Error(
-      `REVISAO_OWNER precisa de exatamente um e-mail (veio ${list.length}). ` +
-      'O owner é único por definição: é o arquiteto fundador do projeto.');
+      `REVISAO_OWNER needs exactly one e-mail (got ${list.length}). ` +
+      'The owner is unique by definition: they are the founding architect of the project.');
   }
   const ownerEmail = list[0];
-  // O owner é admin por consequência, não por configuração: não há como tirar o poder dele por engano.
+  // The owner is an admin by consequence, not by configuration: there is no way to strip their
+  // power by accident.
   const everyone = new Set([...split(admins), ownerEmail]);
   const normalized = (e) => String(e ?? '').trim().toLowerCase();
 
@@ -33,7 +36,7 @@ export function createRoles(owner, admins) {
     owner: ownerEmail,
     admins: [...everyone],
     isOwner: (e) => normalized(e) === ownerEmail,
-    /** Owner também é admin. É isto que responde "pode aprovar?" e "pode triar?". */
+    /** The owner is an admin too. This is what answers "can approve?" and "can triage?". */
     isAdmin: (e) => everyone.has(normalized(e)),
     canApprove: (e) => everyone.has(normalized(e)),
     canTriage: (e) => everyone.has(normalized(e)),

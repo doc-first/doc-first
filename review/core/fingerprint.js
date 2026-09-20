@@ -1,25 +1,28 @@
 /**
- * A digital de um trecho: SHA-256 do texto visível, 16 caracteres.
+ * The fingerprint of a block: SHA-256 of the visible text, 16 characters.
  *
- * ESTA É A ÚNICA IMPLEMENTAÇÃO. Roda no navegador e no servidor, sem build.
+ * THIS IS THE ONLY IMPLEMENTATION. It runs in the browser and on the server, with no build step.
  *
- * Por que isso importa mais do que parece: a digital decide se uma aprovação humana ainda vale. Até
- * 2026-09-18 ela existia TRÊS vezes — em `front/js/review.js`, `front/validacao.py` e
- * `review/pedidos.py` — e as três só concordavam por acaso: a do Python não removia a UI da revisão,
- * e bastaria alguém salvar um marcador no HTML para que toda aprovação virasse "versão anterior do
- * texto", em silêncio, sem ninguém saber por quê.
+ * Why that matters more than it looks: the fingerprint decides whether a human approval still
+ * holds. Until 2026-09-18 it existed THREE times, in three languages, and the three only agreed by
+ * luck — one of them did not strip the review UI, so merely saving a marker into the HTML would
+ * have turned every approval into "an earlier version of the text", silently, with nobody able to
+ * say why.
  *
- * Uma regra dessas não se mantém igual em três lugares por disciplina. Mantém-se por ser uma só.
+ * A rule like this is not kept identical in three places by discipline. It is kept by being one.
  *
  * @module
  */
 
-/** Quantos caracteres do hash entram na digital. Curto o bastante para caber numa tela, longo o
- *  bastante para não colidir por acaso num documento de algumas centenas de trechos. */
+/** How many characters of the hash make up the fingerprint. Short enough to fit on screen, long
+ *  enough not to collide by accident across a few hundred blocks. */
 export const SIZE = 16;
 
 /**
- * Normaliza o texto do jeito que a digital espera: espaços colapsados, pontas aparadas.
+ * Normalises text the way the fingerprint expects: whitespace collapsed, ends trimmed.
+ *
+ * Reformatting a paragraph — rewrapping lines, indenting differently — must NOT invalidate a human
+ * approval. Only the words count.
  * @param {string} text
  * @returns {string}
  */
@@ -28,9 +31,9 @@ export function normalize(text) {
 }
 
 /**
- * Digital do texto já extraído.
- * @param {string} text  texto visível do trecho
- * @returns {Promise<string>} 16 caracteres hexadecimais
+ * Fingerprint of already-extracted text.
+ * @param {string} text  the visible text of the block
+ * @returns {Promise<string>} 16 hexadecimal characters
  */
 export async function fingerprintOfText(text) {
   const bytes = new TextEncoder().encode(normalize(text));
@@ -39,10 +42,11 @@ export async function fingerprintOfText(text) {
 }
 
 /**
- * Digital de um elemento do DOM. Só existe no navegador — o servidor usa `fingerprintOfText`.
+ * Fingerprint of a DOM element. Browser only — the server uses `fingerprintOfText`.
  *
- * A UI da revisão (botões, painel) é marcada com `data-revisao-ui` e NÃO entra na conta: ela é
- * desenhada por cima do documento e mudaria a digital de todo trecho a cada versão do site.
+ * The review UI (buttons, panel) is marked with `data-revisao-ui` and does NOT count: it is drawn
+ * on top of the document, and would change the fingerprint of every block on every release of the
+ * site.
  *
  * @param {Element} el
  * @returns {Promise<string>}
@@ -52,11 +56,11 @@ export async function fingerprintOfElement(el) {
 }
 
 /**
- * O texto visível de um elemento, do jeito que a digital o vê.
+ * The visible text of an element, exactly as the fingerprint sees it.
  *
- * Usado também para a "foto" — o texto do trecho no instante em que alguém aprovou ou pediu
- * alteração. A foto tem de ser o MESMO texto que a digital considerou, senão o histórico mostra uma
- * coisa e a digital fala de outra.
+ * Also used for the "snapshot" — the block's text at the instant someone approved it or asked for
+ * a change. The snapshot has to be the SAME text the fingerprint considered, otherwise the history
+ * shows one thing while the fingerprint talks about another.
  *
  * @param {Element} el
  * @returns {string}

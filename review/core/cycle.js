@@ -1,31 +1,32 @@
 /**
- * O ciclo do pedido: estados, transições e a redução de um histórico de eventos a um estado.
+ * The request cycle: states, transitions, and the reduction of an event history to one state.
  *
- * ESTA É A ÚNICA IMPLEMENTAÇÃO. Navegador e servidor importam este arquivo; a tabela vem do
- * `cycle.json` ao lado, que continua sendo o dado.
+ * THIS IS THE ONLY IMPLEMENTATION. Browser and server both import this file; the table comes from
+ * `cycle.json` next to it, which stays being the data.
  *
- * Histórico que justifica o arquivo: esta máquina de estados chegou a existir CINCO vezes — em C#,
- * em `pedidos.py`, em `revisao.js`, em `shell.js` e em `triagem.html` — e as cinco não eram iguais,
- * eram parecidas. O mesmo pedido aparecia "Aprovado" num lugar e "Aguardando triagem" noutro, e as
- * contagens do site brigavam entre si. Depois disso, a trava de corrida entrou no C# e não foi levada
- * ao Python, e os dois voltaram a discordar. Regra copiada é regra que diverge.
+ * The history that justifies the file: this state machine once existed FIVE times, across five
+ * languages and templates — and the five were not equal, they were similar. The same request showed
+ * as "Approved" in one place and "Awaiting triage" in another, and the site's own counters
+ * disagreed with each other. Later, a race-condition guard was added to one of them and not to the
+ * others, and they diverged again. A copied rule is a rule that drifts.
  *
- * O ciclo NÃO conhece idioma: ele devolve chaves (`open`, `approved`), e quem traduz é o `i18n.js`.
- * Antes, o rótulo em português morava na tabela — e um produto que se quer em três idiomas não pode
- * ter o texto da interface dentro da regra de negócio.
+ * The cycle knows NO language: it returns keys (`open`, `approved`), and translation happens at the
+ * edge. The Portuguese label used to live inside the table — and a product meant for three
+ * languages cannot carry interface text inside its business rule.
  *
  * @module
  */
 
-// `request` é opcional porque `data` é o saco de dados de QUALQUER evento — um comentário tem
-// `category`, um aplicado tem `commit`, e só o request_state tem `request`. Declarar obrigatório
-// fazia o tipo do núcleo brigar com o da API, e o checador de tipos só contou isso quando passou
-// a rodar de verdade (antes de existir o tsconfig, `tsc --noEmit` só imprimia a própria ajuda).
+// `request` is optional because `data` is the grab-bag of ANY event — a comment carries
+// `category`, an applied one carries `commit`, and only request_state carries `request`. Declaring
+// it required made the core's type fight the API's, and the type checker only said so once it
+// actually ran (before the tsconfig existed, `tsc --noEmit` merely printed its own help and
 /** @typedef {{ request?: string, state?: string, from?: string, [k: string]: unknown }} EventData */
 /** @typedef {{ id: string, type: string, author?: string, when?: string, data?: EventData|null }} Event */
 /**
- * `label` e `short` são para a BORDA, não para a regra: o núcleo nunca os lê, e é por isso que eles
- * são opcionais aqui. Quem mostra texto a uma pessoa resolve o rótulo no idioma dela.
+ * `label` and `short` are for the EDGE, not for the rule: the core never reads them, which is why
+ * they are optional here. Whoever shows text to a person resolves the label in that person's
+ * language.
  * @typedef {{ owned_by: string, label?: string, short?: string }} StateDef
  */
 /** @typedef {{ initial: string, initial_for_admin: string, states: Record<string,StateDef>,
@@ -37,18 +38,18 @@
  * @param {CycleTable} table
  */
 export function createCycle(table) {
-  // Object.keys, não truthiness: `{}` é truthy, e uma tabela vazia passaria — aceitando qualquer
-  // mudança de estado. Pego por teste, não por leitura.
+  // Object.keys, not truthiness: `{}` is truthy, so an empty table would slip through — accepting
+  // any state change at all. Caught by a test, not by reading.
   if (!Object.keys(table?.states ?? {}).length || !Object.keys(table?.transitions ?? {}).length) {
-    throw new Error('cycle.json sem estados ou sem transições: qualquer mudança de estado seria aceita.');
+    throw new Error('cycle.json has no states or no transitions: any state change would be accepted.');
   }
   if (!table.states[table.initial]) {
-    throw new Error(`cycle.json: o estado inicial "${table.initial}" não está em "states".`);
+    throw new Error(`cycle.json: the initial state "${table.initial}" is not in "states".`);
   }
   const dangling = Object.entries(table.transitions)
     .flatMap(([from, targets]) => targets.filter((t) => !table.states[t]).map((t) => `${from} → ${t}`));
   if (dangling.length) {
-    throw new Error('cycle.json: transição para estado inexistente — ' + dangling.join(', '));
+    throw new Error('cycle.json: transition to a state that does not exist — ' + dangling.join(', '));
   }
 
   const ownedBy = (who) =>
@@ -65,10 +66,10 @@ export function createCycle(table) {
     requiresCommit: (state) => table.requires_commit.includes(state),
 
     /**
-     * Estado atual de um pedido, a partir do histórico.
+     * The current state of a request, derived from its history.
      * @param {string} requestId
-     * @param {Event[]} events  todos os eventos (a função filtra)
-     * @param {boolean} authorIsAdmin  owner e admin não triam a si mesmos
+     * @param {Event[]} events  all events (this function filters)
+     * @param {boolean} authorIsAdmin  owner and admin do not triage themselves
      */
     currentState(requestId, events, authorIsAdmin = false) {
       let state = authorIsAdmin ? table.initial_for_admin : table.initial;
@@ -78,11 +79,11 @@ export function createCycle(table) {
 
       for (const e of ofRequest) {
         if (e.type === 'request_state' && e.data?.state) {
-          // Trava de corrida: `from` diz de qual estado a mudança partiu. Duas requisições simultâneas
-          // liam o mesmo estado e gravavam as duas — o pedido acabava num estado que a própria
-          // máquina declara impossível, e nada se apaga. Quem partiu de um estado que já não era o
-          // corrente perdeu a corrida. Evento antigo sem `from` continua valendo: a história não se
-          // reescreve.
+          // Race guard: `from` says which state the change departed from. Two simultaneous requests
+          // read the same state and both wrote — the request ended up in a state the machine itself
+          // declares impossible, and nothing can be erased. Whoever departed from a state that was
+          // no longer current lost the race. An old event with no `from` still counts: history is
+          // not rewritten.
           if (e.data.from && e.data.from !== state) continue;
           state = e.data.state;
         } else if (e.type === 'supplement' && table.accepts_supplement.includes(state)) {
@@ -93,10 +94,10 @@ export function createCycle(table) {
     },
 
     /**
-     * O que o front precisa saber, sem reimplementar nada. Devolve CHAVES — o rótulo que a pessoa lê
-     * é resolvido na borda, no idioma dela.
-     * `triage` já vem filtrado: num pedido aprovado, as transições possíveis são todas do agente, e
-     * o botão "Aprovar pedido" não deve aparecer.
+     * What the front end needs to know without reimplementing anything. Returns KEYS — the label a
+     * person reads is resolved at the edge, in their language.
+     * `triage` comes pre-filtered: on an approved request every possible transition belongs to the
+     * agent, so the "Approve" button must not appear at all.
      */
     status(state) {
       const targets = table.transitions[state] ?? [];

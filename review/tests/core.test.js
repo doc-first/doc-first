@@ -79,10 +79,10 @@ test('aprovado não oferece triagem; aberto oferece as três do dono', () => {
   assert.deepEqual(ciclo.status('open').triage, ['approved', 'rejected', 'question']);
 });
 
-test('tabela inválida não passa despercebida', () => {
-  assert.throws(() => createCycle({ states: {}, transitions: {} }), /sem estados/);
-  assert.throws(() => createCycle({ ...tabela, initial: 'nao_existe' }), /estado inicial/);
-  assert.throws(() => createCycle({ ...tabela, transitions: { open: ['fantasma'] } }), /inexistente/);
+test('an invalid table does not slip through', () => {
+  assert.throws(() => createCycle({ states: {}, transitions: {} }), /no states or no transitions/);
+  assert.throws(() => createCycle({ ...tabela, initial: 'nao_existe' }), /initial state/);
+  assert.throws(() => createCycle({ ...tabela, transitions: { open: ['fantasma'] } }), /does not exist/);
 });
 
 test('digital: espaços não contam, 16 caracteres, texto diferente muda', async () => {

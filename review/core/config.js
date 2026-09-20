@@ -1,35 +1,36 @@
 /**
- * A configuração do projeto que usa o método, lida de `doc-first.json` na raiz.
+ * The configuration of the project using the method, read from `doc-first.json` at the root.
  *
- * Existe para que o MOTOR não conheça o produto. Antes, o e-mail do dono e o projeto na nuvem
- * estavam espalhados pelo código — quem clonasse subia um serviço apontando para a infraestrutura
- * de outra pessoa. Agora há um arquivo só para editar.
+ * It exists so the ENGINE does not know the product. Before it, the owner's e-mail and the cloud
+ * project were scattered through the code — anyone who cloned it started a service pointing at
+ * somebody else's infrastructure. Now there is exactly one file to edit.
  *
- * Variável de ambiente vence o arquivo: o mesmo repositório serve a mais de um ambiente.
+ * Environment variables beat the file: the same repository serves more than one environment.
  * @module
  */
 
 /**
- * ⚠️ As CHAVES do `doc-first.json` continuam em pt-BR (`nome`, `nuvem.projeto`): o arquivo é
- * editado por quem ADOTA o método, e renomear o que já está no disco de outra pessoa é migração,
- * não tradução. Quem fala inglês aqui é o que sai desta função.
+ * ⚠️ The KEYS of `doc-first.json` are still Portuguese (`nome`, `nuvem.projeto`): that file is
+ * edited by whoever ADOPTS the method, and renaming what already sits on someone else's disk is a
+ * migration, not a translation. What speaks English here is what this function returns.
  *
  * @param {string} root
- * @param {{ readFile: (path: string) => string }} io  injetado para poder testar sem disco
+ * @param {{ readFile: (path: string) => string }} io  injected so this can be tested without disk
  */
 export function readConfig(root, io, env = {}) {
   let file = {};
   try {
     file = JSON.parse(io.readFile(`${root}/doc-first.json`));
   } catch {
-    // Sem o arquivo, só o ambiente manda. É o caso de quem roda o motor fora de um projeto.
+    // With no file, only the environment matters. That is the case of running the engine outside
+    // a project at all.
   }
   const cloud = file.nuvem ?? {};
   const dev = file.desenvolvimento ?? {};
   const content = file.conteudo ?? {};
 
   return {
-    name: env.DOC_FIRST_NOME ?? file.nome ?? 'Documentação',
+    name: env.DOC_FIRST_NOME ?? file.nome ?? 'Documentation',
     owner: env.REVISAO_OWNER ?? file.owner ?? null,
     admins: env.REVISAO_ADMINS ?? (file.admins ?? []).join(','),
     project: env.REVISAO_PROJETO ?? cloud.projeto ?? null,
@@ -40,16 +41,17 @@ export function readConfig(root, io, env = {}) {
     port: Number(env.PORT ?? dev.porta ?? 8095),
     actAs: env.REVISAO_DEV_EMAIL ?? dev.comoQuem ?? null,
 
-    // ONDE O CONTEÚDO MORA. Era isto que o motor sabia de cor, e que o prendia a um projeto só:
-    // `front/telas` estava escrito dentro de pages.ts, e `docs/validacoes.json` dentro de
-    // validation.ts. Quem adotasse o método teria de nomear as pastas como o primeiro projeto.
-    // Os padrões são os do primeiro projeto que usou o método — servem de exemplo de forma.
+    // WHERE THE CONTENT LIVES. This is what the engine used to know by heart, and what tied it to
+    // a single project: `front/telas` was written inside pages.ts, and the approvals file inside
+    // validation.ts. Anyone adopting the method would have had to name their folders the way the
+    // first project named its own.
+    // The defaults below are that first project's — they stand as an example of shape, not a rule.
     sheetFolders: content.pastas ?? ['front/telas', 'front/ds/catalogo'],
     registry: content.registro ?? 'docs/validacoes.json',
     home: content.inicio ?? '/front/index.html',
-    /** Para o nome curto do arquivo no registro: o pedaço do caminho que não interessa mostrar. */
+    /** For the short file name in the record: the part of the path not worth showing. */
     trimPrefix: content.recortar ?? 'front/',
-    /** Só para a mensagem de erro de página inválida. Vazio = não dá exemplo. */
+    /** Only for the invalid-page error message. Empty means: give no example. */
     pageExamples: content.exemplosDePagina ?? '',
   };
 }

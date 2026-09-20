@@ -1,45 +1,46 @@
 /**
- * O que foi gravado antes de `2026-09-19`, lido pelo código de hoje.
+ * What was written before `2026-09-19`, read by today's code.
  *
- * O código passou a ser inteiro em inglês (docs/VOCABULARIO-EN.md), e isso inclui os valores que
- * viajam gravados: o tipo do evento, o estado do pedido, os campos. Mas **o histórico não se
- * reescreve** — foi decisão de desenho, e é a certa: o registro é append-only por construção
- * (o SQLite recusa UPDATE e DELETE por trigger), e uma aprovação humana com data é prova, não dado.
+ * The code became entirely English, and that includes the values that travel stored: the event
+ * type, the request state, the field names. But **history is not rewritten** — that was a design
+ * decision, and it is the right one: the log is append-only by construction (SQLite refuses UPDATE
+ * and DELETE through triggers), and a dated human approval is evidence, not data.
  *
- * Então a tradução acontece **na leitura**, aqui, numa direção só. O núcleo nunca vê pt-BR.
+ * So translation happens **on read**, here, in one direction only. The core never sees Portuguese.
  *
- * ⚠️ **Hoje ele traduz mais do que histórico.** A API e o front ainda falam pt-BR (`tipo`, `dados`,
- * `pedido`), porque a camada 2 começou pelo núcleo. Então TODO evento que entra no núcleo passa por
- * aqui, não só o antigo. Quando `review/api/` e `front/js/` forem traduzidos, este arquivo volta a
- * ser só o que o nome diz — e o que sobrar nele é a medida do que ainda falta.
+ * ⚠️ **Today it translates more than history.** The API and the front end still speak Portuguese
+ * (`tipo`, `dados`, `pedido`), because the rename started with the core. So EVERY event entering
+ * the core passes through here, not just the old ones. When `review/api/` and the front are
+ * translated, this file goes back to being only what its name says — and whatever is left in it is
+ * the measure of what is still pending.
  *
- * ⚠️ Fora isso, ele só cresce por acidente: se você pensa em acrescentar um par porque código novo
- * gravou em pt-BR, o defeito está no código novo — conserte lá.
+ * ⚠️ Beyond that, it only grows by accident: if you are about to add a pair because new code wrote
+ * in Portuguese, the defect is in the new code — fix it there.
  * @module
  */
 
-/** Campo do evento: `pagina` → `page`. */
+/** Event field: `pagina` → `page`. */
 const CAMPOS = {
   pagina: 'page', caixa: 'block', digital: 'fingerprint', texto: 'text',
   foto: 'snapshot', autor: 'author', quando: 'when', dados: 'data', tipo: 'type',
 };
 
-/** Tipo do evento: `aprovacao` → `approval`. */
+/** Event type: `aprovacao` → `approval`. */
 const TIPOS = {
   aprovacao: 'approval', pedido: 'request', comentario: 'comment',
   resposta_decisao: 'decision_reply', pedido_estado: 'request_state', complemento: 'supplement',
 };
 
-/** Estado do ciclo: `aberto` → `open`. */
+/** Cycle state: `aberto` → `open`. */
 const ESTADOS = {
   aberto: 'open', aprovado: 'approved', recusado: 'rejected', pergunta: 'question',
   analise: 'applying', aguardando: 'waiting', aplicado: 'applied',
 };
 
-/** Categoria do pedido: `duvida` → `doubt`. */
+/** Request category: `duvida` → `doubt`. */
 const CATEGORIAS = { texto: 'text', termo: 'term', remover: 'remove', duvida: 'doubt' };
 
-/** Chave de dentro de `dados`: `pedido` → `request`. */
+/** Key inside `dados`: `pedido` → `request`. */
 const DADOS = {
   pedido: 'request', estado: 'state', de: 'from', motivo: 'reason',
   categoria: 'category', relacionado: 'related', mensagem: 'message',
@@ -53,10 +54,11 @@ export const tipoAtual = traduz(TIPOS);
 export const categoriaAtual = traduz(CATEGORIAS);
 
 /**
- * Um evento como o código de hoje espera lê-lo, venha ele de quando vier.
+ * An event as today's code expects to read it, whenever it came from.
  *
- * Só renomeia o que reconhece: campo desconhecido atravessa intacto, porque um evento que este mapa
- * não entende ainda é um fato — perder o campo seria pior que carregá-lo em pt-BR.
+ * It renames only what it recognises: an unknown field passes through untouched, because an event
+ * this map does not understand is still a fact — losing the field would be worse than carrying it
+ * in Portuguese.
  *
  * @param {Record<string, any>} evento
  * @returns {import('./cycle.js').Event}
@@ -74,7 +76,7 @@ export function doHistorico(evento) {
     /** @type {Record<string, any>} */
     const dados = {};
     for (const [k, v] of Object.entries(saida.data)) dados[DADOS[k] ?? k] = v;
-    // `state` e `from` carregam nome de estado; `category`, nome de categoria.
+    // `state` and `from` carry a state name; `category` carries a category name.
     if (dados.state) dados.state = estadoAtual(dados.state);
     if (dados.from) dados.from = estadoAtual(dados.from);
     if (dados.category) dados.category = categoriaAtual(dados.category);
@@ -83,20 +85,20 @@ export function doHistorico(evento) {
   return saida;
 }
 
-// ---------------------------------------------------------------- a volta, e por que ela existe
+// ---------------------------------------------------------------- the way back, and why it exists
 
-/** Inverte um mapa. Feito uma vez, na carga: são sete pares, mas errar a inversão à mão é barato. */
+/** Inverts a map. Done once, at load: seven pairs, and inverting by hand is cheap to get wrong. */
 const inverso = (mapa) => Object.fromEntries(Object.entries(mapa).map(([a, b]) => [b, a]));
 
 const ESTADOS_PT = inverso(ESTADOS);
 
 /**
- * ⚠️ **ANDAIME, com prazo.** O núcleo já fala inglês; a API HTTP e o front ainda não. Enquanto isso,
- * a borda traduz a resposta de volta para pt-BR, e o contrato publicado não muda no meio do caminho.
+ * ⚠️ **SCAFFOLDING, with an expiry date.** The core already speaks English; the HTTP API and the
+ * front end do not. Meanwhile the edge translates the response back to Portuguese, so the published
+ * contract does not change mid-migration.
  *
- * Isto não é desenho — é a marca de uma migração em andamento. **Morre** quando `front/js/` ler
- * `state` em vez de `estado` (camada 2, passo 5). Se você está lendo isto muito depois disso,
- * a dívida ficou: `docs/DIVIDA-TECNICA.md`.
+ * This is not design — it is the mark of a migration in progress. It **dies** when the front end
+ * reads `state` instead of `estado`. If you are reading this long after that, the debt stayed.
  *
  * @param {{ state: string, ownedBy: string, canGoTo: string[], triage: string[],
  *           requiresReason: string[], acceptsSupplement: boolean }} status
@@ -113,5 +115,5 @@ export function paraOContrato(status) {
   };
 }
 
-/** O nome em pt-BR de um estado — para o CLI e para o contrato. Some junto com `paraOContrato`. */
+/** A state's Portuguese name — for the CLI and the contract. Dies together with `paraOContrato`. */
 export const estadoEmPortugues = (s) => ESTADOS_PT[s] ?? s;
