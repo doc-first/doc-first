@@ -7,14 +7,14 @@ import * as pedidos from './requests.ts';
 import * as validacao from './validation.ts';
 
 /**
- * A ferramenta do agente da metodologia Doc First.
+ * The agent's tool for the Doc First methodology.
  *
- * Um comando só, em vez de dois scripts soltos: `doc-first <comando>`. Lê os pedidos que os revisores
- * fizeram no site, mostra o contexto, mede o impacto antes de alterar, e traz para o repositório os ✓
- * que o dono deu. NUNCA altera conteúdo por conta própria.
+ * One command instead of two loose scripts: `doc-first <comando>`. It reads the requests reviewers
+ * made on the site, shows the context, measures the impact before changing anything, and brings into
+ * the repository the ✓ the owner gave. It NEVER changes content on its own.
  *
- * Usa o MESMO núcleo (review/core/) que o servidor e o navegador: o ciclo do pedido e a digital do
- * texto são um arquivo só, não três implementações que precisam continuar iguais.
+ * It uses the SAME core (review/core/) as the server and the browser: the request cycle and the text
+ * fingerprint are one single file, not three implementations that have to stay identical.
  */
 
 const AJUDA = `
@@ -68,7 +68,7 @@ async function principal() {
   if (values.ajuda || !comando) { console.log(AJUDA.trim()); return 0; }
 
   const raiz = values.raiz ?? process.cwd();
-  // A configuração do projeto (nome, dono, projeto na nuvem) vem do doc-first.json da raiz.
+  // The project configuration (name, owner, cloud project) comes from the doc-first.json at the root.
   const doProjeto = readConfig(raiz, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env);
   if (doProjeto.owner) process.env.REVISAO_OWNER ??= doProjeto.owner;
   const fonte = new Fonte({

@@ -15,14 +15,15 @@ import { Identidade } from './identity-iap.ts';
 import { TIPOS_DE_EVENTO, type Evento, type NovoEvento, type Registro } from './types.ts';
 
 /**
- * Serviço da metodologia Doc First: serve o site e registra os eventos de revisão.
+ * The Doc First service: serves the site and records review events.
  *
- * O IAP protege na borda; a API valida de novo quem é (defesa em profundidade). As regras de negócio
- * — ciclo, papéis, limites — vêm de `review/core/`, o MESMO código que o navegador importa.
+ * When an identity proxy guards the edge, the API still validates who the caller is — defence in
+ * depth. The business rules — cycle, roles, limits — come from `review/core/`, the SAME code the
+ * browser imports.
  */
 
-// A configuração do PROJETO vem de doc-first.json; variável de ambiente vence o arquivo. O motor
-// não conhece nome de produto, e-mail nem projeto na nuvem — ele pergunta.
+// The PROJECT's configuration comes from doc-first.json; environment variables beat the file. The
+// engine knows no product name, no e-mail and no cloud project — it asks.
 const raizDoProjeto = process.env.REVISAO_SITE ?? join(import.meta.dirname, '..', '..');
 const doProjeto = readConfig(raizDoProjeto, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env);
 
@@ -37,21 +38,22 @@ const cfg = {
 };
 
 function log(nivel: string, evento: string, extra: Record<string, unknown> = {}) {
-  // Uma linha JSON por fato: o Cloud Logging entende severity, e dá para achar um evento pelo id.
-  // A API anterior tinha três chamadas de log no total, nenhuma no caminho de escrita.
+  // One JSON line per fact: log collectors understand severity, and an event can be found by id.
+  // The previous API had three log calls in total, none of them on the write path.
   console.log(JSON.stringify({ severity: nivel, evento, hora: new Date().toISOString(), ...extra }));
 }
 
-// ---------------------------------------------------------------- configuração que derruba na subida
+// ---------------------------------------------------------------- configuration that fails at boot
 /**
  * Como as pessoas entram.
- *   senha | usuário e senha no próprio serviço. É o "sobe a imagem e usa", sem nuvem nenhuma.
+ *   senha | user and password in the service itself. This is "start the image and use it".
  *   iap   | Google Cloud IAP. Exige REVISAO_AUDIENCIA.
- *   dev   | cabeçalho X-Dev-Email, só em Development. Abrir o navegador e trabalhar, sem login.
+ *   dev   | the X-Dev-Email header, Development only. Open the browser and work, with no login.
  *
- * O padrão nunca é `dev` fora de Development: um serviço que aceita "sou quem eu disser que sou"
- * em produção não é um descuido pequeno. Fora de Development, IAP quando há audiência e senha no
- * resto — quem sobe a imagem sem configurar nada cai no login, que é o pior caso aceitável.
+ * The default is never `dev` outside Development: a service that accepts "I am whoever I say I
+ * am" in production is not a small oversight. Outside Development it is the identity proxy when
+ * there is an audience, and password everywhere else — whoever starts the image configuring
+ * nothing lands on a login screen, which is the worst acceptable case.
  */
 const comoEntrar = process.env.REVISAO_IDENTIDADE
   ?? (cfg.ambiente === 'Development' ? 'dev' : process.env.REVISAO_AUDIENCIA ? 'iap' : 'senha');
@@ -60,20 +62,22 @@ let papeis: ReturnType<typeof createRoles>;
 let identidade: Identidade | null = null;
 const ciclo = createCycle(JSON.parse(readFileSync(new URL('../cycle.json', import.meta.url), 'utf8')));
 
-// O núcleo fala inglês; a API ainda grava em pt-BR. A tradução acontece AQUI, na entrada do núcleo,
-// e em lugar nenhum mais — ver review/core/legacy.js.
+// The core speaks English; the API still writes Portuguese. Translation happens HERE, at the
+// core's entrance, and nowhere else — see review/core/legacy.js.
 const paraONucleo = (todos: Evento[]) => todos.map(doHistorico);
 
 try {
-  // Sem valor padrão de propósito: num pacote distribuído, um e-mail nosso aqui faria quem esquecesse
-  // de configurar subir um serviço com o NOSSO owner.
+  // No default, on purpose: in a distributed package, an e-mail of ours here would make anyone who
+  // forgot to configure it start a service with OUR owner.
   papeis = createRoles(cfg.owner, cfg.admins);
-  // O IAP só é construído quando é ele quem manda: exigir REVISAO_AUDIENCIA de quem entra por senha
-  // impediria o caso "sobe e usa", que é o ponto da identidade por senha.
+  // The proxy identity is only built when it is the one in charge: demanding its audience from
+  // someone logging in with a password would block the "start it and use it" case, which is the
+  // whole point of password identity.
   if (comoEntrar === 'iap' || comoEntrar === 'dev') {
     identidade = new Identidade({
       audiencia: process.env.REVISAO_AUDIENCIA, modo: cfg.modo,
-      ambiente: cfg.ambiente, // string vazia é uma escolha: 'não identifique ninguém', que o teste usa para exercitar o 401
+      ambiente: cfg.ambiente, // an empty string is a choice — 'identify nobody' — which the test
+                              // uses to exercise the 401
       emailDeDev: process.env.REVISAO_DEV_EMAIL !== undefined ? process.env.REVISAO_DEV_EMAIL || undefined : (doProjeto.actAs ?? undefined),
     });
   } else if (comoEntrar !== 'senha') {
@@ -85,10 +89,11 @@ try {
 }
 
 /**
- * Onde os eventos ficam. `sqlite` é o padrão de quem sobe a ferramenta sem nuvem: um arquivo, sem
- * dependência externa, e com o banco RECUSANDO update e delete — "nada se apaga" vira garantia.
+ * Where events live. `sqlite` is the default for running the tool without a cloud: one file, no
+ * external dependency, and the database REFUSING update and delete — "nothing is erased" stops
+ * being a promise and becomes a guarantee.
  *   memoria  | some ao parar. Para desenvolver e testar.
- *   sqlite   | um arquivo no disco. É o modo "sobe e usa".
+ *   sqlite   | a file on disk. The "start it and use it" mode.
  *   firestore| Google Cloud. Exige REVISAO_PROJETO.
  */
 const ondeGuardar = process.env.REVISAO_BANCO ?? (cfg.modo === 'local' ? 'memoria' : 'sqlite');
@@ -111,8 +116,8 @@ if (comoEntrar === 'senha') {
   porSenha = new IdentidadeSenha(pessoas, { seguro: cfg.ambiente !== 'Development' });
   pessoas.limparSessoesVencidas();
 
-  // Primeira subida: cria o acesso do owner e mostra a senha UMA vez. Senha fixa tipo "admin" é
-  // convidativa, e ferramenta interna fica anos no ar sem ninguém olhar.
+  // First boot: creates the owner's access and shows the password ONCE. A fixed password like
+  // "admin" is an invitation, and an internal tool stays up for years with nobody looking.
   const senha = await porSenha.primeiroAcesso(cfg.owner!, 'Dono');
   if (senha) {
     console.log('\n' + '='.repeat(72));
@@ -149,7 +154,7 @@ async function corpoJson(req: IncomingMessage): Promise<unknown> {
   return partes.length ? JSON.parse(Buffer.concat(partes).toString('utf8')) : {};
 }
 
-/** Pedido + situação calculada pelo servidor. O front não reimplementa o ciclo. */
+/** A request plus the state the server computed. The front end does not reimplement the cycle. */
 const comSituacao = (e: Evento, todos: Evento[]) => ({
   ...e,
   situacao: paraOContrato(ciclo.status(ciclo.currentState(e.id, paraONucleo(todos), papeis.isAdmin(e.autor)))),
@@ -182,24 +187,24 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   if (req.method === 'GET' && rota === '/eu') {
     return json(res, 200, {
       email,
-      // O núcleo devolve a CHAVE do papel; `outro` é o nome que o contrato publicou e o front usa
-      // para estilizar (shell.js). Andaime, como o resto: morre quando o front falar inglês.
+      // The core returns the role KEY; `outro` is the name the published contract uses and the
+      // front end styles on. Scaffolding, like the rest: it dies when the front end speaks English.
       papel: ({ owner: 'owner', admin: 'admin', other: 'outro' } as Record<string, string>)[papeis.roleOf(email)] ?? 'outro',
       podeAprovar: papeis.canApprove(email),
       podeTriar: papeis.canTriage(email),
       owner: papeis.isOwner(email),
       admins: papeis.admins,
       dono: papeis.isAdmin(email),          // ⚠️ compatibilidade; sai quando o front migrar de vez
-      // Só existe quando se entra por senha. Sem isto, recarregar a página esqueceria que a senha
-      // ainda é a do primeiro acesso — e a tela de troca só apareceria no login.
+      // Only exists with password login. Without it, reloading the page would forget the password
+      // is still the first-access one — and the change screen would only appear at login.
       ...(porSenha ? { precisaTrocarSenha: porSenha.daRequisicao(req.headers)?.precisaTrocarSenha ?? false } : {}),
     });
   }
 
   if (req.method === 'GET' && rota === '/eventos') {
     const pagina = url.searchParams.get('pagina');
-    // Os eventos de um pedido ficam TODOS na página dele (a triagem e o agente gravam com a página do
-    // pedido), então a consulta filtrada basta — não é preciso varrer a coleção.
+    // ALL events of a request live on its own page (triage and the agent write with the request's
+    // page), so the filtered query is enough — no need to scan the whole collection.
     const eventos = await registro.listar(pagina);
     return json(res, 200, eventos.map((e) => (e.tipo === 'pedido' ? comSituacao(e, eventos) : e)));
   }
@@ -230,14 +235,16 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
     if (novo.tipo === 'aprovacao' && (!novo.caixa || !novo.digital)) {
       return json(res, 400, { erro: 'aprovação precisa de caixa e digital' });
     }
-    // Aprovar é de owner e admin: o ✓ deles vira trava no repositório e manda o agente aplicar.
+    // Approving belongs to owner and admin: their ✓ becomes a lock in the repository and tells
+    // the agent to apply.
     if (novo.tipo === 'aprovacao' && !podeAprovar) {
       return json(res, 403, { erro: 'só owner e admin aprovam; use pedir alteração ou comentar' });
     }
     if (['pedido', 'comentario', 'complemento'].includes(novo.tipo) && !novo.texto?.trim()) {
       return json(res, 400, { erro: 'escreva o texto' });
     }
-    // O núcleo lê o evento com os nomes dele; a API ainda fala pt-BR. Traduz na entrada, aqui.
+    // The core reads the event with its own field names; the API still speaks Portuguese.
+    // Translate on the way in, here.
     const limite = overLimit(doHistorico(novo), doProjeto.pageExamples);
     if (limite) return json(res, 400, { erro: limite });
 
@@ -247,9 +254,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
       const daPagina = await registro.listar(novo.pagina);
       const pedido = daPagina.find((e) => e.id === pedidoId && e.tipo === 'pedido');
       if (!pedido) return json(res, 404, { erro: 'pedido não encontrado nesta página' });
-      // `atual` é a língua do núcleo (inglês); `atualPt` é a do contrato, que ainda é pt-BR e viaja
-      // para o front e para o registro. Duas variáveis em vez de converter no meio do caminho: o
-      // erro que isto evita é comparar uma língua com a outra e nunca casar.
+      // `atual` is the core's language; `atualPt` is the contract's, still Portuguese, and it
+      // travels to the front end and into the record. Two variables instead of converting midway:
+      // the bug this avoids is comparing one language against the other and never matching.
       const atual = ciclo.currentState(pedidoId, paraONucleo(daPagina), papeis.isAdmin(pedido.autor));
       const atualPt = estadoEmPortugues(atual);
 
@@ -278,8 +285,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
         if (!ciclo.canGo(atual, para)) {
           return json(res, 409, { erro: `não dá para ir de ${atualPt} para ${paraPt}`, estado: atualPt });
         }
-        // Trava de corrida: registrar de onde a mudança saiu faz o próprio histórico ser o guarda.
-        // Grava em pt-BR, como o resto do registro: quem lê traduz (review/core/legacy.js).
+        // Race guard: recording where the change departed from makes the history itself the
+        // guard. Written in Portuguese, like the rest of the record: readers translate
+        // (review/core/legacy.js).
         novo.dados = { ...novo.dados, de: atualPt };
       }
     }
@@ -296,37 +304,35 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   return json(res, 405, { erro: 'método ou rota não existe', rota });
 }
 
-/** A única página servida sem sessão. Autocontida de propósito: ver review/api/login.html. */
+/** The only page served without a session. Self-contained on purpose: see review/api/login.html. */
 const TELA_DE_ENTRADA = '/entrar';
 
-// ---------------------------------------------------------------- site estático
+// ---------------------------------------------------------------- static site
 async function estatico(url: URL, res: ServerResponse) {
   let caminho = decodeURIComponent(url.pathname);
-  // Para onde a raiz leva vem do doc-first.json (`conteudo.inicio`). Estava fixo em
-  // `/front/index.html`, que é a página inicial DESTE projeto, não do método.
+  // Where the root leads comes from doc-first.json (`conteudo.inicio`). It used to be hard-coded
+  // to one project's home page, which is that project's, not the method's.
   if (caminho === '/') return (res.writeHead(302, { location: doProjeto.home }), res.end());
 
-  // O painel de revisão é do MOTOR, e mora junto do servidor — não dentro do conteúdo. Sem esta
-  // rota, apontar REVISAO_SITE para uma documentação montada de fora deixaria o painel sem os
-  // próprios arquivos: a página carregaria, e nenhum botão de revisão apareceria.
-  // A pasta pode não existir (é o caso de quem ainda serve o painel de dentro do site) — aí este
-  // ramo não faz nada e o caminho segue para o site normal.
-  // `web` é o painel; `core` vem junto porque o core-web.js é um MÓDULO e importa
-  // `../core/fingerprint.js` — o navegador resolve isso contra a URL, então /review/core/ precisa
-  // responder ou o painel carrega sem o núcleo e nenhuma digital é calculada.
+  // The review panel belongs to the ENGINE and lives next to the server — not inside the content.
+  // Without this route, pointing REVISAO_SITE at documentation mounted from outside would leave the
+  // panel without its own files: the page would load, and no review button would appear.
+  // `web` is the panel; `core` comes along because core-web.js is a MODULE importing
+  // `../core/fingerprint.js` — the browser resolves that against the URL, so /review/core/ has to
+  // answer or the panel loads without the core and no fingerprint gets computed.
   for (const pasta of ['web', 'core']) {
     const prefixo = `/review/${pasta}/`;
     if (!caminho.startsWith(prefixo)) continue;
     const base = normalize(join(import.meta.dirname, '..', pasta));
     const seguro = normalize(join(base, caminho.slice(prefixo.length)));
-    if (!seguro.startsWith(base + sep)) break;        // fora da pasta do motor
+    if (!seguro.startsWith(base + sep)) break;        // outside the engine folder
     try {
       await stat(seguro);
       return servirArquivo(seguro, res);
-    } catch { break; /* não existe aqui: segue para o site */ }
+    } catch { break; /* not here: fall through to the site */ }
   }
 
-  // normalize + verificação de prefixo: sem isso, `/../../etc/passwd` sairia da pasta do site.
+  // normalize plus a prefix check: without it, `/../../etc/passwd` would escape the site folder.
   const alvo = normalize(join(cfg.site, caminho));
   if (!alvo.startsWith(normalize(cfg.site) + sep)) {
     return json(res, 403, { erro: 'caminho fora do site' });
@@ -341,11 +347,12 @@ async function estatico(url: URL, res: ServerResponse) {
   }
 }
 
-/** Devolve um arquivo do disco. Usado pelo site e pelos arquivos do próprio motor. */
+/** Serves a file from disk. Used both by the site and by the engine's own files. */
 async function servirArquivo(alvo: string, res: ServerResponse, urlPath = '') {
   const ext = extname(alvo).toLowerCase();
-  // O tema (fontes e ícones) não muda: cachear de verdade. Com no-cache o navegador revalidava os
-  // ícones do menu a cada navegação, e como eles entram por mask-image, o menu piscava.
+  // The theme (fonts and icons) does not change: cache it for real. With no-cache the browser
+  // revalidated the menu icons on every navigation, and because they arrive through mask-image,
+  // the menu flickered.
   const cache = urlPath.includes('/tema/') ? 'public, max-age=31536000, immutable' : 'no-cache';
   res.writeHead(200, {
     'content-type': TIPOS_MIME[ext] ?? 'application/octet-stream',
@@ -361,13 +368,13 @@ const servidor = createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/saude') return json(res, 200, { ok: true });
 
-    // /api/entrar é a única rota da API sem sessão: é ela que cria a sessão.
+    // /api/entrar is the only API route without a session: it is the one that creates it.
     if (porSenha && url.pathname === '/api/entrar' && req.method === 'POST') {
       const corpo = (await corpoJson(req)) as { email?: string; senha?: string };
       const r = await porSenha.entrar(corpo.email ?? '', corpo.senha ?? '');
       if (!r) {
-        // A mesma resposta para e-mail inexistente e senha errada: dizer qual dos dois falhou
-        // entrega quem tem conta. O tempo de resposta também é igual (ver pessoas.ts).
+        // The same answer for an unknown e-mail and a wrong password: saying which of the two
+        // failed hands over who has an account. The response time matches too (see users.ts).
         log('AVISO', 'entrada_recusada', { email: corpo.email });
         return json(res, 401, { erro: 'e-mail ou senha não conferem' });
       }
@@ -384,9 +391,10 @@ const servidor = createServer(async (req, res) => {
       return await api(req, res, url, email);
     }
 
-    // No modo IAP quem barra é a borda, antes de chegar aqui. No modo senha não há borda nenhuma:
-    // sem esta guarda, a documentação inteira ficava aberta a quem alcançasse a porta — e quem sobe
-    // a imagem acreditando que configurou login não teria como desconfiar. Achado testando.
+    // With an identity proxy, the edge blocks before anything reaches here. With password login
+    // there is no edge at all: without this guard the entire documentation was open to anyone who
+    // could reach the port — and whoever started the image believing they had configured a login
+    // had no way to suspect otherwise. Found while testing.
     if (porSenha && !porSenha.daRequisicao(req.headers)) {
       if (url.pathname === TELA_DE_ENTRADA) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
@@ -395,7 +403,7 @@ const servidor = createServer(async (req, res) => {
       const destino = encodeURIComponent(url.pathname + url.search);
       return (res.writeHead(302, { location: `${TELA_DE_ENTRADA}?destino=${destino}` }), res.end());
     }
-    // Já com sessão, a tela de entrada não tem o que fazer: leva para o site.
+    // With a session already in hand, the login screen has nothing to do: send them to the site.
     if (porSenha && url.pathname === TELA_DE_ENTRADA) {
       return (res.writeHead(302, { location: '/' }), res.end());
     }

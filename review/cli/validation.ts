@@ -198,10 +198,10 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
 }
 
 /**
- * O semáforo da documentação: onde cada trecho está, e o que precisa de olho humano.
+ * The documentation traffic light: where each block stands, and what needs a human eye.
  *
- * É o comando que responde "posso confiar nesta documentação hoje?". `conferir` responde uma
- * pergunta menor e mais antiga — se alguém adulterou uma marca. Este responde a pergunta do dia.
+ * This is the command that answers "can I trust this documentation today?". `conferir` answers a
+ * smaller and older question — whether someone tampered with a mark. This one answers today's question.
  */
 export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}) {
   const trechos = await lerTrechos(raiz);
@@ -218,8 +218,8 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
   console.log(linha('broken', 'o texto está igual, mas a base mudou — CONFERIR'));
   console.log(linha('none',   'ninguém validou ainda'));
 
-  // O vermelho vem primeiro e com nome: é o único estado que ninguém descobre sozinho lendo a
-  // página, porque nada nela mudou.
+  // Red comes first, and named: it is the only state nobody spots on their own by reading the page,
+  // because nothing on the page changed.
   const vermelhos = [...byBlock].filter(([, r]) => r.state === 'broken');
   if (vermelhos.length) {
     console.log(`\n🔴 Precisam de conferência — mudou o chão, não o texto:\n`);
@@ -241,7 +241,7 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
   return tally;
 }
 
-/** O que mais preciso olhar se eu mexer aqui? A pergunta que se faz ANTES de editar. */
+/** What else do I have to look at if I touch this? The question to ask BEFORE editing. */
 export async function seEuMexer(raiz: string, id: string) {
   const trechos = await lerTrechos(raiz);
   if (!trechos.has(id)) { console.log(`✗ não achei o trecho ${id}`); return 1; }
@@ -264,15 +264,15 @@ export async function seEuMexer(raiz: string, id: string) {
   return 0;
 }
 
-// ---------------------------------------------------------------- o índice no banco
+// ---------------------------------------------------------------- the index in the database
 
 /**
- * Refaz o índice da documentação no banco: quais trechos existem, de que tipo, de quem dependem,
- * e o que falta em cada um.
+ * Rebuilds the documentation index in the database: which blocks exist, of what kind, what they depend
+ * on, and what is missing in each one.
  *
- * ⚠️ O banco não vira a verdade. A verdade continua no arquivo, versionado — é ele que tem diff e
- * autoria. Isto aqui é um retrato, e existe para as perguntas que arquivo responde mal:
- * "todos os diagramas do projeto", "toda decisão sem dono", "o que quebra se eu mexer aqui".
+ * ⚠️ The database does not become the truth. The truth stays in the file, versioned — the file is what
+ * has diff and authorship. This is a snapshot, and it exists for the questions a file answers badly:
+ * "every diagram in the project", "every decision without an owner", "what breaks if I touch this".
  */
 export async function indexar(raiz: string, caminhoDoBanco?: string) {
   const { Index } = await import('../api/index-store.ts');
@@ -313,7 +313,7 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
   }
 }
 
-/** O catálogo de tipos, para quem está escrevendo e quer saber o que existe. */
+/** The catalogue of kinds, for whoever is writing and wants to know what exists. */
 export async function tipos() {
   const { catalogue } = await import('../core/kinds.js');
   console.log('\nTipos de conteúdo — todo trecho validável é de um destes:\n');

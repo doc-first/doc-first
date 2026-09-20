@@ -2,14 +2,14 @@ import { Pessoas, type Pessoa } from './users.ts';
 import { randomBytes } from 'node:crypto';
 
 /**
- * Identidade por usuário e senha, no próprio serviço — a alternativa ao IAP do Google.
+ * Identity by user and password, inside the service itself — the alternative to Google IAP.
  *
- * É o que permite o Doc First ser usado como o Keycloak é: sobe, entra, trabalha. Sem conta em nuvem
- * nenhuma, sem provedor externo.
+ * It is what lets Doc First be used the way Keycloak is: start it, log in, work. No cloud account
+ * anywhere, no external provider.
  *
- * A sessão vive num cookie `httpOnly` + `SameSite=Strict`: JavaScript da página não o lê (então um
- * XSS não rouba a sessão) e ele não viaja em requisição vinda de outro site (então não há CSRF por
- * navegação). `Secure` fica ligado fora de desenvolvimento.
+ * The session lives in a `httpOnly` + `SameSite=Strict` cookie: page JavaScript cannot read it (so
+ * an XSS does not steal the session) and it does not travel on a request coming from another site
+ * (so there is no CSRF by navigation). `Secure` stays on outside development.
  */
 export const COOKIE = 'docfirst_sessao';
 
@@ -25,8 +25,8 @@ export class IdentidadeSenha {
   get pessoas() { return this.#pessoas; }
 
   /**
-   * Cria o primeiro acesso, se não houver ninguém. A senha é gerada e devolvida para ser mostrada
-   * UMA vez, no log da primeira subida.
+   * Creates the first access, if nobody exists yet. The password is generated and returned to be
+   * shown ONCE, in the log of the first start.
    */
   async primeiroAcesso(email: string, nome = 'Administração'): Promise<string | null> {
     if (!this.#pessoas.vazio()) return null;
@@ -39,7 +39,7 @@ export class IdentidadeSenha {
     return { pessoa, sessao: this.#pessoas.abrirSessao(pessoa.email) };
   }
 
-  /** E-mail de quem chamou, a partir do cookie. Null = não autenticado. */
+  /** E-mail of the caller, taken from the cookie. Null = not authenticated. */
   daRequisicao(cabecalhos: Record<string, string | string[] | undefined>): Pessoa | null {
     return this.#pessoas.daSessao(this.#lerCookie(cabecalhos, COOKIE));
   }
@@ -67,6 +67,6 @@ export class IdentidadeSenha {
     return undefined;
   }
 
-  /** Token de uso único para formulários, contra CSRF em POST. */
+  /** Single-use token for forms, against CSRF on POST. */
   novoToken(): string { return randomBytes(24).toString('base64url'); }
 }

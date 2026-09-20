@@ -7,19 +7,20 @@ import { dirname } from 'node:path';
 const derivar = promisify(scrypt) as (s: string, salt: Buffer, len: number) => Promise<Buffer>;
 
 /**
- * Autenticação própria: quem entra, com usuário e senha, sem depender de provedor nenhum.
+ * Authentication of its own: who gets in, with user and password, depending on no provider.
  *
- * Existe para o Doc First poder ser usado como o Keycloak é: sobe a imagem, entra com admin, começa
- * a trabalhar. Até aqui a identidade era o IAP do Google, e isso amarrava o método a uma nuvem
- * específica — quem não estivesse no GCP não tinha como usar.
+ * It exists so Doc First can be used the way Keycloak is: start the image, log in as admin, get to
+ * work. Until here identity came from Google IAP, and that tied the method to one specific cloud —
+ * anyone outside GCP had no way to use it.
  *
- * Sobre as senhas:
- * - guardadas com **scrypt** (o Node traz nativo), sal por pessoa, nunca em texto;
- * - comparação em **tempo constante**, para o tempo de resposta não revelar quantos caracteres batem;
- * - a senha inicial do admin é **gerada aleatoriamente** e mostrada UMA VEZ no log da primeira
- *   subida. "admin/admin" é convidativo, mas quem sobe e esquece fica com a porta aberta — e
- *   ferramenta de documentação interna costuma ficar anos no ar sem ninguém olhar;
- * - trocar a senha inicial é **obrigatório**: enquanto não trocar, a pessoa só acessa a troca.
+ * About the passwords:
+ * - stored with **scrypt** (Node ships it), one salt per person, never in plain text;
+ * - comparison in **constant time**, so the response time does not reveal how many characters match;
+ * - the admin's initial password is **randomly generated** and shown ONCE in the log of the first
+ *   start. "admin/admin" is inviting, but whoever starts it and forgets leaves the door open — and
+ *   an internal documentation tool tends to stay up for years with nobody looking;
+ * - changing the initial password is **mandatory**: until it changes, the person reaches only the
+ *   change screen.
  */
 export interface Pessoa {
   email: string;
@@ -58,7 +59,7 @@ export class Pessoas {
     return derivar(senha.normalize('NFKC'), sal, 64);
   }
 
-  /** Cria a pessoa. Devolve a senha gerada quando nenhuma é informada. */
+  /** Creates the person. Returns the generated password when none is given. */
   async criar(email: string, nome: string, senha?: string, precisaTrocar = true): Promise<string> {
     const senhaFinal = senha ?? randomBytes(12).toString('base64url');
     const sal = randomBytes(16);
@@ -69,12 +70,12 @@ export class Pessoas {
     return senhaFinal;
   }
 
-  /** Confere a senha. Devolve a pessoa, ou null — sem dizer se o e-mail existe. */
+  /** Checks the password. Returns the person, or null — without saying whether the e-mail exists. */
   async conferir(email: string, senha: string): Promise<Pessoa | null> {
     const l = this.#db.prepare('SELECT * FROM pessoas WHERE email = ?')
       .get(email.toLowerCase().trim()) as Record<string, any> | undefined;
 
-    // Mesmo sem a pessoa, derivamos um hash: sem isto, o tempo de resposta diria se o e-mail existe.
+    // Derive a hash even with no person: without this, the response time would tell whether the e-mail exists.
     const sal = l ? Buffer.from(l.sal) : randomBytes(16);
     const calculado = await this.#hash(senha, sal);
     if (!l) return null;
@@ -102,7 +103,7 @@ export class Pessoas {
     return (this.#db.prepare('SELECT COUNT(*) c FROM pessoas').get() as any).c === 0;
   }
 
-  // ---------------------------------------------------------------- sessões
+  // --------------------------------------------------------------- sessions
   abrirSessao(email: string, horas = 12): string {
     const id = randomBytes(32).toString('base64url');
     const agora = new Date();

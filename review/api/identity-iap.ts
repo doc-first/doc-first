@@ -1,16 +1,16 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 /**
- * Quem está usando vem do IAP: o cabeçalho `x-goog-iap-jwt-assertion` é assinado pelo Google (ES256).
- * Validamos assinatura, emissor e audiência — o cabeçalho de e-mail sozinho NÃO é confiável e é
- * ignorado de propósito.
+ * Who is using it comes from IAP: the `x-goog-iap-jwt-assertion` header is signed by Google
+ * (ES256). Signature, issuer and audience all get validated — the e-mail header alone is NOT
+ * trustworthy and is ignored on purpose.
  *
- * O atalho de desenvolvimento (`X-Dev-Email`) exige DUAS condições: ambiente de desenvolvimento E
- * `REVISAO_MODO=local`. Antes bastava a segunda, e dava para ligá-lo num serviço publicado e virar
- * owner com um cabeçalho, sem JWT nenhum.
+ * The development shortcut (`X-Dev-Email`) demands TWO conditions: development environment AND
+ * `REVISAO_MODO=local`. The second one used to be enough, and that allowed turning it on in a
+ * published service and becoming owner with one header, no JWT at all.
  *
- * O `createRemoteJWKSet` do jose já resolve o que era feito à mão no C#: cache das chaves, trava
- * contra busca concorrente, e nova busca quando aparece um `kid` desconhecido (rotação do Google).
+ * jose's `createRemoteJWKSet` already solves what was hand-written in C#: key cache, a lock against
+ * concurrent fetches, and a new fetch when an unknown `kid` shows up (Google rotation).
  */
 export class Identidade {
   #jwks: ReturnType<typeof createRemoteJWKSet>;

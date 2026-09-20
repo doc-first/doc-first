@@ -4,13 +4,14 @@ import { dirname } from 'node:path';
 import type { Evento, NovoEvento, Registro } from './types.ts';
 
 /**
- * Persistência em SQLite, usando o `node:sqlite` embutido — **nenhuma dependência externa**.
+ * SQLite persistence on the built-in `node:sqlite` — **no external dependency**.
  *
- * É o que permite subir o Doc First e usar, sem banco, sem nuvem, sem conta em lugar nenhum: um
- * arquivo no disco. Para valer em equipe, troque por Postgres/MySQL implementando a mesma interface
- * `Registro` — são cinco métodos.
+ * It is what lets someone start Doc First and use it with no database, no cloud, no account
+ * anywhere: one file on disk. For a team, swap in Postgres/MySQL by implementing the same
+ * `Registro` interface — five methods.
  *
- * SÓ INCLUI, como manda o método: não existe UPDATE nem DELETE neste arquivo. O rastro é o produto.
+ * INSERT ONLY, as the method demands: there is no UPDATE and no DELETE in this file. The trail is
+ * the product.
  */
 export class RegistroSqlite implements Registro {
   #db: DatabaseSync;
@@ -20,9 +21,10 @@ export class RegistroSqlite implements Registro {
       if (caminho !== ':memory:') mkdirSync(dirname(caminho), { recursive: true });
       this.#db = new DatabaseSync(caminho);
     } catch (e) {
-      // O erro cru do SQLite é "unable to open database file", que não diz onde nem por quê. Num
-      // contêiner isso é quase sempre permissão: o processo roda como `node`, e um volume montado
-      // do host chega com o dono do host — o chown da imagem não alcança bind mount.
+      // The raw SQLite error is "unable to open database file", which says neither where nor why.
+      // In a container it is almost always permission: the process runs as `node`, and a volume
+      // mounted from the host arrives owned by the host user — the image chown never reaches a
+      // bind mount.
       const causa = (e as NodeJS.ErrnoException).code === 'EACCES' || /unable to open/i.test(String(e))
         ? `sem permissão de escrita em ${dirname(caminho)}`
         : String((e as Error).message ?? e);
@@ -32,7 +34,7 @@ export class RegistroSqlite implements Registro {
         '  Com pasta do host, dê o dono a quem roda:  mkdir -p dados && sudo chown 1000:1000 dados');
     }
 
-    // WAL: leitura não bloqueia escrita. Numa ferramenta de revisão, várias abas leem ao mesmo tempo.
+    // WAL: a read does not block a write. In a review tool, several tabs read at the same time.
     this.#db.exec('PRAGMA journal_mode = WAL');
     this.#db.exec('PRAGMA foreign_keys = ON');
     this.#db.exec(`
@@ -85,7 +87,7 @@ export class RegistroSqlite implements Registro {
     if (!velha) return;
 
     const quantos = this.#db.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number };
-    if (quantos.n > 0) return;                       // já migrado: não duplica
+    if (quantos.n > 0) return;                       // already migrated: do not duplicate
 
     const linhas = this.#db.prepare('SELECT COUNT(*) AS n FROM eventos').get() as { n: number };
     if (linhas.n === 0) return;

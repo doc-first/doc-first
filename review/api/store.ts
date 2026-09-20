@@ -1,7 +1,7 @@
 import { Firestore, FieldValue } from '@google-cloud/firestore';
 import type { Evento, NovoEvento, Registro } from './types.ts';
 
-/** Só para rodar e testar na máquina. Não persiste. */
+/** Only for running and testing on the machine. Persists nothing. */
 export class RegistroEmMemoria implements Registro {
   #eventos: Evento[] = [];
 
@@ -19,9 +19,9 @@ export class RegistroEmMemoria implements Registro {
 }
 
 /**
- * Firestore, coleção `eventos`. SÓ INCLUI: `create` falha se o documento já existir, então não há
- * caminho de código que sobrescreva um fato. A garantia de "nada se apaga" é do código — o IAM do
- * projeto ainda permite delete, e isso está registrado como dívida em docs/DIVIDA-TECNICA.md.
+ * Firestore, `eventos` collection. INSERT ONLY: `create` fails if the document already exists, so
+ * no code path overwrites a fact. Here the "nothing is erased" guarantee comes from the code — the
+ * project IAM still allows delete, and that is logged as debt in docs/DIVIDA-TECNICA.md.
  */
 export class RegistroFirestore implements Registro {
   #db: Firestore;
