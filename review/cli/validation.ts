@@ -4,7 +4,7 @@ import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
 import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
 import { readConfig } from '../core/config.js';
-import { semaforo as calcular, quemDependeDe, CORES } from '../core/validity.js';
+import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
 import { Fonte } from './remote.ts';
 
 /**
@@ -205,11 +205,11 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
 export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}) {
   const trechos = await lerTrechos(raiz);
   const reg = carregar(raiz);
-  const { porTrecho, placar } = calcular(trechos as never, reg as never);
+  const { byBlock, tally } = trafficLight(trechos as never, reg as never);
 
   const total = trechos.size;
   const linha = (e: 'valid' | 'stale' | 'broken' | 'none', nome: string) =>
-    `  ${CORES[e]} ${String(placar[e]).padStart(4)}  ${nome}`;
+    `  ${COLOURS[e]} ${String(tally[e]).padStart(4)}  ${nome}`;
 
   console.log(`\nDocumentação: ${total} trecho(s)\n`);
   console.log(linha('valid',  'validados, e nada mudou desde então'));
@@ -219,16 +219,16 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
 
   // O vermelho vem primeiro e com nome: é o único estado que ninguém descobre sozinho lendo a
   // página, porque nada nela mudou.
-  const vermelhos = [...porTrecho].filter(([, r]) => r.estado === 'broken');
+  const vermelhos = [...byBlock].filter(([, r]) => r.state === 'broken');
   if (vermelhos.length) {
     console.log(`\n🔴 Precisam de conferência — mudou o chão, não o texto:\n`);
     for (const [id, r] of vermelhos) {
       console.log(`  ${id}`);
-      console.log(`     depende de: ${r.culpados.join(', ')} — e isso mudou desde o ✓`);
+      console.log(`     depende de: ${r.blame.join(', ')} — e isso mudou desde o ✓`);
     }
   }
 
-  const amarelos = [...porTrecho].filter(([, r]) => r.estado === 'stale');
+  const amarelos = [...byBlock].filter(([, r]) => r.state === 'stale');
   if (amarelos.length && opcoes.so !== 'vermelho') {
     console.log(`\n🟡 Reaprovar (o texto mudou):\n  ${amarelos.map(([id]) => id).join('  ')}`);
   }
@@ -237,7 +237,7 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
     console.log(`\n✓ nada pendente de conferência.`);
   }
   console.log('');
-  return placar;
+  return tally;
 }
 
 /** O que mais preciso olhar se eu mexer aqui? A pergunta que se faz ANTES de editar. */
@@ -245,7 +245,7 @@ export async function seEuMexer(raiz: string, id: string) {
   const trechos = await lerTrechos(raiz);
   if (!trechos.has(id)) { console.log(`✗ não achei o trecho ${id}`); return 1; }
 
-  const dependentes = quemDependeDe(id, trechos as never);
+  const dependentes = dependentsOf(id, trechos as never);
   const reg = carregar(raiz);
 
   console.log(`\nSe você mexer em ${id}:\n`);
@@ -314,10 +314,10 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
 
 /** O catálogo de tipos, para quem está escrevendo e quer saber o que existe. */
 export async function tipos() {
-  const { catalogo } = await import('../core/kinds.js');
+  const { catalogue } = await import('../core/kinds.js');
   console.log('\nTipos de conteúdo — todo trecho validável é de um destes:\n');
-  for (const t of catalogo()) {
-    console.log(`  ${t.id.padEnd(11)} ${t.nome}${t.numerado ? '' : '   (sem número na página)'}`);
-    console.log(`  ${''.padEnd(11)} ${t.descricao.replace(/\s+/g, ' ')}\n`);
+  for (const t of catalogue()) {
+    console.log(`  ${t.id.padEnd(11)} ${t.name}${t.numbered ? '' : '   (sem número na página)'}`);
+    console.log(`  ${''.padEnd(11)} ${t.description.replace(/\s+/g, ' ')}\n`);
   }
 }

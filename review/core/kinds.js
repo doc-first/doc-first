@@ -1,189 +1,192 @@
 /**
- * O catálogo de tipos de conteúdo. Todo pedaço validável da documentação é de UM tipo, e cada tipo
- * sabe o que exige de si mesmo.
+ * The catalogue of content kinds. Every validatable piece of documentation is of ONE kind, and
+ * each kind knows what it demands of itself.
  *
- * Por que tipificar, e não deixar "um trecho é um trecho": porque a pergunta *"isto está bom?"* não
- * é a mesma para um título e para um diagrama. Um diagrama tem de ser texto para entrar na digital.
- * Uma imagem tem de ter descrição, ou não existe para quem usa leitor de tela. Uma decisão sem dono
- * não é uma decisão pendente — é uma decisão perdida.
+ * Why type content at all, instead of "a block is a block": because the question *"is this good?"*
+ * is not the same for a heading and for a diagram. A diagram has to be text to enter the
+ * fingerprint. An image has to carry a description, or it does not exist for anyone using a screen
+ * reader. A decision without an owner is not a pending decision — it is a lost one.
  *
- * Sem tipo, essas regras viram convenção oral, e convenção oral morre na terceira pessoa que entra
- * no projeto.
+ * Without kinds, those rules become spoken convention, and spoken convention dies with the third
+ * person who joins the project.
  *
- * ⚠️ Um tipo NÃO muda quem aprova nem como a digital é calculada. Ele muda **o que se cobra** antes
- * de considerar o trecho pronto para aprovação. A trava continua uma só.
+ * ⚠️ A kind does NOT change who approves, nor how the fingerprint is computed. It changes **what is
+ * demanded** before a block counts as ready for approval. There is still only one lock.
  * @module
  */
 
 /**
  * @typedef {{
- *   nome: string,
- *   descricao: string,
- *   numerado: boolean,
- *   exige?: (trecho: {texto: string, html: string, atributos: Record<string,string>}) => string[],
- * }} Tipo
+ *   name: string,
+ *   description: string,
+ *   numbered: boolean,
+ *   demands?: (block: {text: string, html: string, attributes: Record<string,string>}) => string[],
+ * }} Kind
  */
 
-/** Uma exigência que falhou devolve a frase do que fazer, não o nome da regra. */
-const vazio = () => [];
+/** A failed demand returns the sentence of what to do, not the name of the rule. */
+const nothing = () => [];
 
-/** @type {Record<string, Tipo>} */
-export const TIPOS = {
-  // ---------------------------------------------------------------- estrutura
+/** @type {Record<string, Kind>} */
+export const KINDS = {
+  // ---------------------------------------------------------------- structure
   title: {
-    nome: 'título',
-    descricao: 'o título de uma página ou seção. Não mostra número, mas TEM trava: mudar um título '
-      + 'muda o sentido de tudo que vem abaixo.',
-    numerado: false,
-    exige: ({ texto }) => texto.trim().length > 80
-      ? ['título com mais de 80 caracteres — provavelmente é um parágrafo disfarçado'] : [],
+    name: 'heading',
+    description: 'the title of a page or a section. Shows no number, but IS locked: changing a '
+      + 'heading changes the meaning of everything under it.',
+    numbered: false,
+    demands: ({ text }) => text.trim().length > 80
+      ? ['heading longer than 80 characters — probably a paragraph in disguise'] : [],
   },
   subtitle: {
-    nome: 'subtítulo',
-    descricao: 'a linha que explica a seção em uma frase, logo abaixo do título.',
-    numerado: false,
-    exige: vazio,
+    name: 'subheading',
+    description: 'the one line that explains the section, right under the heading.',
+    numbered: false,
+    demands: nothing,
   },
 
-  // ---------------------------------------------------------------- texto
+  // ---------------------------------------------------------------- text
   text: {
-    nome: 'texto',
-    descricao: 'um parágrafo. O tipo mais comum, e o padrão de quem não declara nada.',
-    numerado: true,
-    exige: vazio,
+    name: 'text',
+    description: 'a paragraph. The most common kind, and the default for anything undeclared.',
+    numbered: true,
+    demands: nothing,
   },
   list: {
-    nome: 'lista',
-    descricao: 'itens em sequência. Uma lista de um item só é um parágrafo mal vestido.',
-    numerado: true,
-    exige: ({ html }) => (html.match(/<li\b/g) ?? []).length < 2
-      ? ['lista com menos de dois itens — ou vire parágrafo, ou acrescente o resto'] : [],
+    name: 'list',
+    description: 'items in sequence. A one-item list is a paragraph in bad clothing.',
+    numbered: true,
+    demands: ({ html }) => (html.match(/<li\b/g) ?? []).length < 2
+      ? ['list with fewer than two items — either make it a paragraph, or add the rest'] : [],
   },
   box: {
-    nome: 'caixa de informação',
-    descricao: 'um aviso, uma ressalva, uma nota. Precisa dizer de que tipo é — info, alerta, '
-      + 'proibição —, senão vira só um parágrafo com borda.',
-    numerado: true,
-    exige: ({ atributos }) => atributos['data-box'] ? []
-      : ['caixa sem data-box: diga se é info, alerta, ok ou proibido'],
+    name: 'callout',
+    description: 'a warning, a caveat, a note. It has to say which it is — info, warning, ban — '
+      + 'otherwise it is just a paragraph with a border, and the colour means nothing.',
+    numbered: true,
+    demands: ({ attributes }) => attributes['data-box'] ? []
+      : ['callout without data-box: say whether it is info, warning, ok or forbidden'],
   },
   table: {
-    nome: 'tabela',
-    descricao: 'dados em linhas e colunas. Toda tabela precisa de cabeçalho — sem ele, ninguém '
-      + 'que use leitor de tela sabe o que cada célula significa.',
-    numerado: true,
-    exige: ({ html }) => /<th\b/.test(html) ? []
-      : ['tabela sem <th>: sem cabeçalho, a tabela não é legível por leitor de tela'],
+    name: 'table',
+    description: 'data in rows and columns. Every table needs a header row — without it, nobody '
+      + 'using a screen reader knows what each cell means.',
+    numbered: true,
+    demands: ({ html }) => /<th\b/.test(html) ? []
+      : ['table without <th>: with no header, the table is unreadable by a screen reader'],
   },
 
   // ---------------------------------------------------------------- visual
   image: {
-    nome: 'imagem',
-    descricao: 'uma figura. ⚠️ O texto dentro de uma imagem NÃO entra na digital — mudar a imagem '
-      + 'não muda a digital do trecho, e por isso a descrição é obrigatória: é ela que é revisável.',
-    numerado: true,
-    exige: ({ html }) => {
-      const faltas = [];
+    name: 'image',
+    description: 'a figure. ⚠️ Text INSIDE an image does not enter the fingerprint — swapping the '
+      + 'image does not change the block fingerprint, which is why the description is mandatory: '
+      + 'it is the only reviewable part of it.',
+    numbered: true,
+    demands: ({ html }) => {
+      const missing = [];
       if (/<img\b/.test(html) && !/\balt="[^"]+"/.test(html)) {
-        faltas.push('imagem sem alt: descreva o que ela mostra — é a única parte dela que entra na trava');
+        missing.push('image without alt: describe what it shows — it is the only part of it under the lock');
       }
-      return faltas;
+      return missing;
     },
   },
   diagram: {
-    nome: 'diagrama',
-    descricao: 'um fluxo, um modelo, uma arquitetura — EM TEXTO (Mermaid, PlantUML). '
-      + 'Diagrama como imagem não tem digital útil: recomprimir muda os bytes sem mudar o sentido, '
-      + 'e mudar o sentido não aparece no diff.',
-    numerado: true,
-    exige: ({ html }) => /<img\b/.test(html)
-      ? ['diagrama como imagem: use Mermaid ou PlantUML em <code>, para o diagrama entrar na trava']
+    name: 'diagram',
+    description: 'a flow, a model, an architecture — AS TEXT (Mermaid, PlantUML). A diagram as an '
+      + 'image has no useful fingerprint: recompressing changes the bytes without changing the '
+      + 'meaning, and changing the meaning does not show up in a diff.',
+    numbered: true,
+    demands: ({ html }) => /<img\b/.test(html)
+      ? ['diagram as an image: use Mermaid or PlantUML inside <code>, so it comes under the lock']
       : [],
   },
   colors: {
-    nome: 'paleta',
-    descricao: 'cores da marca, com o valor junto. "Azul primário" não é um valor; "#0883C5" é.',
-    numerado: true,
-    exige: ({ texto }) => /#[0-9a-fA-F]{3,8}\b|\b(rgb|hsl|oklch)\(/.test(texto) ? []
-      : ['paleta sem nenhum valor de cor: escreva o hexadecimal, não só o nome'],
+    name: 'palette',
+    description: 'brand colours, with the value next to them. "Primary blue" is not a value; '
+      + '"#0883C5" is.',
+    numbered: true,
+    demands: ({ text }) => /#[0-9a-fA-F]{3,8}\b|\b(rgb|hsl|oklch)\(/.test(text) ? []
+      : ['palette with no colour value: write the hex, not just the name'],
   },
 
-  // ---------------------------------------------------------------- técnico
+  // ---------------------------------------------------------------- technical
   config: {
-    nome: 'configuração',
-    descricao: 'uma variável, um parâmetro, um valor que muda por ambiente.',
-    numerado: true,
-    exige: vazio,
+    name: 'configuration',
+    description: 'a variable, a parameter, a value that differs per environment.',
+    numbered: true,
+    demands: nothing,
   },
   contract: {
-    nome: 'contrato',
-    descricao: 'uma rota, um evento, um payload. É promessa pública: quebrar aqui quebra o sistema '
-      + 'de outra pessoa.',
-    numerado: true,
-    exige: vazio,
+    name: 'contract',
+    description: 'a route, an event, a payload. It is a public promise: breaking it here breaks '
+      + "somebody else's system.",
+    numbered: true,
+    demands: nothing,
   },
   model: {
-    nome: 'modelagem',
-    descricao: 'uma entidade, um relacionamento, um campo do dicionário de dados.',
-    numerado: true,
-    exige: vazio,
+    name: 'data model',
+    description: 'an entity, a relationship, a field of the data dictionary.',
+    numbered: true,
+    demands: nothing,
   },
 
-  // ---------------------------------------------------------------- decisão
+  // ---------------------------------------------------------------- decision
   rationale: {
-    nome: 'justificativa',
-    descricao: 'por que foi assim, e o que foi descartado. A alternativa descartada é a parte que '
-      + 'mais vale: ela prova que houve escolha, e não inércia.',
-    numerado: true,
-    exige: vazio,
+    name: 'rationale',
+    description: 'why it was done this way, and what was rejected. The rejected alternative is the '
+      + 'part that pays: it proves there was a choice, and not just inertia.',
+    numbered: true,
+    demands: nothing,
   },
   decision: {
-    nome: 'decisão pendente',
-    descricao: 'o que falta decidir. Sem dono e sem prazo não é pendência — é decisão perdida.',
-    numerado: true,
-    exige: ({ atributos }) => {
-      const faltas = [];
-      if (!atributos['data-dono']) faltas.push('decisão sem data-dono: quem decide isto?');
-      if (!atributos['data-prazo']) faltas.push('decisão sem data-prazo: até quando?');
-      return faltas;
+    name: 'open decision',
+    description: 'what is still undecided. With no owner and no deadline it is not a pending '
+      + 'decision — it is a lost one.',
+    numbered: true,
+    demands: ({ attributes }) => {
+      const missing = [];
+      if (!attributes['data-dono']) missing.push('decision without data-dono: who decides this?');
+      if (!attributes['data-prazo']) missing.push('decision without data-prazo: by when?');
+      return missing;
     },
   },
 };
 
-export const PADRAO = 'text';
+export const DEFAULT_KIND = 'text';
 
 /**
- * O tipo de um trecho: o que ele declara, ou o que dá para deduzir de como foi escrito.
+ * The kind of a block: what it declares, or what can be inferred from how it was written.
  *
- * A dedução existe para o método não começar cobrando: documentação que já existe passa a ter tipo
- * sem ninguém reescrever nada, e quem quiser precisão declara.
+ * Inference exists so the method does not start by demanding: documentation that already exists
+ * gets kinds without anyone rewriting anything, and whoever wants precision declares it.
  *
- * @param {{ atributos: Record<string,string>, classes: string[], tag: string, html: string }} t
+ * @param {{ attributes: Record<string,string>, classes: string[], tag: string, html: string }} b
  */
-export function tipoDe(t) {
-  const declarado = t.atributos['data-tipo'];
-  if (declarado && TIPOS[declarado]) return declarado;
-  if (declarado) return PADRAO;                       // tipo inventado: cai no padrão, e o lint acusa
+export function kindOf(b) {
+  const declared = b.attributes['data-tipo'];
+  if (declared && KINDS[declared]) return declared;
+  if (declared) return DEFAULT_KIND;               // made-up kind: falls back, and the lint reports
 
-  const cod = t.atributos['data-cod'] ?? '';
-  if (/\.titulo$/.test(cod) || /^h[1-3]$/.test(t.tag)) return 'title';
-  if (/\.sub$/.test(cod) || t.classes.includes('lead-secao')) return 'subtitle';
+  const code = b.attributes['data-cod'] ?? '';
+  if (/\.titulo$/.test(code) || /^h[1-3]$/.test(b.tag)) return 'title';
+  if (/\.sub$/.test(code) || b.classes.includes('lead-secao')) return 'subtitle';
 
-  if (/class="mermaid"|<pre\b/.test(t.html)) return 'diagram';
-  if (/<table\b/.test(t.html)) return 'table';
-  if (/<img\b/.test(t.html)) return 'image';
-  if (/<[uo]l\b/.test(t.html)) return 'list';
-  if (t.classes.some((c) => c.startsWith('caixa'))) return 'box';
-  return PADRAO;
+  if (/class="mermaid"|<pre\b/.test(b.html)) return 'diagram';
+  if (/<table\b/.test(b.html)) return 'table';
+  if (/<img\b/.test(b.html)) return 'image';
+  if (/<[uo]l\b/.test(b.html)) return 'list';
+  if (b.classes.some((c) => c.startsWith('caixa'))) return 'box';
+  return DEFAULT_KIND;
 }
 
-/** O que falta neste trecho para ele estar pronto para aprovação. */
-export function oQueFalta(tipo, trecho) {
-  const t = TIPOS[tipo];
-  if (!t) return [`tipo desconhecido: "${tipo}" — veja review/core/kinds.js`];
-  return t.exige ? t.exige(trecho) : [];
+/** What this block is still missing before it is ready for approval. */
+export function whatIsMissing(kind, block) {
+  const k = KINDS[kind];
+  if (!k) return [`unknown kind: "${kind}" — see review/core/kinds.js`];
+  return k.demands ? k.demands(block) : [];
 }
 
-/** Os tipos existentes, para o catálogo e para o `doc-first tipos`. */
-export const catalogo = () =>
-  Object.entries(TIPOS).map(([id, t]) => ({ id, ...t, exige: undefined }));
+/** Every kind there is, for the catalogue and for `doc-first kinds`. */
+export const catalogue = () =>
+  Object.entries(KINDS).map(([id, k]) => ({ id, ...k, demands: undefined }));

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { readConfig } from '../core/config.js';
 import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
-import { tipoDe, oQueFalta } from '../core/kinds.js';
+import { kindOf, whatIsMissing } from '../core/kinds.js';
 
 /**
  * Leitura das folhas do repositório: quais trechos existem, o texto de cada um e a digital.
@@ -69,15 +69,17 @@ export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
       const texto = copia.textContent ?? '';
       const atributos: Record<string, string> = {};
       for (const a of Array.from(el.attributes ?? [])) atributos[(a as Attr).name] = (a as Attr).value;
-      const contexto = { texto: texto.replace(/\s+/g, ' ').trim(), html: el.innerHTML ?? '', atributos };
-      const tipo = tipoDe({
-        atributos, classes: (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean),
+      const contexto = {
+        text: texto.replace(/\s+/g, ' ').trim(), html: el.innerHTML ?? '', attributes: atributos,
+      };
+      const tipo = kindOf({
+        attributes: atributos, classes: (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean),
         tag: (el.tagName ?? 'div').toLowerCase(), html: contexto.html,
       });
 
       mapa.set(id, {
         id, pagina: id.split('.')[0], caminho, cod,
-        tipo, falta: oQueFalta(tipo, contexto),
+        tipo, falta: whatIsMissing(tipo, contexto),
         arquivo: nomeCurto(raiz, caminho),
         texto: texto.replace(/\s+/g, ' ').trim(),
         digital: await fingerprintOfText(texto),

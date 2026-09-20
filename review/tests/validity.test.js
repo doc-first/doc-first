@@ -5,63 +5,63 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { estadoDoTrecho, semaforo, quemDependeDe } from '../core/validity.js';
+import { stateOf, trafficLight, dependentsOf } from '../core/validity.js';
 
-const trecho = (id, digital, depende = []) => [id, { id, digital, depende }];
+const trecho = (id, fingerprint, dependsOn = []) => [id, { id, fingerprint, dependsOn }];
 
-test('branco: ninguém validou ainda', () => {
-  const r = estadoDoTrecho({ id: 'A.1.1', digital: 'aaa' }, undefined, new Map());
-  assert.equal(r.estado, 'none');
+test('white: nobody has validated it yet', () => {
+  const r = stateOf({ id: 'A.1.1', fingerprint: 'aaa' }, undefined, new Map());
+  assert.equal(r.state, 'none');
 });
 
-test('verde: validado e nada mudou', () => {
-  const r = estadoDoTrecho({ id: 'A.1.1', digital: 'aaa' }, { digital_texto: 'aaa' }, new Map());
-  assert.equal(r.estado, 'valid');
+test('green: validated and nothing changed', () => {
+  const r = stateOf({ id: 'A.1.1', fingerprint: 'aaa' }, { digital_texto: 'aaa' }, new Map());
+  assert.equal(r.state, 'valid');
 });
 
-test('amarelo: o texto do próprio trecho mudou depois do ✓', () => {
-  const r = estadoDoTrecho({ id: 'A.1.1', digital: 'NOVO' }, { digital_texto: 'aaa' }, new Map());
-  assert.equal(r.estado, 'stale');
-  assert.match(r.porque, /ninguém aprovou o texto novo/);
+test("yellow: the block's own text changed after the ✓", () => {
+  const r = stateOf({ id: 'A.1.1', fingerprint: 'NOVO' }, { digital_texto: 'aaa' }, new Map());
+  assert.equal(r.state, 'stale');
+  assert.match(r.why, /nobody approved the new text/);
 });
 
-test('VERMELHO: o texto está igual, mas a base mudou', () => {
+test('RED: the text is unchanged, but the ground moved', () => {
   // Este é o caso que justifica o módulo existir. A digital do trecho bate — ele está idêntico ao
   // que foi aprovado. O que mudou foi a regra em que ele se apoia.
   const agora = new Map([['B.2.1', 'MUDOU']]);
-  const r = estadoDoTrecho(
-    { id: 'A.1.1', digital: 'aaa', depende: ['B.2.1'] },
+  const r = stateOf(
+    { id: 'A.1.1', fingerprint: 'aaa', dependsOn: ['B.2.1'] },
     { digital_texto: 'aaa', depende: { 'B.2.1': 'era-assim' } },
     agora,
   );
-  assert.equal(r.estado, 'broken');
-  assert.deepEqual(r.culpados, ['B.2.1']);
+  assert.equal(r.state, 'broken');
+  assert.deepEqual(r.blame, ['B.2.1']);
 });
 
-test('vermelho também quando a dependência SOME', () => {
+test('red when the dependency VANISHES, too', () => {
   // Apontar para um trecho que não existe mais é tão quebrado quanto apontar para um que mudou —
   // e é mais fácil de acontecer, porque apagar não deixa rastro no texto de quem dependia.
-  const r = estadoDoTrecho(
-    { id: 'A.1.1', digital: 'aaa', depende: ['SUMIU.1.1'] },
+  const r = stateOf(
+    { id: 'A.1.1', fingerprint: 'aaa', dependsOn: ['SUMIU.1.1'] },
     { digital_texto: 'aaa', depende: { 'SUMIU.1.1': 'existia' } },
     new Map(),
   );
-  assert.equal(r.estado, 'broken');
-  assert.deepEqual(r.culpados, ['SUMIU.1.1']);
+  assert.equal(r.state, 'broken');
+  assert.deepEqual(r.blame, ['SUMIU.1.1']);
 });
 
-test('amarelo vence vermelho: se o próprio texto mudou, é esse o problema a resolver', () => {
+test("yellow beats red: if the block's own text changed, that is the problem to fix", () => {
   // Ordem importa. Dizer "a base mudou" para quem também reescreveu o próprio texto manda a pessoa
   // olhar o lugar errado — primeiro se reaprova o que está na frente dos olhos.
-  const r = estadoDoTrecho(
-    { id: 'A.1.1', digital: 'NOVO', depende: ['B.2.1'] },
+  const r = stateOf(
+    { id: 'A.1.1', fingerprint: 'NOVO', dependsOn: ['B.2.1'] },
     { digital_texto: 'aaa', depende: { 'B.2.1': 'era-assim' } },
     new Map([['B.2.1', 'MUDOU']]),
   );
-  assert.equal(r.estado, 'stale');
+  assert.equal(r.state, 'stale');
 });
 
-test('o placar da documentação inteira', () => {
+test('the tally for the whole documentation', () => {
   const trechos = new Map([
     trecho('A.1.1', 'aaa'),                     // validado, intacto  → verde
     trecho('A.1.2', 'NOVO'),                    // texto mudou        → amarelo
@@ -74,18 +74,18 @@ test('o placar da documentação inteira', () => {
     'A.1.2': { digital_texto: 'antigo' },
     'A.1.3': { digital_texto: 'ccc', depende: { 'A.1.4': 'era-assim' } },
   };
-  const { placar, porTrecho } = semaforo(trechos, registro);
-  assert.deepEqual(placar, { none: 2, valid: 1, stale: 1, broken: 1 });
-  assert.equal(porTrecho.get('A.1.3').estado, 'broken');
+  const { tally, byBlock } = trafficLight(trechos, registro);
+  assert.deepEqual(tally, { none: 2, valid: 1, stale: 1, broken: 1 });
+  assert.equal(byBlock.get('A.1.3').state, 'broken');
 });
 
-test('quem depende de um trecho — a pergunta que a pessoa faz antes de mexer', () => {
+test('what depends on a block — the question people ask before editing', () => {
   const trechos = new Map([
     trecho('A.1.1', 'aaa'),
     trecho('A.2.1', 'bbb', ['A.1.1']),
     trecho('A.3.1', 'ccc', ['A.1.1', 'A.2.1']),
     trecho('A.4.1', 'ddd'),
   ]);
-  assert.deepEqual(quemDependeDe('A.1.1', trechos).sort(), ['A.2.1', 'A.3.1']);
-  assert.deepEqual(quemDependeDe('A.4.1', trechos), []);
+  assert.deepEqual(dependentsOf('A.1.1', trechos).sort(), ['A.2.1', 'A.3.1']);
+  assert.deepEqual(dependentsOf('A.4.1', trechos), []);
 });

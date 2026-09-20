@@ -1,115 +1,118 @@
 /**
- * O semáforo da documentação viva: em que estado está a validação de cada trecho.
+ * The traffic light of living documentation: what state each block's validation is in.
  *
- * A pergunta que isto responde não é "alguém aprovou?", é **"a aprovação ainda vale?"**. São coisas
- * diferentes, e a segunda é a que importa numa documentação que muda.
+ * The question this answers is not "did someone approve it?" but **"does the approval still
+ * hold?"**. Those are different questions, and the second one is what matters in documentation
+ * that keeps changing.
  *
- *   ⚪ none     ninguém validou ainda
- *   🟢 valid    validado, e nada mudou desde então
- *   🟡 stale    o TEXTO deste trecho mudou depois do ✓ — ninguém aprovou o texto novo
- *   🔴 broken   o texto deste trecho está igual, mas algo de que ele DEPENDE mudou
+ *   ⚪ none     nobody has validated it yet
+ *   🟢 valid    validated, and nothing has changed since
+ *   🟡 stale    this block's TEXT changed after the ✓ — nobody approved the new text
+ *   🔴 broken   this block's text is unchanged, but something it DEPENDS ON changed
  *
- * O amarelo o motor já sabia ver desde o começo, pela digital. O vermelho é o que faz a
- * documentação ser viva em vez de só rastreável: é ele que diz *"isto aqui continua escrito do
- * mesmo jeito, mas a regra em que se apoiava mudou — vá conferir se ainda é verdade"*.
+ * The engine could always see yellow, through the fingerprint. Red is what makes documentation
+ * living rather than merely traceable: it is what says *"this is still written exactly as
+ * approved, but the rule it stood on moved — go check whether it is still true"*.
  *
- * ⚠️ Vermelho não é erro. É **pergunta**. O motor não sabe se o trecho ficou errado — sabe que ele
- * ficou SUSPEITO, e que um humano precisa olhar. Tratar como erro faria as pessoas desligarem a
- * checagem no primeiro falso positivo, e aí a trava inteira perde o sentido.
+ * ⚠️ Red is not an error. It is a **question**. The engine does not know the block became wrong —
+ * it knows the block became SUSPECT, and that a human needs to look. Treating it as an error would
+ * make people switch the check off at the first false positive, and then the whole lock is
+ * pointless.
  * @module
  */
 
-/** @typedef {'none'|'valid'|'stale'|'broken'} Estado */
+/** @typedef {'none'|'valid'|'stale'|'broken'} State */
 
 /**
- * Um trecho, do ponto de vista do semáforo.
+ * A block, as the traffic light sees it.
  * @typedef {{
  *   id: string,
- *   digital: string,
- *   depende?: string[],
- * }} Trecho
+ *   fingerprint: string,
+ *   dependsOn?: string[],
+ * }} Block
  */
 
 /**
- * O que está gravado sobre a validação de um trecho.
- * @typedef {{ digital_texto: string, data?: string, depende?: Record<string,string> }} Registro
+ * What was recorded when someone validated a block.
+ * @typedef {{ digital_texto: string, data?: string, depende?: Record<string,string> }} Record_
  */
 
-export const CORES = /** @type {const} */ ({
+export const COLOURS = /** @type {const} */ ({
   none: '⚪', valid: '🟢', stale: '🟡', broken: '🔴',
 });
 
 /**
- * O estado de UM trecho.
+ * The state of ONE block.
  *
- * @param {Trecho} trecho          como ele está agora, no disco
- * @param {Registro|undefined} reg o que foi gravado quando alguém validou
- * @param {Map<string, string>} digitaisAgora  id → digital atual de todos os trechos
- * @returns {{ estado: Estado, porque: string, culpados: string[] }}
+ * @param {Block} block             how it looks right now, on disk
+ * @param {Record_|undefined} record what was written down when someone validated it
+ * @param {Map<string, string>} fingerprintsNow  id → current fingerprint of every block
+ * @returns {{ state: State, why: string, blame: string[] }}
  */
-export function estadoDoTrecho(trecho, reg, digitaisAgora) {
-  if (!reg) return { estado: 'none', porque: 'ninguém validou ainda', culpados: [] };
+export function stateOf(block, record, fingerprintsNow) {
+  if (!record) return { state: 'none', why: 'nobody has validated it yet', blame: [] };
 
-  if (reg.digital_texto !== trecho.digital) {
+  if (record.digital_texto !== block.fingerprint) {
     return {
-      estado: 'stale',
-      porque: 'o texto mudou depois da validação — ninguém aprovou o texto novo',
-      culpados: [],
+      state: 'stale',
+      why: 'the text changed after validation — nobody approved the new text',
+      blame: [],
     };
   }
 
-  // O texto está igual. Resta saber se o chão embaixo dele continua o mesmo.
-  // `reg.depende` guarda a digital que CADA dependência tinha no momento do ✓. Comparar com a de
-  // agora é o que revela a mudança indireta — aquela que nenhuma digital deste trecho denuncia.
-  const dependiaDe = reg.depende ?? {};
-  const mudaram = Object.entries(dependiaDe)
-    .filter(([id, digitalEntao]) => {
-      const agora = digitaisAgora.get(id);
-      // Dependência que sumiu também é quebra: o trecho aponta para algo que não existe mais.
-      return agora === undefined || agora !== digitalEntao;
+  // The text is unchanged. What is left is whether the ground under it still is.
+  // `record.depende` holds the fingerprint EACH dependency had at the moment of the ✓. Comparing
+  // with today's is what reveals the indirect change — the one no fingerprint of this block
+  // denounces.
+  const dependedOn = record.depende ?? {};
+  const moved = Object.entries(dependedOn)
+    .filter(([id, fingerprintThen]) => {
+      const now = fingerprintsNow.get(id);
+      // A dependency that vanished is a break too: the block points at something that is gone.
+      return now === undefined || now !== fingerprintThen;
     })
     .map(([id]) => id);
 
-  if (mudaram.length) {
+  if (moved.length) {
     return {
-      estado: 'broken',
-      porque: `o texto continua igual, mas mudou aquilo de que ele depende: ${mudaram.join(', ')}`,
-      culpados: mudaram,
+      state: 'broken',
+      why: `the text is unchanged, but what it depends on moved: ${moved.join(', ')}`,
+      blame: moved,
     };
   }
 
-  return { estado: 'valid', porque: 'validado, e nada mudou desde então', culpados: [] };
+  return { state: 'valid', why: 'validated, and nothing has changed since', blame: [] };
 }
 
 /**
- * O semáforo da documentação inteira.
+ * The traffic light for the whole documentation.
  *
- * @param {Map<string, Trecho>} trechos
- * @param {Record<string, Registro>} registro
- * @returns {{ porTrecho: Map<string, {estado: Estado, porque: string, culpados: string[]}>,
- *             placar: Record<Estado, number> }}
+ * @param {Map<string, Block>} blocks
+ * @param {Record<string, Record_>} records
+ * @returns {{ byBlock: Map<string, {state: State, why: string, blame: string[]}>,
+ *             tally: Record<State, number> }}
  */
-export function semaforo(trechos, registro) {
-  const digitaisAgora = new Map([...trechos].map(([id, t]) => [id, t.digital]));
-  const porTrecho = new Map();
-  const placar = /** @type {Record<Estado, number>} */ ({ none: 0, valid: 0, stale: 0, broken: 0 });
+export function trafficLight(blocks, records) {
+  const fingerprintsNow = new Map([...blocks].map(([id, b]) => [id, b.fingerprint]));
+  const byBlock = new Map();
+  const tally = /** @type {Record<State, number>} */ ({ none: 0, valid: 0, stale: 0, broken: 0 });
 
-  for (const [id, t] of trechos) {
-    const r = estadoDoTrecho(t, registro[id], digitaisAgora);
-    porTrecho.set(id, r);
-    placar[r.estado]++;
+  for (const [id, b] of blocks) {
+    const r = stateOf(b, records[id], fingerprintsNow);
+    byBlock.set(id, r);
+    tally[r.state]++;
   }
-  return { porTrecho, placar };
+  return { byBlock, tally };
 }
 
 /**
- * Quem depende de um trecho — a pergunta ao contrário, e a que a pessoa realmente faz:
- * *"se eu mexer aqui, o que mais preciso olhar?"*
+ * What depends on a block — the question the other way round, and the one people actually ask:
+ * *"if I touch this, what else do I have to look at?"*
  *
  * @param {string} id
- * @param {Map<string, Trecho>} trechos
+ * @param {Map<string, Block>} blocks
  * @returns {string[]}
  */
-export function quemDependeDe(id, trechos) {
-  return [...trechos.values()].filter((t) => (t.depende ?? []).includes(id)).map((t) => t.id);
+export function dependentsOf(id, blocks) {
+  return [...blocks.values()].filter((b) => (b.dependsOn ?? []).includes(id)).map((b) => b.id);
 }
