@@ -1,0 +1,39 @@
+# Torna o pacote da imagem público.
+#
+# Por que existe um workflow para isto: a visibilidade do pacote no GHCR é separada da do
+# repositório, e o padrão é PRIVADO mesmo em repositório público. Mudar pela API exige um token com
+# escopo `write:packages`, que o `gh` local não tem por padrão — mas o GITHUB_TOKEN de uma execução
+# do Actions tem `packages: write`.
+#
+# Roda uma vez. Depois disso o pacote continua público, e este arquivo vira documentação de como
+# fazer de novo se alguém trocar.
+name: Pacote público
+
+on:
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tornar o pacote público
+        run: |
+          codigo=$(curl -s -o /tmp/resposta -w '%{http_code}' \
+            -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/doc-first \
+            -d '{"visibility":"public"}')
+          echo "HTTP $codigo"
+          cat /tmp/resposta
+          case "$codigo" in
+            2*) echo "✓ pacote público" ;;
+            *)  echo "✗ não deu. Faça à mão em:"
+                echo "  github.com/orgs/${{ github.repository_owner }}/packages/container/doc-first/settings"
+                exit 1 ;;
+          esac
