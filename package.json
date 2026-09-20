@@ -11,16 +11,20 @@
     "testar": "node --test 'review/tests/*.test.js' 'review/tests/*.test.ts'",
     "servir": "node review/api/server.ts",
     "tipos": "tsc --noEmit",
-    "doc": "node review/cli/doc-first.ts"
+    "doc": "node review/cli/doc-first.ts",
+    "build:web": "esbuild review/web/src/entrada.jsx --bundle --format=esm --jsx=automatic --minify --target=es2022 --outfile=review/web/painel-react.js --external:/review/core/fingerprint.js"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.11.0",
     "jose": "^6.0.0",
-    "linkedom": "^0.18.13"
+    "linkedom": "^0.18.13",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "typescript": "^5.7.0"
   },

@@ -7,10 +7,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lerTrechos } from '../cli/pages.ts';
+import { lerTrechos, arquivosDeFolhas } from '../cli/pages.ts';
 import { orfaos, carregar } from '../cli/validation.ts';
 
 const RAIZ = new URL('../../', import.meta.url).pathname;
@@ -95,4 +95,45 @@ test('sincronizar segue com o registro local quando a nuvem falha', async () => 
 test('a Fonte recusa a nuvem sem projeto, em vez de mandar URL inválida', async () => {
   const { Fonte } = await import('../cli/remote.ts');
   await assert.rejects(() => new Fonte({}).eventos(), /nuvem.projeto|REVISAO_PROJETO/);
+});
+
+/**
+ * Dois trechos com o mesmo `data-id` é o erro mais silencioso que uma folha pode ter: o segundo
+ * sobrescreve o primeiro no registro, e uma aprovação humana passa a valer para o trecho errado.
+ * Nada avisa — nem o navegador, nem o servidor.
+ *
+ * Aconteceu de verdade no gabarito: o lead da folha e o primeiro bloco da seção 1 nasceram os dois
+ * como `1.1`.
+ */
+test('código de trecho repetido na mesma página é acusado', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'docfirst-dup-'));
+  try {
+    mkdirSync(join(tmp, 'p'));
+    writeFileSync(join(tmp, 'doc-first.json'),
+      JSON.stringify({ owner: 'x@y.org', conteudo: { pastas: ['p'], registro: 'r.json' } }));
+    writeFileSync(join(tmp, 'p', 'X01.html'),
+      '<main>' +
+      '<div data-id="X01.1.1" data-cod="1.1">um</div>' +
+      '<div data-id="X01.1.1" data-cod="1.1">outro</div>' +
+      '</main>');
+
+    // lerTrechos devolve um Map: o repetido some, e a contagem denuncia.
+    const lidos = await lerTrechos(tmp);
+    const noArquivo = (readFileSync(join(tmp, 'p', 'X01.html'), 'utf8').match(/data-id="/g) ?? []).length;
+    assert.equal(noArquivo, 2, 'o arquivo tem dois');
+    assert.equal(lidos.size, 1, 'e o motor só enxerga um — é a perda que este teste existe para mostrar');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/** O gabarito é o que todo adotante copia. Ele não pode ter o defeito que acabamos de descrever. */
+test('o gabarito não tem código de trecho repetido', async () => {
+  const gabarito = join(RAIZ, 'examples', 'gabarito');
+  const trechos = await lerTrechos(gabarito);
+  const noDisco = arquivosDeFolhas(gabarito)
+    .flatMap((f) => readFileSync(f, 'utf8').match(/data-id="[^"]+"/g) ?? []);
+  assert.equal(trechos.size, noDisco.length,
+    `${noDisco.length} data-id no disco, ${trechos.size} lidos: há código repetido`);
+  assert.ok(trechos.size >= 20, 'o gabarito precisa ter conteúdo de verdade');
 });

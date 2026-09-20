@@ -33,6 +33,10 @@ COPY review ./review
 COPY examples ./examples
 COPY doc-first.json ./doc-first.json
 
+# O painel React é empacotado (`npm run build:web`) e o resultado é VERSIONADO — por isso ele já
+# vem aqui, sem passo de build na imagem. Um bundle que só existisse depois de `npm install`
+# quebraria a promessa de "clona e roda".
+
 # O banco fica FORA de /app, em volume. Sem isto o SQLite grava numa camada do contêiner: o serviço
 # sobe, responde, aceita aprovação — e perde tudo ao recriar.
 # ⚠️ Com PASTA DO HOST em vez de volume nomeado, o dono vem do host e este chown não alcança. Use

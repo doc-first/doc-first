@@ -1,0 +1,28 @@
+/* O mínimo para a página ficar legível e o painel de revisão funcionar.
+   Não é design: é o contrato em forma de CSS. */
+
+body.doc { font: 16px/1.6 system-ui, sans-serif; color: #222; margin: 0; background: #f7f7f8; }
+.doc-pagina { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; background: #fff;
+              min-height: 100vh; box-shadow: 0 0 2rem rgba(0,0,0,.06); }
+.doc-titulo { font-size: 1.6rem; line-height: 1.25; margin: 0 0 1.5rem; }
+.doc-titulo__cod { display: inline-block; background: #0883C5; color: #fff; border-radius: .3rem;
+                   padding: .1em .45em; margin-right: .4em; font-size: .8em; }
+h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
+h2 .n { color: #0883C5; margin-right: .3em; }
+code { background: #eef1f4; border-radius: .2rem; padding: .1em .35em; font-size: .9em; }
+
+/* ⚠️ position: relative é EXIGÊNCIA do motor, não estética. O botão de revisão é posicionado
+   dentro do trecho; sem isto ele escapa para o canto da página. */
+.frase, .bloco { position: relative; margin: 0 0 1rem; padding: .85rem 1rem;
+                 border: 1px solid #e3e6ea; border-radius: .4rem; background: #fff; }
+.frase { border-left: 3px solid #0883C5; }
+.bloco p { margin: 0; }
+
+/* O selo do trecho, quando o painel NÃO está ligado (sem servidor, abrindo o arquivo direto). */
+.frase[data-cod]::after, .bloco[data-cod]::after {
+  content: attr(data-cod); position: absolute; top: -.6rem; right: .6rem; font-size: .7rem;
+  color: #6b7280; background: #f7f7f8; padding: 0 .35rem; border-radius: .2rem;
+}
+/* Quando o painel liga, ele põe o próprio botão. Esta regra tira o selo estático para não
+   aparecerem dois. */
+body.rv-ativa .frase[data-cod]::after, body.rv-ativa .bloco[data-cod]::after { content: none; }

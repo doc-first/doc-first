@@ -124,7 +124,7 @@ test('limites: aplicado sem commit de verdade não passa', () => {
 });
 
 /**
- * A ponte do navegador (front/js/core-web.js) é o ÚNICO lugar onde o front toca o núcleo, e nada
+ * A ponte do navegador (review/web/core-web.js) é o ÚNICO lugar onde o front toca o núcleo, e nada
  * mais a exercita: o contrato HTTP testa a API, e os testes de unidade importam o núcleo direto.
  * Quando o núcleo virou inglês, um nome errado aqui só apareceria como botão que não monta, na
  * tela de quem estivesse revisando.
@@ -134,7 +134,7 @@ test('a ponte do navegador entrega ao front os nomes que ele chama', async () =>
   const janela = {};
   Object.assign(globalThis, { window: janela, document: doc, CustomEvent: class { constructor() {} } });
   try {
-    await import('../../front/js/core-web.js');
+    await import('../web/core-web.js');
     const nucleo = janela.ARAUTOS?.nucleo ?? {};
     // Os nomes que front/js/review.js chama hoje. Mudou aqui? Mude lá — ou o botão some.
     for (const nome of ['digitalDoElemento', 'digitalDoTexto', 'textoDoElemento', 'normalizar']) {
