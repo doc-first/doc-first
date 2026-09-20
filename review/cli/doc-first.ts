@@ -18,34 +18,37 @@ import * as validacao from './validation.ts';
  */
 
 const AJUDA = `
-doc-first — ferramenta do agente da metodologia Doc First
+doc-first — the agent's tool for the Doc First method
 
-  Revisão (o que chegou do site)
-    listar [--todos]            pedidos APROVADOS pelo dono, a aplicar (ou todos)
-    ver <id>                    o pedido, o texto do trecho antes e agora, e a conversa
-    impacto <id> [--termo x]    onde mais o assunto aparece, e o que está validado
-    resumo                      aprovações e pedidos por página
-    estado <id> <novo> "msg"    registra o andamento (o revisor vê no painel)
-                                  --commit <sha>    obrigatório em "aplicado"
-                                  --trechos D01.1.4,D02.3.1
+  Review (what came in from the site)
+    listar [--todos]            requests the owner APPROVED, waiting to be applied (or all)
+    ver <id>                    the request, the block's text then and now, and the thread
+    impacto <id> [--termo x]    where else the subject shows up, and what is validated
+    resumo                      approvals and requests, per page
+    estado <id> <new> "msg"     records progress (whoever asked sees it in the panel)
+                                  --commit <sha>    required for "aplicado"
+                                  --trechos A01.1.4,A02.3.1
 
-  Trava de validação (o ✓ humano)
-    sincronizar                 traz para o repositório os ✓ que o dono deu no site
-    conferir                    acusa trecho validado que mudou, e marca sem registro
-    indexar                     refaz o índice da documentação no banco (tipos, dependências)
-    tipos                       o catálogo de tipos de conteúdo
-    semaforo                    o estado da documentação inteira: 🟢 🟡 🔴 ⚪
-    se-eu-mexer <id>            o que mais precisa de conferência se eu editar isto
+  The validation lock (the human ✓)
+    sincronizar                 pulls in the ✓ the owner gave on the site
+    conferir                    a validated block that changed, and a ✓ with no trail
+    indexar                     rebuilds the index: kinds, dependencies, what is missing
+    tipos                       the catalogue of content kinds
+    semaforo                    the state of the whole documentation: 🟢 🟡 🔴 ⚪
+    se-eu-mexer <id>            what else needs checking if I edit this
 
-  Opções
-    --local                     falar com o servidor local em vez da nuvem
-    --raiz <caminho>            raiz do projeto (padrão: o diretório atual)
-    --banco <arquivo>           lê os eventos de um SQLite (o modo sem nuvem)
+  Options
+    --local                     talk to the local server instead of the cloud
+    --raiz <path>               the project root (default: the current directory)
+    --banco <file>              read the events from a SQLite file (the no-cloud mode)
 
-  Variáveis
-    REVISAO_OWNER               quem aprova; é o ✓ dele que vira trava
-    REVISAO_PROJETO             projeto do Firestore, na nuvem
-    REVISAO_CONTA               fixa a conta do gcloud (padrão: a primeira que emitir token)
+  Variables
+    REVISAO_OWNER               who approves; it is THEIR ✓ that becomes a lock
+    REVISAO_PROJETO             the Firestore project, in the cloud
+    REVISAO_CONTA               pins the gcloud account (default: the first one to issue a token)
+
+  ⚠️ The command names are still Portuguese. They are a published interface, so they are being
+     renamed in their own step, and the old names will keep working.
 `;
 
 async function principal() {
@@ -94,14 +97,14 @@ async function principal() {
     case 'semaforo':    await validacao.mostrarSemaforo(raiz, { so: values.so }); return 0;
     case 'se-eu-mexer': return validacao.seEuMexer(raiz, exige(arg, 'se-eu-mexer <id>'));
     default:
-      console.error(`comando desconhecido: ${comando}\n`);
+      console.error(`unknown command: ${comando}\n`);
       console.error(AJUDA.trim());
       return 2;
   }
 }
 
 function exige(valor: string | undefined, uso: string): string {
-  if (!valor) { console.error(`falta o argumento. Uso: doc-first ${uso}`); process.exit(2); }
+  if (!valor) { console.error(`missing argument. Usage: doc-first ${uso}`); process.exit(2); }
   return valor;
 }
 
