@@ -163,10 +163,11 @@ Repainting after a commit costs *blocks changed + their direct dependents*. Neve
 
 | | |
 |---|---|
-| ✅ | the fingerprint, the traffic light, the fourteen kinds |
+| ✅ | the fingerprint, the traffic light, the fifteen kinds |
 | ✅ | dependency declared by block id (`data-depende`), and the reverse index |
 | ⬜ | **subject** — linking by name instead of by number |
-| ⬜ | **weight** — `gravity` and `sensitivity` on the kind, and the matrix |
+| ✅ | **weight** — `gravity`, `sensitivity` and `entails` on the kind, the matrix and the three signals of stage 3b, in `review/core/impact.js` |
+| ⬜ | **the wiring** — nothing calls `severityOf` yet: it is a function, not a pipeline |
 | ⬜ | **the respect** of a dependency |
 | ⬜ | **stage 4** — the agent closing what did not reach |
 | ⬜ | **the queue** — every open impact in the project, in one place |

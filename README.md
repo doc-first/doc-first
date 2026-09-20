@@ -95,10 +95,11 @@ Every reviewable piece is of one kind, and each kind knows what it demands of it
 | `decision` | an owner and a deadline | without them it is not a pending decision, it is a lost one |
 | `colors` | the value | "primary blue" is not a value; `#0883C5` is |
 | `list` | two items | a one-item list is a paragraph in bad clothing |
+| `rule` | the test that defends it (`data-prova`) | a rule nobody proved is a rule nobody can check |
 
-Plus `title`, `subtitle`, `text`, `box`, `config`, `contract`, `model` and `rationale`. A kind never
-changes who approves or how the fingerprint is computed — only what is demanded before a block
-counts as ready.
+Plus `title`, `subtitle`, `text`, `box`, `config`, `contract`, `model` and `rationale` — fifteen in
+all, in `review/core/kinds.js`. A kind never changes who approves or how the fingerprint is
+computed — only what is demanded before a block counts as ready.
 
 ## How it is stored
 

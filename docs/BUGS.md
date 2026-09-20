@@ -51,8 +51,8 @@ systems.
 ## Domain rule, integration rule — the engine does not guess
 
 It does not infer the category. The content was already **typed**, and the kind is where the answer
-lives. Two of the fourteen already carry it: `model` is the domain's shape, `contract` is the
-integration promise. What is missing is `rule` — the domain rule proper, the thing that has to hold
+lives. Two of the fifteen already carry it: `model` is the domain's shape, `contract` is the
+integration promise. The third is `rule` — the domain rule proper, the thing that has to hold
 regardless of how the system is built.
 
 Then a third property on the kind, beside `gravity` and `sensitivity`:
@@ -99,7 +99,7 @@ file that is gone is an issue, not a shrug.
 | triage with states and legal transitions (`review/cycle.json`) | ✅ exists |
 | a `bug` request category beside `text`, `term`, `remove`, `doubt` | ⬜ one line |
 | the three outcomes as triage results, instead of approve/reject | ⬜ |
-| `rule` as a fifteenth kind | ⬜ |
-| `entails` on the kind | ⬜ |
-| `data-prova`, and the check that the proof moved too | ⬜ |
+| `rule` as a fifteenth kind | ✅ exists |
+| `entails` on the kind | ✅ exists |
+| `data-prova`, and the check that the proof moved too | 🟨 half: the kind demands it, nobody checks the proof moved |
 | a report that lands on **no** block — the hole case | ⬜ the hard one: it needs a subject before it has a home |

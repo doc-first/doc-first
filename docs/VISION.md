@@ -79,7 +79,7 @@ matures; today it has eleven sections, and every one of them has a page to copy.
 
 | Section | What it holds | Status |
 |---|---|---|
-| **Kinds** | the fourteen kinds of content, each demonstrating itself | ✅ |
+| **Kinds** | the fifteen kinds of content, each demonstrating itself | ✅ |
 | **Discovery** | why it exists, who for, what changes if it works | ✅ |
 | **Roles** | who can do what, the capability table, who approves | ✅ |
 | **Design system** | the values, the components, and what is not done here | ✅ |
@@ -101,7 +101,7 @@ bytes without changing the meaning, and no change of meaning is legible in a dif
 text enters the traffic light like any other block — and it is the only way a flowchart turns 🟡
 when the flow it draws has changed.
 
-*Status:* 🟨 half. `diagram` is one of the fourteen kinds, it demands to be text, and a diagram in
+*Status:* 🟨 half. `diagram` is one of the fifteen kinds, it demands to be text, and a diagram in
 text enters the lock like any other block. What does not exist is **generating** one — today a human
 draws it, and the engine only keeps it honest.
 

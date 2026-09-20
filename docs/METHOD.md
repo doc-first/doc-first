@@ -72,7 +72,7 @@ Commands: `doc-first semaforo`, `doc-first se-eu-mexer <id>`.
 
 Every reviewable piece is of one kind, and each kind knows what it demands of itself. `title`,
 `subtitle`, `text`, `list`, `box`, `table`, `image`, `diagram`, `colors`, `config`, `contract`,
-`model`, `rationale`, `decision` — fourteen, in `review/core/kinds.js`.
+`model`, `rule`, `rationale`, `decision` — fifteen, in `review/core/kinds.js`.
 
 The kind is **declared** (`data-tipo`) or **inferred** from how the block was written (a `<table>`
 is a table, a `<pre>` is a diagram). Inference exists so the method does not open by demanding:
@@ -80,7 +80,7 @@ documentation that already exists gets kinds without anyone rewriting anything.
 
 ⚠️ A kind **never** changes who approves, nor how the fingerprint is computed. It changes only
 **what is demanded** before a block counts as ready. There is one lock, and it is the same for all
-fourteen.
+fifteen.
 
 ## Roles
 
@@ -185,7 +185,7 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 |---|---|---|
 | The lock | `review/core/fingerprint.js` | one implementation, shared by browser, server and CLI |
 | The traffic light | `review/core/validity.js` | ⚪ 🟢 🟡 🔴, computed — never declared |
-| Kinds | `review/core/kinds.js` | fourteen, and what each demands of itself |
+| Kinds | `review/core/kinds.js` | fifteen, and what each demands of itself |
 | The cycle | `review/cycle.json` + `review/core/cycle.js` | the legal transitions, in one table |
 | Roles | `review/core/roles.js` | owner, admin, everyone else |
 | Language | `review/core/i18n.js` + `review/locales/` | the reviewer's messages; logs stay English |
