@@ -15,6 +15,10 @@ cd doc-first
 REVISAO_OWNER=voce@exemplo.org docker compose up
 ```
 
+> Rode isso numa pasta vazia. Num repositório que já **usa** o Doc First existe um script chamado
+> `doc-first` na raiz — o atalho da ferramenta —, e o `git clone` recusa criar uma pasta com um nome
+> que já está ocupado por um arquivo.
+
 Abra `http://localhost:8080`. A senha do primeiro acesso aparece **uma vez** no log, e o primeiro
 login obriga a trocá-la. Não existe `admin/admin`: ferramenta interna fica anos no ar.
 

@@ -1,19 +1,22 @@
 # Torna o pacote da imagem público.
 #
-# Por que existe um workflow para isto: a visibilidade do pacote no GHCR é separada da do
-# repositório, e o padrão é PRIVADO mesmo em repositório público. Mudar pela API exige um token com
-# escopo `write:packages`, que o `gh` local não tem por padrão — mas o GITHUB_TOKEN de uma execução
-# do Actions tem `packages: write`.
+# ⚠️ TESTADO E NÃO FUNCIONA com o GITHUB_TOKEN. A API de visibilidade de pacotes devolve 404 tanto
+# para o GITHUB_TOKEN de uma execução do Actions quanto para o token do `gh` sem escopo
+# `write:packages` — ela exige um token PESSOAL com esse escopo.
 #
-# Roda uma vez. Depois disso o pacote continua público, e este arquivo vira documentação de como
-# fazer de novo se alguém trocar.
+# Está aqui porque a alternativa é esquecer: a visibilidade do pacote no GHCR é separada da do
+# repositório, e o padrão é PRIVADO mesmo em repositório público. Quem descobre isso, descobre pelo
+# `docker pull` de outra pessoa falhando.
+#
+# O CAMINHO QUE FUNCIONA, e leva dez segundos:
+#   github.com/orgs/doc-first/packages/container/doc-first/settings
+#   → Danger Zone → Change visibility → Public
+#
+# Para rodar por aqui, crie um PAT com `write:packages` e guarde como secret PAT_PACOTES.
 name: Pacote público
 
 on:
   workflow_dispatch:
-
-permissions:
-  packages: write
 
 jobs:
   publicar:
@@ -22,18 +25,22 @@ jobs:
     steps:
       - name: Tornar o pacote público
         run: |
-          codigo=$(curl -s -o /tmp/resposta -w '%{http_code}' \
-            -X PATCH \
+          if [ -z "${{ secrets.PAT_PACOTES }}" ]; then
+            echo "✗ falta o secret PAT_PACOTES (token pessoal com escopo write:packages)."
+            echo ""
+            echo "  Mais rápido que criar o token é fazer à mão:"
+            echo "  github.com/orgs/${{ github.repository_owner }}/packages/container/doc-first/settings"
+            echo "  → Change visibility → Public"
+            exit 1
+          fi
+          codigo=$(curl -s -o /tmp/resposta -w '%{http_code}' -X PATCH \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.PAT_PACOTES }}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             https://api.github.com/orgs/${{ github.repository_owner }}/packages/container/doc-first \
             -d '{"visibility":"public"}')
-          echo "HTTP $codigo"
           cat /tmp/resposta
           case "$codigo" in
             2*) echo "✓ pacote público" ;;
-            *)  echo "✗ não deu. Faça à mão em:"
-                echo "  github.com/orgs/${{ github.repository_owner }}/packages/container/doc-first/settings"
-                exit 1 ;;
+            *)  echo "✗ HTTP $codigo — faça à mão nas configurações do pacote"; exit 1 ;;
           esac
