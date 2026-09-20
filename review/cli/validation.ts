@@ -119,6 +119,21 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
     else console.log(`  ⚠ ${id} declara depender de ${outro}, que não existe`);
   }
 
+  // O navegador precisa de duas fotos para pintar o semáforo sem consultar o servidor:
+  //   data-digital-validada  o texto que foi aprovado  → sem ela não há 🟡
+  //   data-dependia-de       o chão naquele momento    → sem ela não há 🔴
+  // O JSON é a verdade; estes atributos são a cópia que viaja com a página.
+  const atributos: Record<string, string> = { 'data-digital-validada': digital };
+  if (Object.keys(depende).length) {
+    atributos['data-dependia-de'] = JSON.stringify(depende).replace(/"/g, '&quot;');
+  }
+  let html = readFileSync(achado.caminho, 'utf8');
+  for (const [attr, valor] of Object.entries(atributos)) {
+    const alvo = new RegExp(`(data-id="${id.replace(/\./g, '\\.')}")((?:(?!${attr})[^>])*?)>`);
+    html = html.replace(alvo, `$1$2 ${attr}="${valor}">`);
+  }
+  writeFileSync(achado.caminho, html, 'utf8');
+
   const antigo = reg[id];
   reg[id] = {
     arquivo: nomeCurto(raiz, achado.caminho),

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C01 · A arquitetura em quatro zooms (C4)</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+<main class="doc-pagina">
+
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">C01</span> A arquitetura em quatro zooms (C4)</h1>
+
+  <p class="frase" data-id="C01.0.1" data-cod="0.1">Quatro níveis, do mais longe ao mais perto. A regra é simples: <b>cada nível responde a uma pergunta diferente</b>, e misturar dois numa figura só é como a maioria dos diagramas de arquitetura vira parede de caixinha.</p>
+
+  <h2><span class="n">1</span> Contexto — o sistema no mundo</h2>
+  <p class="lead-secao">Quem usa, e com o que ele conversa.</p>
+
+  <div class="bloco" data-id="C01.1.1" data-cod="1.1">
+    <p>Diagrama, em texto — para entrar no semáforo como qualquer outro trecho:</p>
+    <pre><code class="mermaid">flowchart LR
+  P([a pessoa]) --> S[o seu sistema]
+  S --> E1[sistema externo]
+  S --> E2[outro externo]</code></pre>
+  </div>
+
+  <div class="bloco" data-id="C01.1.2" data-cod="1.2">
+    <p>Este nível é para quem não vai escrever código. Se um diretor não entende, está errado.</p>
+  </div>
+
+  <h2><span class="n">2</span> Contêineres — as partes que rodam</h2>
+  <p class="lead-secao">Cada coisa que sobe sozinha.</p>
+
+  <div class="bloco" data-id="C01.2.1" data-cod="2.1">
+    <p>Diagrama, em texto — para entrar no semáforo como qualquer outro trecho:</p>
+    <pre><code class="mermaid">flowchart TD
+  W[navegador] --> A[API]
+  A --> B[(banco)]
+  A --> F[fila]</code></pre>
+  </div>
+
+  <div class="bloco" data-id="C01.2.2" data-cod="2.2">
+    <p>Uma caixa por processo: aplicação, API, banco, fila, job. Diga em que cada uma é escrita e como as outras falam com ela.</p>
+  </div>
+
+  <h2><span class="n">3</span> Componentes e código</h2>
+  <p class="lead-secao">Só onde vale a pena.</p>
+
+  <div class="bloco" data-id="C01.3.1" data-cod="3.1">
+    <p>Desenhe o terceiro nível apenas para as partes complicadas. O quarto — o código — quase nunca vale: ele envelhece em dias, e o código já está lá para ser lido.</p>
+  </div>
+
+</main>
+
+<script type="module" src="/review/web/painel-react.js"></script>
+</body>
+</html>

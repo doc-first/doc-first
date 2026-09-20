@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M01 · As entidades e como elas se ligam</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+<main class="doc-pagina">
+
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">M01</span> As entidades e como elas se ligam</h1>
+
+  <p class="frase" data-id="M01.0.1" data-cod="0.1">O modelo de dados em forma de <b>significado</b>, não de tabela. Nome de coluna muda; o que a entidade representa no negócio, não.</p>
+
+  <h2><span class="n">1</span> As entidades</h2>
+  <p class="lead-secao">O que cada uma É, numa frase que o negócio entenda.</p>
+
+  <div class="bloco" data-id="M01.1.1" data-cod="1.1">
+    <p>Uma linha por entidade: o nome, o que representa no mundo real, e quem é dono dela. "Pedido" não é uma tabela — é uma intenção de compra de alguém.</p>
+  </div>
+
+  <div class="bloco" data-id="M01.1.2" data-cod="1.2">
+    <p>⚠️ Se você não consegue explicar a entidade sem usar palavras de banco de dados, ela ainda não é uma entidade de negócio.</p>
+  </div>
+
+  <h2><span class="n">2</span> Como elas se ligam</h2>
+  <p class="lead-secao">O diagrama, e a regra por trás de cada seta.</p>
+
+  <div class="bloco" data-id="M01.2.1" data-cod="2.1">
+    <p>Diagrama, em texto — para entrar no semáforo como qualquer outro trecho:</p>
+    <pre><code class="mermaid">erDiagram
+  CLIENTE ||--o{ PEDIDO : faz
+  PEDIDO ||--|{ ITEM : contem
+  PRODUTO ||--o{ ITEM : aparece_em</code></pre>
+  </div>
+
+  <div class="bloco" data-id="M01.2.2" data-cod="2.2">
+    <p>Para cada relação, a regra em palavras: "um cliente pode não ter pedido nenhum", "um pedido tem pelo menos um item". A cardinalidade do diagrama e a frase têm de concordar.</p>
+  </div>
+
+  <h2><span class="n">3</span> O dicionário</h2>
+  <p class="lead-secao">Campo a campo, o que é e o que não pode ser.</p>
+
+  <div class="bloco" data-id="M01.3.1" data-cod="3.1">
+    <p>Nome, tipo, obrigatório, e <b>a regra</b>. "CPF: texto, 11 dígitos" é tipo; "CPF: de quem paga, não de quem recebe" é significado — e é isso que falta na maioria.</p>
+  </div>
+
+</main>
+
+<script type="module" src="/review/web/painel-react.js"></script>
+</body>
+</html>

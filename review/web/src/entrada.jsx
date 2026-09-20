@@ -12,7 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
 import Painel from './Painel.jsx';
 import { quemSouEu, eventosDaPagina, registrar, digitalDo } from './api.js';
-import { doTrecho } from './estado.js';
+import { doTrecho, semaforoDo } from './estado.js';
 
 const pagina = (document.querySelector('.doc-titulo__cod')?.textContent ?? '').trim();
 
@@ -46,12 +46,21 @@ function App({ trechos }) {
     })().catch((e) => desligar(e));
   }, []);
 
-  // O número de cada trecho vira botão, e o estado pinta nele.
+  // O número de cada trecho vira botão, e o SEMÁFORO pinta nele: ⚪ 🟢 🟡 🔴.
   useEffect(() => {
+    const digitaisAgora = new Map(trechos.map((t) => [t.id, t.digital]));
     for (const t of trechos) {
       const situacao = doTrecho(eventos, t.id, t.digital);
-      t.botao.className = 'rv-num' + (situacao.aprovado || t.validado ? ' rv-num--ok'
-        : situacao.abertos.length ? ' rv-num--pedido' : '');
+      const { cor, culpados } = semaforoDo(t, situacao, digitaisAgora);
+      t.semaforo = { cor, culpados };
+      t.botao.className = 'rv-num'
+        + (cor === 'valid' ? ' rv-num--ok' : '')
+        + (cor === 'stale' ? ' rv-num--stale' : '')
+        + (cor === 'broken' ? ' rv-num--broken' : '')
+        + (situacao.abertos.length ? ' rv-num--pedido' : '');
+      t.botao.title = cor === 'broken'
+        ? `o texto está igual, mas mudou: ${culpados.join(', ')}`
+        : '';
       t.botao.onclick = () => setAberto(t);
     }
   }, [eventos, trechos]);
@@ -102,6 +111,10 @@ async function iniciar() {
       id: el.getAttribute('data-id'),
       pagina,
       validado: el.getAttribute('data-validado'),
+      depende: (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean),
+      digitalValidada: el.getAttribute('data-digital-validada'),
+      // A foto das dependências no momento do ✓, que o servidor injeta no HTML ao marcar.
+      dependiaDe: JSON.parse(el.getAttribute('data-dependia-de') || '{}'),
       resumo: resumoDe(el),
       texto: textoVisivel(el),
       digital: await digitalDo(el),

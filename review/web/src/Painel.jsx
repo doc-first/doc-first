@@ -164,6 +164,17 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
       <p className="rv-resumo">{trecho.resumo}</p>
       <p className="rv-situacao"><Selo situacao={situacao} validadoEm={trecho.validado} /></p>
 
+      {/* Vermelho sem motivo faz a pessoa reaprovar no susto — que é o que a trava existe para
+          impedir. Então o painel diz O QUE mudou, e manda olhar lá antes de decidir aqui. */}
+      {trecho.semaforo?.cor === 'broken' ? (
+        <div className="rv-quebrado">
+          <b>Este texto não mudou, mas o chão mudou.</b>
+          Ele depende de {trecho.semaforo.culpados.map((c) => <code key={c}>{c}</code>)},
+          {' '}e isso foi alterado depois que você aprovou aqui. Confira se ainda é verdade antes
+          de aprovar de novo.
+        </div>
+      ) : null}
+
       <div className="rv-acoes">
         {podeAprovar && !situacao.aprovado ? (
           <button type="button" onClick={() => enviar('aprovacao')} disabled={enviando}>

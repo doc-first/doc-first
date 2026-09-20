@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>U01 · Um caso de uso, ponta a ponta</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+<main class="doc-pagina">
+
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">U01</span> Um caso de uso, ponta a ponta</h1>
+
+  <p class="frase" data-id="U01.0.1" data-cod="0.1">Uma folha por caso. O caso de uso é onde as outras folhas se encontram: ele usa os papéis, passa pelas telas, move as entidades. É também a folha que <b>mais fica vermelha</b> — e isso é o método funcionando.</p>
+
+  <h2><span class="n">1</span> A situação</h2>
+  <p class="lead-secao">Quem, querendo o quê, e por quê agora.</p>
+
+  <div class="bloco" data-id="U01.1.1" data-cod="1.1">
+    <p>Comece pela pessoa e pelo momento. "A enfermeira recebe um alerta às 7h da manhã" diz mais que "o sistema notifica o usuário".</p>
+  </div>
+
+  <h2><span class="n">2</span> O fluxo</h2>
+  <p class="lead-secao">Passo a passo, com o que trafega em cada um.</p>
+
+  <div class="bloco" data-id="U01.2.1" data-cod="2.1">
+    <p>Diagrama, em texto — para entrar no semáforo como qualquer outro trecho:</p>
+    <pre><code class="mermaid">flowchart TD
+  A[a pessoa faz algo] --> B{o sistema decide}
+  B -->|caminho feliz| C[acontece o esperado]
+  B -->|e quando não| D[o que acontece então]</code></pre>
+  </div>
+
+  <div class="bloco" data-id="U01.2.2" data-cod="2.2">
+    <p>Numere os passos e diga, em cada um, <b>o que sai de onde</b>. O passo que ninguém escreve é sempre o que quebra na integração.</p>
+  </div>
+
+  <h2><span class="n">3</span> Quando dá errado</h2>
+  <p class="lead-secao">Os caminhos infelizes, que são a maioria do código.</p>
+
+  <div class="bloco" data-id="U01.3.1" data-cod="3.1">
+    <p>Um por linha: o que falha, o que a pessoa vê, e o que o sistema faz. O caminho feliz é o que menos dá trabalho; estes é que decidem o prazo.</p>
+  </div>
+
+</main>
+
+<script type="module" src="/review/web/painel-react.js"></script>
+</body>
+</html>

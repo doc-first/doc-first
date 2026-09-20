@@ -103,3 +103,29 @@ body.rv-ativa main [data-cod]::after { content: none !important; }
    CSS nenhum. O aviso nascia sem estilo desde sempre. */
 .rv-alerta { margin: 0; padding: .7rem 1rem; background: #FDF3D7; border-bottom: 1px solid #E4C96B;
              color: #5A4708; font-size: .9rem; text-align: center; }
+
+/* ---------------------------------------------------------------- o semáforo
+   Quatro estados, e só dois deles pedem ação. A cor não é enfeite: é a única forma de ver, numa
+   página de cinquenta trechos, onde parar. */
+
+/* 🟡 o texto mudou depois do ✓ — alguém precisa reaprovar o texto novo */
+.rv-num--stale {
+  background: #FDF3D7; border-color: #E4C96B; color: #5A4708;
+}
+
+/* 🔴 o texto está IGUAL, mas mudou algo de que ele depende.
+   Este é o único estado que ninguém descobre lendo a página — porque na página nada mudou.
+   Por isso ele é o mais forte visualmente: é o que precisa interromper a leitura. */
+.rv-num--broken {
+  background: #FBE9E7; border-color: #C94A4A; color: #8A2B2B; font-weight: 700;
+}
+.rv-num--broken::before { content: '!'; margin-right: .15em; }
+
+/* O aviso dentro do painel, quando o trecho está vermelho. Explica a causa, porque "vermelho" sem
+   motivo faz a pessoa reaprovar no susto — que é exatamente o que a trava existe para impedir. */
+.rv-quebrado {
+  margin: 0 0 .75rem; padding: .7rem .9rem; border-radius: .4rem;
+  background: #FBE9E7; border: 1px solid #C94A4A; color: #8A2B2B; font-size: .9rem;
+}
+.rv-quebrado b { display: block; margin-bottom: .2rem; }
+.rv-quebrado code { background: rgba(0,0,0,.06); padding: .05em .3em; border-radius: .2rem; }

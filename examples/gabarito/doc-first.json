@@ -2,23 +2,31 @@
   "_leia": [
     "O GABARITO. Copie esta pasta para o seu projeto, troque o owner, e comece a escrever.",
     "",
-    "As cinco seções são a ordem em que uma documentação de produto costuma ficar de pé:",
-    "por que existe → quem pode o quê → como se parece → o que a pessoa vê → o que falta decidir.",
-    "Cada página traz, no próprio texto, o que escrever ali e o que NÃO escrever.",
+    "As dez seções são a ordem em que uma documentação de produto costuma ficar de pé:",
+    "por que existe → quem pode o quê → como se parece → o que a pessoa vê → o que falta decidir →",
+    "de que é feito → como os dados se ligam → o fluxo ponta a ponta → a arquitetura → as fronteiras.",
     "",
+    "Cada página traz, no próprio texto revisável, o que escrever ali e o que NÃO escrever.",
     "Apague o que não servir. Um gabarito que obriga vira burocracia."
   ],
-
   "nome": "Gabarito",
   "owner": "voce@exemplo.org",
-
   "conteudo": {
     "pastas": [
-      "01-discovery", "02-papeis", "03-design-system", "04-telas", "05-decisoes"
+      "01-discovery",
+      "02-papeis",
+      "03-design-system",
+      "04-telas",
+      "05-decisoes",
+      "06-stack",
+      "07-modelagem",
+      "08-casos-de-uso",
+      "09-arquitetura",
+      "10-contratos"
     ],
     "registro": "aprovacoes.json",
     "inicio": "/01-discovery/D01.html",
     "recortar": "",
-    "exemplosDePagina": "D01, P01, S01, T01 ou X01"
+    "exemplosDePagina": "D01, P01, S01, T01, X01, K01, M01, U01, C01 ou I01"
   }
 }

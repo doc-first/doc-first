@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I01 · O que entra e o que sai</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+<main class="doc-pagina">
+
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">I01</span> O que entra e o que sai</h1>
+
+  <p class="frase" data-id="I01.0.1" data-cod="0.1">As fronteiras do sistema: APIs, eventos, arquivos. Contrato é promessa — e promessa quebrada aqui quebra o sistema de outra pessoa, que é o pior jeito de descobrir.</p>
+
+  <h2><span class="n">1</span> As rotas</h2>
+  <p class="lead-secao">Método, caminho, o que recebe e o que devolve.</p>
+
+  <div class="bloco" data-id="I01.1.1" data-cod="1.1">
+    <p>Para cada uma: o que ela faz, quem pode chamar, e os códigos de erro <b>com o motivo</b>. "400 quando o corpo é inválido" não ajuda; "400 quando falta o CPF" ajuda.</p>
+  </div>
+
+  <h2><span class="n">2</span> Os eventos</h2>
+  <p class="lead-secao">O que o sistema publica, e quem depende disso.</p>
+
+  <div class="bloco" data-id="I01.2.1" data-cod="2.1">
+    <p>Nome, quando dispara, e o que carrega. E — o campo que todo mundo esquece — <b>se ele pode chegar duas vezes</b>.</p>
+  </div>
+
+  <h2><span class="n">3</span> O que não muda sem avisar</h2>
+  <p class="lead-secao">A parte do contrato que é promessa pública.</p>
+
+  <div class="bloco" data-id="I01.3.1" data-cod="3.1">
+    <p>Liste o que outros sistemas já dependem. Mudar isso exige versão nova, não um deploy. ⚠️ Se a lista estiver vazia, ou o sistema é novo, ou alguém não perguntou.</p>
+  </div>
+
+</main>
+
+<script type="module" src="/review/web/painel-react.js"></script>
+</body>
+</html>
