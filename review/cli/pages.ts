@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { readConfig } from '../core/config.js';
 import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
+import { tipoDe, oQueFalta } from '../core/kinds.js';
 
 /**
  * Leitura das folhas do repositório: quais trechos existem, o texto de cada um e a digital.
@@ -18,6 +19,11 @@ export interface Trecho {
   /** De que outros trechos este depende (`data-depende="D01.1.4 D02.3.1"`). É o que permite dizer
    *  "o texto não mudou, mas a base mudou" — o vermelho do semáforo. */
   depende: string[];
+  /** O tipo do conteúdo: title, box, diagram, decision… (review/core/kinds.js). */
+  tipo: string;
+  /** O que este tipo cobra e o trecho não tem. Vazio quer dizer pronto para aprovação. */
+  falta: string[];
+  cod: string;
   /** Título e subtítulo de seção não mostram número, mas TÊM trava: entram no registro e precisam
    *  ser conferidos. Filtrá-los aqui fazia o `conferir` dizer "elemento sumiu" para os três que o
    *  o dono já validou. */
@@ -61,8 +67,17 @@ export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
       const copia = el.cloneNode(true) as Element;
       copia.querySelectorAll('[data-revisao-ui]').forEach((x: Element) => x.remove());
       const texto = copia.textContent ?? '';
+      const atributos: Record<string, string> = {};
+      for (const a of Array.from(el.attributes ?? [])) atributos[(a as Attr).name] = (a as Attr).value;
+      const contexto = { texto: texto.replace(/\s+/g, ' ').trim(), html: el.innerHTML ?? '', atributos };
+      const tipo = tipoDe({
+        atributos, classes: (el.getAttribute('class') ?? '').split(/\s+/).filter(Boolean),
+        tag: (el.tagName ?? 'div').toLowerCase(), html: contexto.html,
+      });
+
       mapa.set(id, {
-        id, pagina: id.split('.')[0], caminho,
+        id, pagina: id.split('.')[0], caminho, cod,
+        tipo, falta: oQueFalta(tipo, contexto),
         arquivo: nomeCurto(raiz, caminho),
         texto: texto.replace(/\s+/g, ' ').trim(),
         digital: await fingerprintOfText(texto),

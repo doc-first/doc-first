@@ -262,3 +262,62 @@ export async function seEuMexer(raiz: string, id: string) {
   console.log('');
   return 0;
 }
+
+// ---------------------------------------------------------------- o índice no banco
+
+/**
+ * Refaz o índice da documentação no banco: quais trechos existem, de que tipo, de quem dependem,
+ * e o que falta em cada um.
+ *
+ * ⚠️ O banco não vira a verdade. A verdade continua no arquivo, versionado — é ele que tem diff e
+ * autoria. Isto aqui é um retrato, e existe para as perguntas que arquivo responde mal:
+ * "todos os diagramas do projeto", "toda decisão sem dono", "o que quebra se eu mexer aqui".
+ */
+export async function indexar(raiz: string, caminhoDoBanco?: string) {
+  const { Indice } = await import('../api/index-store.ts');
+  const banco = caminhoDoBanco ?? process.env.REVISAO_SQLITE ?? join(raiz, 'dados', 'eventos.db');
+  const trechos = await lerTrechos(raiz);
+
+  const idx = new Indice(banco);
+  try {
+    const quantos = idx.reindexar([...trechos.values()].map((t) => ({
+      id: t.id, pagina: t.pagina, tipo: t.tipo, arquivo: t.arquivo, cod: t.cod || null,
+      numerado: t.numerado, digital: t.digital, texto: t.texto.slice(0, 400),
+      depende: t.depende, falta: t.falta,
+    })));
+
+    console.log(`\nIndexados ${quantos} trecho(s) em ${banco}\n`);
+    for (const { tipo, quantos: n } of idx.porTipo()) {
+      console.log(`  ${String(n).padStart(4)}  ${tipo}`);
+    }
+
+    const quebradas = idx.dependenciasQuebradas();
+    if (quebradas.length) {
+      console.log(`\n✗ ${quebradas.length} dependência(s) apontam para trecho que não existe:`);
+      for (const q of quebradas) console.log(`    ${q.trecho} → ${q.depende}`);
+    }
+
+    const faltas = idx.pendencias();
+    if (faltas.length) {
+      console.log(`\n⚠ ${faltas.length} pendência(s) de tipo:\n`);
+      for (const f of faltas.slice(0, 20)) console.log(`  ${f.id.padEnd(14)} ${f.falta}`);
+      if (faltas.length > 20) console.log(`  … e mais ${faltas.length - 20}`);
+    } else {
+      console.log('\n✓ nenhuma pendência de tipo.');
+    }
+    console.log('');
+    return { quantos, faltas: faltas.length, quebradas: quebradas.length };
+  } finally {
+    idx.fechar();
+  }
+}
+
+/** O catálogo de tipos, para quem está escrevendo e quer saber o que existe. */
+export async function tipos() {
+  const { catalogo } = await import('../core/kinds.js');
+  console.log('\nTipos de conteúdo — todo trecho validável é de um destes:\n');
+  for (const t of catalogo()) {
+    console.log(`  ${t.id.padEnd(11)} ${t.nome}${t.numerado ? '' : '   (sem número na página)'}`);
+    console.log(`  ${''.padEnd(11)} ${t.descricao.replace(/\s+/g, ' ')}\n`);
+  }
+}

@@ -32,6 +32,8 @@ doc-first — ferramenta do agente da metodologia Doc First
   Trava de validação (o ✓ humano)
     sincronizar                 traz para o repositório os ✓ que o dono deu no site
     conferir                    acusa trecho validado que mudou, e marca sem registro
+    indexar                     refaz o índice da documentação no banco (tipos, dependências)
+    tipos                       o catálogo de tipos de conteúdo
     semaforo                    o estado da documentação inteira: 🟢 🟡 🔴 ⚪
     se-eu-mexer <id>            o que mais precisa de conferência se eu editar isto
 
@@ -87,6 +89,8 @@ async function principal() {
                           { commit: values.commit, caixas: values.trechos }); return 0;
     case 'sincronizar': await validacao.sincronizar(raiz, fonte); return 0;
     case 'conferir':    return (await validacao.conferir(raiz)) ? 1 : 0;
+    case 'indexar':     await validacao.indexar(raiz, values.banco); return 0;
+    case 'tipos':       await validacao.tipos(); return 0;
     case 'semaforo':    await validacao.mostrarSemaforo(raiz, { so: values.so }); return 0;
     case 'se-eu-mexer': return validacao.seEuMexer(raiz, exige(arg, 'se-eu-mexer <id>'));
     default:

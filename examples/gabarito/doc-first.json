@@ -13,6 +13,7 @@
   "owner": "voce@exemplo.org",
   "conteudo": {
     "pastas": [
+      "00-tipos",
       "01-discovery",
       "02-papeis",
       "03-design-system",
@@ -25,7 +26,7 @@
       "10-contratos"
     ],
     "registro": "aprovacoes.json",
-    "inicio": "/01-discovery/D01.html",
+    "inicio": "/00-tipos/Y01.html",
     "recortar": "",
     "exemplosDePagina": "D01, P01, S01, T01, X01, K01, M01, U01, C01 ou I01"
   }

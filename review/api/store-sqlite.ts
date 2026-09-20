@@ -49,6 +49,10 @@ export class RegistroSqlite implements Registro {
         dados    TEXT
       );
       CREATE INDEX IF NOT EXISTS eventos_por_pagina ON eventos (pagina, quando);
+
+      -- O ÍNDICE da documentação (trechos, dependências, pendências) NÃO mora aqui: ele é
+      -- derivado e refeito a cada "doc-first indexar", enquanto esta tabela é fato e o banco
+      -- recusa apagar. Ver review/api/index-store.ts — uma definição só, e a diferença explícita.
     `);
 
     // Um gatilho que RECUSA alterar e apagar. A regra "nada se apaga" deixa de depender de o código

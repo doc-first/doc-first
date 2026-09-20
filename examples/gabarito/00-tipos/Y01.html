@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Y01 · Os tipos de conteúdo</title>
+<link rel="stylesheet" href="../estilo/folha.css">
+<link rel="stylesheet" href="/review/web/painel.css">
+</head>
+<body class="doc">
+<main class="doc-pagina">
+
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">Y01</span> Os tipos de conteúdo</h1>
+
+  <p class="frase" data-id="Y01.0.1" data-cod="0.1" data-tipo="text">
+    Esta folha é o catálogo, e cada trecho dela é um exemplo de si mesmo. Se você quiser saber o
+    que é um tipo, olhe o trecho que carrega esse tipo — ele está escrito do jeito que o tipo pede.
+  </p>
+
+  <h2><span class="n">1</span> Por que tipificar</h2>
+  <p class="lead-secao">Porque "isto está bom?" não é a mesma pergunta para um título e para um diagrama.</p>
+
+  <div class="bloco" data-id="Y01.1.1" data-cod="1.1" data-tipo="text">
+    <p>Sem tipo, cada regra de qualidade vira convenção oral — e convenção oral morre na terceira
+    pessoa que entra no projeto. Com tipo, a regra é do <b>tipo</b>, não da memória de alguém.</p>
+  </div>
+
+  <div class="bloco caixa--info" data-id="Y01.1.2" data-cod="1.2" data-tipo="box" data-box="info">
+    <p><b>Caixa de informação.</b> Toda caixa diz de que tipo é — <code>info</code>,
+    <code>alerta</code>, <code>ok</code> ou <code>proibido</code>. Sem isso ela é só um parágrafo
+    com borda, e a cor não significa nada.</p>
+  </div>
+
+  <div class="bloco" data-id="Y01.1.3" data-cod="1.3" data-tipo="list">
+    <p>O que um tipo muda, e o que não muda:</p>
+    <ul>
+      <li><b>Muda</b> o que se cobra antes de aprovar — uma imagem precisa de descrição, uma
+      decisão precisa de dono.</li>
+      <li><b>Não muda</b> quem aprova, nem como a digital é calculada. A trava continua uma só.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">2</span> Os tipos que pedem algo de você</h2>
+  <p class="lead-secao">A maioria não pede nada. Estes pedem, e o motor cobra.</p>
+
+  <div class="bloco" data-id="Y01.2.1" data-cod="2.1" data-tipo="table">
+    <table>
+      <tr><th>Tipo</th><th>O que ele cobra</th><th>Por quê</th></tr>
+      <tr><td><code>image</code></td><td>um <code>alt</code></td>
+          <td>o que está dentro da imagem não entra na digital; a descrição é a única parte revisável</td></tr>
+      <tr><td><code>diagram</code></td><td>ser texto, não imagem</td>
+          <td>PNG não tem digital útil: recomprimir muda os bytes sem mudar o sentido</td></tr>
+      <tr><td><code>table</code></td><td>cabeçalho</td>
+          <td>sem <code>&lt;th&gt;</code> ninguém com leitor de tela sabe o que cada célula é</td></tr>
+      <tr><td><code>decision</code></td><td>dono e prazo</td>
+          <td>pendência sem dono não é pendência — é decisão perdida</td></tr>
+      <tr><td><code>colors</code></td><td>o valor da cor</td>
+          <td>"azul primário" não é um valor; <code>#0883C5</code> é</td></tr>
+      <tr><td><code>list</code></td><td>dois itens</td>
+          <td>lista de um item só é parágrafo mal vestido</td></tr>
+    </table>
+  </div>
+
+  <div class="bloco" data-id="Y01.2.2" data-cod="2.2" data-tipo="diagram">
+    <p>Um diagrama é texto, e por isso entra na trava como qualquer parágrafo:</p>
+    <pre><code class="mermaid">flowchart LR
+  E[o texto muda] --> D{a digital muda}
+  D -->|sim| A[fica amarelo]
+  D -->|não, mas a base mudou| V[fica vermelho]</code></pre>
+  </div>
+
+  <div class="bloco" data-id="Y01.2.3" data-cod="2.3" data-tipo="colors">
+    <p>A paleta, com o valor junto: <code>#0883C5</code> para a marca,
+    <code>#C94A4A</code> para o que exige atenção, <code>#16212E</code> para a tinta.</p>
+  </div>
+
+  <h2><span class="n">3</span> Dependência, e o que ela habilita</h2>
+  <p class="lead-secao">Declarar de que um trecho depende é o que liga o semáforo vermelho.</p>
+
+  <div class="bloco" data-id="Y01.3.1" data-cod="3.1" data-tipo="text" data-depende="Y01.1.1">
+    <p>Este trecho declara <code>data-depende="Y01.1.1"</code>. Se aquele mudar, este fica
+    🔴 — não porque ficou errado, mas porque ficou <b>suspeito</b>, e alguém precisa conferir se
+    ainda é verdade.</p>
+  </div>
+
+  <div class="bloco caixa--aberto" data-id="Y01.3.2" data-cod="3.2" data-tipo="decision"
+       data-dono="quem escreve a documentação" data-prazo="antes de adotar o método">
+    <p><b>Decisão pendente, com dono e prazo.</b> Quanto da dependência dá para a ferramenta
+    propor sozinha, em vez de esperar alguém declarar? Dois trechos que falam do mesmo termo
+    provavelmente dependem um do outro — mas "provavelmente" não basta para travar uma aprovação.</p>
+  </div>
+
+</main>
+
+<script type="module" src="/review/web/painel-react.js"></script>
+</body>
+</html>
