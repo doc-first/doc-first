@@ -1,211 +1,266 @@
-# Doc First — rich, collaborative, traceable documentation before the app
+# The method
 
-> Proposal · `2026-09-17` · born out of practice, on a real product documentation project.
-> The idea: before building the project or the app, build the **documentation of the full system**,
-> reviewed by whoever knows the subject, with a record of **who asked, when, what and why**.
-> The first use was a healthcare product. The method has to be replicable on another project
-> without rewriting anything.
+> `2026-09-20`. This describes **what exists today**, not the intention. Anything not built yet is
+> in "Not built yet" at the end, and in the README under the same name.
+
+Doc First is an engine, not a project. Everything here has to hold on a documentation project it
+has never seen: nothing in the engine names a company, a product or a person — whatever varies is
+configuration.
 
 ## The cycle
 
 ```
-Write (agent + owner)  →  Publish on demand  →  Review (people, on the site)
-        ↑                                              │
-        └──── Apply with impact analysis (agent) ←── Request recorded
+Write (agent + owner)  →  Publish when the owner says so  →  Review (people, in the browser)
+        ↑                                                            │
+        └──── Apply, after impact analysis (agent) ←──── Request recorded
 ```
 
 | Step | Who | How |
 |---|---|---|
-| **Write** | the agent, with the owner | pages in the approved standard (`PADRAO-DOCUMENTO.md`), numbered blocks, lessons (`LICOES-DE-REVISAO.md`) |
-| **Publish** | the owner decides when | `gh workflow run publicar-leitura.yml` — batches the changes, publishes them in one go |
-| **Review** | reviewers with access (e.g. the domain specialist) | on the site, on every block: **Approve · Ask for a change · Comment**; answer open decisions |
-| **Apply** | **the agent only**, with the owner | reads the request, **analyses the impact** (the term on other pages, a use case other parts rely on, approvals that will drop), asks about anything ambiguous, applies it, commits with `Pedido:` and `Solicitado-por:`, marks the request as applied |
-| **Learn** | the agent | a pattern of correction becomes a lesson; a reviewer's preference becomes memory |
+| **Write** | the agent, with the owner | HTML pages, one `data-id` per block, in the standard of whoever adopts the method |
+| **Publish** | the owner decides when | outside the engine: the content is a repository, and publishing it is that repository's business |
+| **Review** | whoever has access | in the browser, block by block: **Approve · Ask for a change · Comment** |
+| **Apply** | **the agent only**, with the owner | reads the request, measures the impact, asks about anything ambiguous, applies it, commits with `Pedido:` and `Solicitado-por:`, closes the request |
+| **Learn** | the agent | a repeated correction becomes a written lesson in the adopting project |
 
-## Rules of the method
+## The six rules
 
 1. **Git is the source of the content.** Nothing changes a page outside a commit. The site never
-   edits content.
-2. **Review is a log of events that do not get erased.** Approved, asked, commented, answered,
-   applied, refused — each one with **who** (verified identity), **when** (server), **where** (page
-   and block) and **the fingerprint of the text** at that moment.
-3. **An approval is for a text, not for a block.** Change the text and the approval drops on its own.
-3b. **Approving belongs to owner and admin** (design decision, `2026-09-17`). Their ✓ is not an
-   opinion: it becomes a **lock in the repository** and sends the agent off to apply. A reviewer
-   **asks for a change, comments and answers a decision**; the API refuses `aprovacao` from anyone
-   who is not an admin (403), and the site does not even show the button. *Today there is no admin
-   besides the owner — in practice, the one who approves is the owner.*
-3c. **A request from an owner or an admin is born approved.** Nobody triages themselves. It holds
-   the same for a request made on the site and for one made straight into the conversation with the
-   agent.
+   edits content — it only records what people said about it.
+2. **Review is a log of events that never get erased.** Approved, asked, commented, answered,
+   applied, refused: each with **who** (verified identity), **when** (the server's clock), **where**
+   (page and block) and **the fingerprint of the text** at that instant.
+3. **An approval is for a text, not for a block.** Change the text and the approval drops on its
+   own — nobody has to remember to drop it.
 4. **Every change is born from a request or from a session with the owner**, and the commit says
    which.
-5. **Impact before change.** The agent never applies a request without looking for everywhere else
-   it touches.
-6. **Minimum cost.** Everything inside free quotas while it is an internal tool.
+5. **Impact before change.** The agent never applies a request without looking at everywhere else it
+   touches.
+6. **Minimum cost.** A container and a file. No managed database is required to start.
 
-## The request cycle (the owner triages before the agent)
+## The traffic light
 
-```
-reviewer asks ──► To triage ──► owner: Approve ──► agent: Applying ──► Applied (commit)
-                     │  ▲
-                     │  └── reviewer/owner adds detail
-                     ▼
-               owner: Reject (reason) · Ask ──► can be reviewed again and Approved
-```
+Rule 3 gives you yellow. Rule 5, written down, gives you red.
 
-- **Who triages** = **owner or admin** (`Papeis.cs`). The API refuses anyone else (403). Today only
-  the owner exists.
-- **Rejected can be revisited**: whoever asked adds detail (it goes back to "To triage"), or the
-  owner approves it straight away.
-- **Approved never goes back** to rejected, and takes no supplement. Changing something approved =
-  **a new request** linked to the previous one (`dados.relacionado`), even if it means going back to
-  the earlier text.
-- **Snapshot of the text**: every request and every approval keeps the text of the block at that
-  instant. Git remains the version history; the snapshot shows *what* was approved or asked.
-- Triage page: the project's request queue.
-
-## System roles (`2026-09-17`)
-
-"If the documentation is part of the system, we are already talking about **roles**." So review has
-no list of people of its own: it uses the system roles, which **go to Keycloak** once it exists —
-and then only `Papeis.cs` changes, because nobody else asks who is who.
-
-| Who | Where it comes from | Can |
+| | State | Meaning |
 |---|---|---|
-| **owner** | the methodology | **one, always the same** — the founding architect (the project owner). Everything, including creating the roles |
-| **admin** *(project role)* | a project role carrying the capability to approve | everything the owner does, **except being the owner** or changing who that is. Today: none |
-| **specialist** *(project role)* | a role with the `founder` tag — whoever answers for the domain | see the whole Fundamental, ask for changes, comment, answer decisions |
+| ⚪ | `none` | nobody has validated it yet |
+| 🟢 | `valid` | validated, and nothing has changed since |
+| 🟡 | `stale` | **this** block's text changed after the ✓ |
+| 🔴 | `broken` | the text is unchanged, but something it **depends on** moved |
 
-- **A single owner is an invariant, not a convention:** a configuration with zero or two owners
-  **does not bring the service up**, with a legible error message. It is tested.
+Red is the reason the method exists. It catches what nobody notices while reading the page, because
+**on the page, nothing changed**: the deadline in section 2 was edited, and the sentence in section 7
+that reasoned from that deadline is now standing on nothing.
+
+It works because the ✓ records more than the block's own fingerprint. At the moment of approval,
+`marcar()` also writes the fingerprint **each declared dependency had right then** (`depende` in the
+record, `data-dependia-de` in the HTML). `stateOf()` compares those with today's. A dependency that
+vanished counts as moved: the block is pointing at something that no longer exists.
+
+Yellow beats red, deliberately. If the text itself changed, saying "something it depends on also
+changed" adds nothing — re-approving the new text is the next step either way.
+
+⚠️ **Red is a question, not an error.** The engine does not know the block became wrong; it knows it
+became suspect. Treat it as an error and people switch the check off at the first false positive —
+and then the whole lock is worth nothing.
+
+Code: `review/core/validity.js` (`stateOf`, `trafficLight`, `dependentsOf`).
+Commands: `doc-first semaforo`, `doc-first se-eu-mexer <id>`.
+
+## Kinds of content
+
+Every reviewable piece is of one kind, and each kind knows what it demands of itself. `title`,
+`subtitle`, `text`, `list`, `box`, `table`, `image`, `diagram`, `colors`, `config`, `contract`,
+`model`, `rationale`, `decision` — fourteen, in `review/core/kinds.js`.
+
+The kind is **declared** (`data-tipo`) or **inferred** from how the block was written (a `<table>`
+is a table, a `<pre>` is a diagram). Inference exists so the method does not open by demanding:
+documentation that already exists gets kinds without anyone rewriting anything.
+
+⚠️ A kind **never** changes who approves, nor how the fingerprint is computed. It changes only
+**what is demanded** before a block counts as ready. There is one lock, and it is the same for all
+fourteen.
+
+## Roles
+
+The engine knows three: **owner**, **admin** and everyone else. Product roles — clinical lead,
+manager, auditor — belong to whoever adopts the method, and usually come from their identity
+provider. If the engine named a product role, it would stop being an engine.
+
+| Who | Can |
+|---|---|
+| **owner** | exactly one, always the same. Everything, including granting admin |
+| **admin** | everything the owner does, **except** being the owner or changing who that is |
+| **anyone else with access** | see, ask for a change, comment, answer an open decision |
+
+- **A single owner is an invariant, not a convention.** Zero or two owners **do not bring the
+  service up**, with a legible message. It is tested.
 - **The owner is an admin by consequence**, not by configuration — there is no way to strip their
   power by accident.
-- Today there is no admin at all, so "only the owner approves" stays true without needing an
-  exception in the code.
+- **Only the owner's ✓ becomes a lock in the repository.** Anyone else's approval is recorded as an
+  event, and stays an opinion.
+- **A request from an owner or an admin is born approved.** Nobody triages themselves.
 
-**From the methodology, only `owner` and `founder`** (`2026-09-17`). **`admin`, `clinical lead`,
-`operator`, `auditor` — those are roles OF THE PROJECT**, of whoever applies the method. Whoever
-adopts Doc First on another project brings their own roles and receives only these two pieces:
+Code: `review/core/roles.js`. Configuration: `REVISAO_OWNER`, `REVISAO_ADMINS`.
 
-| Piece | Whose | Rule |
+## The request cycle
+
+```
+somebody asks ──► To triage ──► owner: Approve ──► agent: Applying ──► Applied (commit)
+                     │  ▲
+                     │  └── whoever asked adds detail
+                     ▼
+               owner: Reject (reason) · Ask ──► can be revisited and approved
+```
+
+- **Rejected can be revisited**: whoever asked adds detail and it goes back to "To triage".
+- **Approved never goes back**, and takes no supplement. Changing something already approved is a
+  **new request** linked to the previous one — even when it means returning to the earlier text.
+- **Snapshot of the text**: every request and every approval keeps the text of the block at that
+  instant. Git stays the version history; the snapshot shows *what* was approved or asked.
+
+Which transitions are legal lives in one file, `review/cycle.json`, read by `review/core/cycle.js` —
+server, CLI and browser all obey the same table.
+
+## How the ✓ gets back into the repository
+
+The owner validates **in the browser, not in the terminal**. The site does not write to the
+repository; the agent closes the loop.
+
+```
+owner clicks ✓ ──► event in the store ──► doc-first sincronizar
+                                     ──► the approvals file + three attributes in the HTML
+```
+
+The approvals file is the project's, not the engine's: `conteudo.registro` in `doc-first.json` says
+where it goes. Writing it inside the engine was a decision of the first project, and it came out.
+
+| In the HTML | Holds | Without it |
 |---|---|---|
-| **owner** | **methodology** | exactly one, always the same. It is who **creates the roles**. Zero or two **do not bring the service up** |
-| **the `founder` tag** | **methodology** | it sits **on the role, not on the person**. It grants the power to **see the whole documentation** |
-| **role** | the project's | data the owner creates and names. On a healthcare project, for example: admin, clinical lead, manager, operator, doctor, nurse, auditor |
-| **capability** | the methodology defines, the project assigns | **see · ask · approve**. The `founder` tag grants see and ask; **approve** belongs to the owner and to whoever they grant it. On a healthcare project, the one who approves is the `admin` |
+| `data-validado` | who validated, and when | there is no ✓ |
+| `data-digital-validada` | the text that was approved | there is no 🟡 |
+| `data-dependia-de` | the ground it stood on at that moment | there is no 🔴 |
 
-- The tag belongs to the role and not to the person because that way the **second** holder of that
-  role also sees the documentation, without having to be called a founder or to get an exception.
-- ⚠️ **Known bottleneck (`2026-09-17`):** today approving **and** implementing both go through the
-  owner. `admin` already solves the approving half — what is missing is designing who can
-  **implement** (run the agent), which today is not a system permission but whoever has the
-  repository in hand. **To be thought through later**, without blocking anything now.
-- **Who sees the Fundamental** is whoever holds a role with the **`founder` tag** — the tag sits on
-  the role, not on the person, so the second clinical lead sees it too. See, ask and approve are
-  three separate powers: the tag grants the first two. Model in
-  `MODELO-tenancy-e-compartilhamento.md`.
-- **The engine only knows owner, admin and "other".** The **product** role of whoever is not an
-  admin — Manager, the business roles of each product — belong to THE PROJECT, and usually come
-  from the identity provider. If the engine named a product role, it would stop being an engine.
-
-## How the owner's ✓ gets back into the repository
-
-The owner **validates on the site, not in the terminal** (design decision, `2026-09-17`):
-"validation happens on the site; here we only build". The site does not write to the repository —
-the one who closes the loop is the agent:
-
-```
-owner clicks ✓ on a block ──► `aprovacao` event in Firestore ──► agent: doc-first sincronizar
-                                                            ──► docs/validacoes.json + data-validado in the HTML
-```
-
-- `node review/cli/doc-first.ts sincronizar` — runs at the start of every session (the resumption
-  routine calls it).
-- **Only the owner's ✓ locks.** A reviewer's approval is recorded, but it does not become a lock in
-  the repository.
-- **A stale ✓ does not lock.** If the text changed after the click, the command warns and ignores it
-  — the lock only exists for the text they actually read.
-- **Two fingerprints, on purpose.** `digital_texto` (SHA-256 of the visible text) is the one the
-  browser computes and the only one that matches the site; `digital` (SHA-256 of the HTML) is the
-  only one that catches a change of **formatting** in a validated block. Keeping both ties the lock
-  to the site without loosening it.
-- `validar` in the terminal still exists, for when the site is down. The origin is recorded
-  (`origem: site | terminal`).
+- **A stale ✓ does not lock.** If the text changed between the click and the sync, the command warns
+  and ignores it: the lock exists only for the text they actually read.
+- **Two fingerprints, on purpose.** `digital_texto` (SHA-256 of the visible text) is what the browser
+  computes and the only one that matches the site. `digital` (SHA-256 of the HTML) is the only one
+  that catches a change of **formatting** in a validated block. Keeping both ties the lock to the
+  site without loosening it.
+- **One implementation.** Browser, server and CLI import the same `review/core/fingerprint.js`. Two
+  implementations of the same hash is two implementations that will drift.
 
 ## How the agent applies a request
 
-Tool: `python3 review/cli/doc-first.ts` (cloud) or `--local` (the `rodar-local.sh` server).
+```bash
+node review/cli/doc-first.ts <command>     # --local to talk to the local server
+```
 
-1. **See** — `doc-first listar` (only the ones **approved by the owner**) and `doc-first ver ID`:
-   what was asked, by whom, the current text of the block, whether the block changed since the
-   request, and whether it is **validated** by Ale.
-2. **Mark it under analysis** — `doc-first estado ID analise "Recebido…"` (the reviewer sees it in
-   the panel).
-3. **Analyse the impact** — `doc-first impacto ID --termo "…"` for each term/subject in the request:
-   blocks on the pages (flagged as validated and approved), real screens, documents, decisions.
-   Think about dependency of meaning too (remove a use case → what uses that use case).
-4. **Ask the owner** about anything ambiguous, or anything touching a validated block ("only in this
-   block, or in the other N as well?"). If the decision belongs to the reviewer,
-   `estado ID aguardando "question"`.
-5. **Apply** it in the repository, run `marcar_ids.py` if a block was created, run
-   `doc-first conferir` (a validated block gets changed only with the owner's ok — re-validate), and
-   check the screenshots.
+1. **See** — `listar` (only the ones the owner approved) and `ver <id>`: what was asked, by whom, the
+   text then and now, and whether the block is validated.
+2. **Mark it under analysis** — `estado <id> analise "…"`. Whoever asked sees it in the panel.
+3. **Measure the impact** — `impacto <id> --termo "…"` for each subject in the request, and
+   `se-eu-mexer <id>` for what the block holds up. Dependency of meaning counts: remove a use case,
+   and whatever cited that use case is now suspect.
+4. **Ask the owner** about anything ambiguous, and about anything touching a validated block — "only
+   in this block, or in the other N as well?". If the answer belongs to whoever asked,
+   `estado <id> aguardando "question"`.
+5. **Apply** it, then run `conferir` (a validated block changes only with the owner's ok) and
+   `indexar`.
 6. **Commit** with trailers:
    ```
    Pedido: <full id>
-   Solicitado-por: <reviewer's e-mail>
+   Solicitado-por: <e-mail of whoever asked>
    ```
-7. **Close** — `doc-first estado ID aplicado "what changed" --commit SHA --caixas D01.2.1,D01.2.2`
-   (or `recusado "reason"`).
-8. **Learn** — if the request reveals a preference or a pattern, add a lesson to
-   `LICOES-DE-REVISAO.md` or to memory.
-9. **Publish** only when the owner asks — until then the reviewer sees "Applied" but the new text is
-   not on the site yet.
+7. **Close** — `estado <id> aplicado "what changed" --commit <sha> --trechos A01.2.1,A01.2.2`, or
+   `recusado "reason"`.
 
-## Technical pieces (replicable)
+**The separation of powers is tested:** the agent applies, and refuses to approve. Triage belongs to
+whoever owns the documentation, and the API answers 403 to anyone else.
+
+## The pieces
 
 | Piece | Where | Note |
 |---|---|---|
-| Pages and standard | `front/telas/`, `front/css/doc.css`, `docs/PADRAO-DOCUMENTO.md` | copy to another project |
-| Numbering and lock | `front/marcar_ids.py`, `review/cli/doc-first.ts` | a block with a stable code and a fingerprint |
-| Index and decisions | `front/gerar_index.py`, `docs/decisoes-em-aberto.json` | |
-| Review service | `review/` — minimal API in .NET + static site in the same container | identity comes from the IAP (signed JWT) |
-| Events | Firestore, `(default)` database (free quota), `eventos` collection (insert only) | |
-| Publishing | `.github/workflows/publicar-leitura.yml` (manual), WIF with no key | |
-| Access | `publicar/liberar.sh` | reader/reviewer by e-mail |
-| The agent's tool | `review/cli/doc-first.ts` | listar, ver, impacto, estado, resumo |
+| The lock | `review/core/fingerprint.js` | one implementation, shared by browser, server and CLI |
+| The traffic light | `review/core/validity.js` | ⚪ 🟢 🟡 🔴, computed — never declared |
+| Kinds | `review/core/kinds.js` | fourteen, and what each demands of itself |
+| The cycle | `review/cycle.json` + `review/core/cycle.js` | the legal transitions, in one table |
+| Roles | `review/core/roles.js` | owner, admin, everyone else |
+| Language | `review/core/i18n.js` + `review/locales/` | the reviewer's messages; logs stay English |
+| Server | `review/api/server.ts` | Node 24 running TypeScript directly — no build step |
+| Event store | `review/api/store-sqlite.ts` | SQLite on `/data`; the interface takes other stores |
+| Index | `review/api/index-store.ts` | derived, disposable, rebuilt by `indexar` |
+| Identity | `review/api/identity-password.ts`, `identity-iap.ts` | password, or a signed header from an identity proxy |
+| Review panel | `review/web/` | React, bundled into `painel-react.js` |
+| The agent's tool | `review/cli/doc-first.ts` | the commands above |
+| Example content | `examples/gabarito/`, `examples/ola-mundo/` | a template with eleven sections, and a two-page tour |
 
-## Engine and content — separate them from now on (`2026-09-17`)
+**Configuration** (all of it optional except the first):
 
-Doc First belongs to no project: it is an **engine**. The intent is to package it and distribute it
-to the community, with the first project as a use case, not as an owner. That is why the boundary
-gets marked **while it is being built**, not in a refactor at the end — separating later costs far
-more, and never happens.
+| Variable | What it is |
+|---|---|
+| `REVISAO_OWNER` | who approves. Their ✓ is what becomes a lock |
+| `REVISAO_ADMINS` | e-mails, comma separated |
+| `REVISAO_SITE` | where the pages live (default: what `doc-first.json` says) |
+| `REVISAO_SQLITE` | the events file (default: `./dados/eventos.db`) |
+| `REVISAO_IDENTIDADE` | `senha`, `iap`, or `dev` — never `dev` outside Development |
+| `REVISAO_IDIOMA` | the project's default language, when the reader has no preference |
 
-| | Engine (leaves with the method) | Of this project (stays) |
+## Truth and index
+
+Two databases, and only one of them is truth.
+
+- **`events`** is fact. Triggers refuse `UPDATE` and `DELETE` — through the database, not through
+  discipline. Nothing is ever erased; a correction is a new event.
+- **`blocks`, `dependencies`, `issues`** are derived. `indexar` wipes and rewrites them inside a
+  transaction. Delete the file and you lose nothing.
+
+They are separate because files answer some questions badly — "every suspect diagram in the
+project", "every decision with no owner", "what breaks if I touch this". Those are database
+questions. But if both were truth, one day they would disagree, and there would be no way to know
+which to believe.
+
+## Language
+
+The engine is in English. Messages the reviewer reads go through `review/core/i18n.js`; adding a
+language is copying one file (`examples/locales/` has a worked one).
+
+Three audiences, and they are not the same:
+
+| Who | Reads | Language |
 |---|---|---|
-| Method | the request cycle, the lock by fingerprint, "only the owner approves", events that do not get erased | — |
-| Code | `review/` (API + `doc-first`), `review/cli/doc-first.ts`, `marcar_ids.py`, `front/js/review.js` | `front/telas/*.html`, `docs/*.md`, `docs/decisoes-em-aberto.json` |
-| Identity and roles | IAP + `Papeis.cs` (`REVISAO_OWNER`, `REVISAO_ADMINS`) | the real e-mails |
-| Brand | — | theme, icons, product name, typography |
+| the reviewer | the panel, in the browser | theirs — person, then `Accept-Language`, then the project's default |
+| whoever operates | logs | English, always. A log is evidence, and evidence that changes wording by locale cannot be grepped |
+| whoever installs | boot errors | English, hard-coded. A service refusing to start has no session and no chosen language yet |
 
-**The rule for whoever writes code here:** nothing in the engine may name a project, a client, a
-care pathway or an e-mail — whatever varies becomes configuration (as `REVISAO_OWNER` and
-`REVISAO_ADMINS` already are). When something in the engine needs to know about the product, the
-product passes the value in; the engine does not go looking for it.
+A missing key returns the key itself. A page showing `block.approved` is ugly and diagnosable in a
+second; a page showing nothing is a bug someone chases for an afternoon. `missing()` lists every
+hole, and a test calls it.
 
-⚠️ **No survey of similar methodologies** before the engine exists — build first, compare later, if
-it comes to that.
+## Not built yet
 
-## Slices of construction
+Honest, `2026-09-20`:
 
-1. **Foundation** — API, IAP identity, event database. *(done, published)*
-2. **On the site** — approve and ask for a change, with state. *(done, not published)*
-2b. **Owner triage** — approve, reject, ask; supplements; snapshot of the text. *(done, not
-   published)*
-3. **Agent** — `doc-first` and the impact analysis flow. *(done)*
-4. **Decisions** — answering open decisions from the site.
-5. **Navigable prototype** — screens wired together with fake data.
-6. **Packaged method** — a repository template and a guide, with the engine already separated from
-   the content (see "Engine and content"), to distribute to the community.
+- **The consolidated triage queue.** Triage works inside the panel, block by block; the "every open
+  request in the project" view is missing.
+- **Generation.** Today a human writes and the tool keeps it honest. The intent is the tool writing
+  the first draft, and the human correcting it.
+- **Generated diagrams.** `diagram` exists as a kind and enters the lock; nothing produces one.
+- **Automatic dependencies.** Dependencies are declared by hand. The tool should propose them: two
+  blocks using the same term probably depend on each other.
+- **AI assistance.** Designed, not built. Each project brings its own key.
+- **Identity beyond password and identity proxy.** OIDC, Google, LDAP: the interface is there, the
+  piece is not.
+- **Command names and some configuration keys are still Portuguese** (`sincronizar`, `REVISAO_*`).
+  They are being renamed; the old names will keep working.
+
+## What is not in here, and why
+
+⚠️ **No survey of similar methodologies** until the engine stands on its own. Build first, compare
+after — comparing first turns into designing for a comparison table.
+
+**Who can implement is still not a permission.** Approving is: it is the owner's, and the code
+enforces it. Running the agent is whoever has the repository in hand. That is a real gap, it is
+known, and it is not being papered over.
