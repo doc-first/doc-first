@@ -18,8 +18,8 @@ export class Identidade {
   #local: boolean;
   #emailDeDev?: string;
 
-  /** `urlJwks` existe para o teste poder subir um JWKS local e provar que um JWT VÁLIDO é aceito —
-   *  sem isso, só dá para testar recusa, e um `return null` incondicional passaria em tudo. */
+  /** `urlJwks` exists so a test can start a local JWKS and prove that a VALID JWT is accepted —
+   *  without it only refusal is testable, and an unconditional `return null` would pass everything. */
   constructor(cfg: { audiencia?: string; modo?: string; ambiente?: string; emailDeDev?: string; urlJwks?: string }) {
     this.#jwks = createRemoteJWKSet(
       new URL(cfg.urlJwks ?? 'https://www.gstatic.com/iap/verify/public_key-jwk'),
@@ -45,7 +45,7 @@ export class Identidade {
 
   get modoLocal() { return this.#local; }
 
-  /** E-mail de quem chamou, ou null. Null = 401. */
+  /** E-mail of the caller, or null. Null = 401. */
   async email(cabecalhos: Record<string, string | string[] | undefined>): Promise<string | null> {
     if (this.#local) {
       const dev = cabecalhos['x-dev-email'];
