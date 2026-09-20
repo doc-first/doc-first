@@ -1,5 +1,8 @@
-node_modules/
-dados/
+# No trailing slash, on purpose: `node_modules/` matches a directory and NOT a symlink with the
+# same name, so `scripts/worktree.sh` — which links node_modules instead of copying it — left every
+# fresh worktree looking dirty, and `git worktree remove` refused to clean it up.
+node_modules
+dados
 *.db
 *.db-wal
 *.db-shm
