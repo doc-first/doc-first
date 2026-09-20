@@ -6,39 +6,42 @@ import { fingerprintOfText } from '../core/fingerprint.js';
 import { kindOf, whatIsMissing } from '../core/kinds.js';
 
 /**
- * Leitura das folhas do repositório: quais trechos existem, o texto de cada um e a digital.
+ * Reading a repository's pages: which blocks exist, the text of each one, and the fingerprint.
  *
- * ⚠️ O texto tem de sair EXATAMENTE como o navegador o vê, senão a digital diverge e toda aprovação
- * cai em silêncio. O `linkedom` foi conferido contra os trechos já validados no primeiro projeto (calculados
- * antes com lxml e com o DOM real): 17 de 17 batem. Trocar de parser exige refazer essa conferência.
+ * ⚠️ The text has to come out EXACTLY as the browser sees it, or the fingerprint diverges and every
+ * approval falls silently. The parser in use was checked against the blocks already validated in
+ * the first project — computed beforehand with a different parser and with a real DOM — and all of
+ * them matched. Swapping parsers means redoing that check.
  */
 
 export interface Trecho {
   id: string; pagina: string; arquivo: string; caminho: string;
   texto: string; digital: string; validado: string | null;
-  /** De que outros trechos este depende (`data-depende="D01.1.4 D02.3.1"`). É o que permite dizer
-   *  "o texto não mudou, mas a base mudou" — o vermelho do semáforo. */
+  /** Which other blocks this one depends on (`data-depende="D01.1.4 D02.3.1"`). It is what allows
+   *  saying "the text did not change, but the ground did" — the red of the traffic light. */
   depende: string[];
-  /** O tipo do conteúdo: title, box, diagram, decision… (review/core/kinds.js). */
+  /** The content kind: title, box, diagram, decision… (review/core/kinds.js). */
   tipo: string;
-  /** O que este tipo cobra e o trecho não tem. Vazio quer dizer pronto para aprovação. */
+  /** What this kind demands and the block does not have. Empty means ready for approval. */
   falta: string[];
   cod: string;
-  /** Título e subtítulo de seção não mostram número, mas TÊM trava: entram no registro e precisam
-   *  ser conferidos. Filtrá-los aqui fazia o `conferir` dizer "elemento sumiu" para os três que o
-   *  o dono já validou. */
+  /** Section headings and subheadings show no number, but they ARE locked: they enter the record
+   *  and have to be checked. Filtering them out here made `conferir` report "element vanished" for
+   *  the ones the owner had already validated. */
   numerado: boolean;
 }
 
-/** O que o projeto diz sobre onde o conteúdo mora. Lido do doc-first.json da raiz. */
+/** What the project says about where its content lives. Read from doc-first.json at the root. */
 function doProjeto(raiz: string) {
   return readConfig(raiz, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env);
 }
 
 /**
- * As pastas de folhas vêm do `doc-first.json` (`conteudo.pastas`), não do código.
- * Estavam escritas aqui, e era o acoplamento mais duro entre o motor e o projeto de origem: quem
- * adotasse o método teria de nomear as pastas exatamente como este projeto as nomeia.
+ * The page folders come from `doc-first.json` (`conteudo.pastas`), not from the code.
+ *
+ * They used to be written here, and it was the hardest coupling between the engine and the project
+ * it grew in: anyone adopting the method would have had to name their folders exactly as that one
+ * named its own.
  */
 export function pastasDeFolhas(raiz: string): string[] {
   return doProjeto(raiz).sheetFolders.map((p: string) => join(raiz, ...p.split('/')));
@@ -51,12 +54,12 @@ export function arquivosDeFolhas(raiz: string): string[] {
       for (const nome of readdirSync(pasta).sort()) {
         if (nome.endsWith('.html') && !nome.startsWith('_')) saida.push(join(pasta, nome));
       }
-    } catch { /* pasta que não existe neste projeto */ }
+    } catch { /* folder that does not exist in this project */ }
   }
   return saida;
 }
 
-/** Todos os trechos numerados das folhas, com digital calculada. */
+/** Every block in the pages, with its fingerprint computed. */
 export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
   const mapa = new Map<string, Trecho>();
   for (const caminho of arquivosDeFolhas(raiz)) {
@@ -92,7 +95,7 @@ export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
   return mapa;
 }
 
-/** Um trecho específico, sem varrer tudo (usado ao marcar validação). */
+/** One specific block, without scanning everything (used when marking a validation). */
 export function acharArquivoDoTrecho(raiz: string, id: string): { caminho: string; html: string } | null {
   for (const caminho of arquivosDeFolhas(raiz)) {
     const html = readFileSync(caminho, 'utf8');
@@ -102,11 +105,11 @@ export function acharArquivoDoTrecho(raiz: string, id: string): { caminho: strin
 }
 
 /**
- * O nome do arquivo como ele aparece no registro de validações.
+ * The file name as it appears in the approvals record.
  *
- * Era `caminho.slice(caminho.indexOf('front'))` — procurava a string "front" no caminho absoluto.
- * Num projeto sem pasta `front/`, `indexOf` devolve -1 e o slice corta pelo fim, devolvendo lixo.
- * Agora é o caminho relativo à raiz, sem o prefixo que o projeto pedir para recortar.
+ * It used to search for a hard-coded folder name inside the absolute path. In a project without
+ * that folder, the search returns -1 and the slice cuts from the end, returning garbage. Now it is
+ * the path relative to the root, minus whatever prefix the project asks to trim.
  */
 export function nomeCurto(raiz: string, caminho: string): string {
   const rel = caminho.startsWith(raiz) ? caminho.slice(raiz.length).replace(/^[/\\]/, '') : caminho;

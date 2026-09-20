@@ -6,12 +6,12 @@ import type { Evento } from '../api/types.ts';
 const exec = promisify(execFile);
 
 /**
- * De onde vêm os eventos para a ferramenta do agente: do Firestore na nuvem (REST, com o token do
- * gcloud) ou do servidor local em memória.
+ * Where events come from for the agent's tool: the cloud (REST, with a gcloud token), a local
+ * SQLite file, or a local server in memory.
  *
- * ⚠️ Escrever direto no Firestore contorna a API — e portanto o ciclo, os papéis e os limites. Está
- * registrado como o achado S3 em docs/DIVIDA-TECNICA.md, e o caminho certo é o agente entrar pela
- * API com identidade própria. Enquanto isso não existe, a leitura é por aqui.
+ * ⚠️ Writing straight to the cloud store bypasses the API — and therefore the cycle, the roles and
+ * the limits. The right path is for the agent to come in through the API with an identity of its
+ * own. Until that exists, reading happens here.
  */
 export class Fonte {
   #local: boolean;
@@ -25,20 +25,20 @@ export class Fonte {
   constructor(opcoes: { local?: boolean; projeto?: string; urlLocal?: string; conta?: string;
                        banco?: string } = {}) {
     this.#local = opcoes.local ?? false;
-    // O arquivo de eventos, quando o projeto roda sem nuvem. É o caminho que fecha o ciclo sem
-    // Google: sem ele, `sincronizar` só funcionava contra o Firestore ou contra um servidor em modo
-    // de desenvolvimento — e um Doc First que sobe por contêiner não é nenhum dos dois.
+    // The events file, when the project runs without a cloud. This is what closes the loop
+    // offline: without it, `sincronizar` only worked against the cloud store or against a server
+    // in development mode — and a Doc First started from a container is neither.
     this.#banco = opcoes.banco ?? process.env.REVISAO_SQLITE;
-    // Sem valor fixo: vem do doc-first.json do projeto, ou do ambiente.
+    // No hard-coded value: it comes from the project's doc-first.json, or from the environment.
     this.#projeto = opcoes.projeto ?? process.env.REVISAO_PROJETO ?? '';
     this.#urlLocal = opcoes.urlLocal ?? process.env.REVISAO_LOCAL ?? 'http://localhost:8095';
     this.#preferida = process.env.REVISAO_CONTA ?? opcoes.conta;
   }
 
   /**
-   * Sem projeto, a URL do Firestore sai como `projects//databases/...` e a nuvem responde 400
-   * "Invalid resource field value" — erro que não diz nada a quem está lendo. Falhar aqui, com o
-   * nome do que falta, custa uma linha e economiza a investigação inteira.
+   * With no project, the URL comes out as `projects//databases/...` and the cloud answers 400
+   * "Invalid resource field value" — an error that tells the reader nothing. Failing here, naming
+   * what is missing, costs one line and saves the whole investigation.
    */
   #exigeProjeto(): string {
     if (this.#projeto) return this.#projeto;
@@ -49,10 +49,11 @@ export class Fonte {
   }
 
   /**
-   * Primeira conta do gcloud que realmente emite token.
-   * A conta era fixa no código, e quando a credencial dela expirou — com o dono em acesso remoto, sem como
-   * refazer o login — a ferramenta parou, embora OUTRA conta autenticada na mesma máquina tivesse
-   * acesso ao projeto.
+   * The first gcloud account that actually issues a token.
+   *
+   * The account used to be hard-coded, and when its credential expired — with the owner on a
+   * remote session and no way to redo the login — the tool simply stopped, even though ANOTHER
+   * authenticated account on the same machine had access to the project.
    */
   async #contaComToken(): Promise<string> {
     if (this.#conta) return this.#conta;
@@ -60,11 +61,11 @@ export class Fonte {
     try {
       const { stdout } = await exec('gcloud', ['auth', 'list', '--format=value(account)']);
       contas = stdout.split('\n').map((s) => s.trim()).filter(Boolean);
-    } catch { /* gcloud ausente: cai no erro claro abaixo */ }
+    } catch { /* no gcloud: falls through to the clear error below */ }
 
-    // A preferida primeiro, e só depois as outras: a escolha deixa de depender de qual conta o
-    // gcloud lista antes. Se a preferida existe mas não emite, as outras ainda valem — trabalhar
-    // remoto, sem como refazer um login, não pode parar a ferramenta.
+    // The preferred one first, the others after: the choice stops depending on which account
+    // gcloud happens to list first. If the preferred one exists but issues nothing, the others
+    // still count — working remotely, with no way to redo a login, must not stop the tool.
     const ordem = this.#preferida
       ? [this.#preferida, ...contas.filter((c) => c !== this.#preferida)]
       : contas;
@@ -72,13 +73,14 @@ export class Fonte {
     for (const c of ordem) {
       try {
         await exec('gcloud', ['auth', 'print-access-token', '--account', c]);
-        // Ler a nuvem com uma identidade que não é a esperada é coisa que se diz em voz alta.
+        // Reading the cloud as an identity other than the expected one is something you say out
+        // loud.
         if (this.#preferida && c !== this.#preferida) {
           console.warn(`  ⚠ a credencial de ${this.#preferida} não emite token; lendo como ${c}.\n` +
             `    Para voltar ao normal:  gcloud auth login ${this.#preferida} --no-launch-browser`);
         }
         return (this.#conta = c);
-      } catch { /* essa não emite; tenta a próxima */ }
+      } catch { /* this one issues nothing; try the next */ }
     }
 
     throw new Error(
@@ -99,11 +101,11 @@ export class Fonte {
     }
   }
 
-  /** A mensagem que a nuvem devolve vem enterrada em JSON; o que ajuda é ela mais o que fazer. */
+  /** The cloud's message comes buried in JSON; what helps is that message plus what to do. */
   async #erroDaNuvem(r: Response, oQue: string): Promise<Error> {
     const cru = await r.text();
     let recado = cru.slice(0, 200);
-    try { recado = JSON.parse(cru).error?.message ?? recado; } catch { /* não era JSON */ }
+    try { recado = JSON.parse(cru).error?.message ?? recado; } catch { /* it was not JSON */ }
     const conta = this.#conta ?? '(conta desconhecida)';
     const saida = [`erro ${r.status} ao ${oQue} o Firestore: ${recado}`];
     if (r.status === 403) {
@@ -115,8 +117,8 @@ export class Fonte {
   }
 
   /**
-   * Lê os eventos direto do arquivo SQLite. SÓ LÊ — nunca escreve: gravar por aqui contornaria o
-   * ciclo, os papéis e os limites, que é o achado S3 de docs/DIVIDA-TECNICA.md.
+   * Reads events straight from the SQLite file. READ ONLY — never writes: writing through here
+   * would bypass the cycle, the roles and the limits.
    */
   async #doArquivo(caminho: string): Promise<Evento[]> {
     const { DatabaseSync } = await import('node:sqlite');
@@ -137,7 +139,7 @@ export class Fonte {
   }
 
   async eventos(): Promise<Evento[]> {
-    // O arquivo vem antes da nuvem: quem configurou um banco local quis o banco local.
+    // The file comes before the cloud: whoever configured a local database wanted the local one.
     if (this.#banco && existsSync(this.#banco)) return this.#doArquivo(this.#banco);
     if (this.#local) {
       const r = await fetch(`${this.#urlLocal}/api/eventos`, {
@@ -163,12 +165,12 @@ export class Fonte {
   }
 
   /**
-   * Registra um evento. No local vai pela API (passando pelo ciclo, pelos papéis e pelos limites);
-   * na nuvem, escreve direto no Firestore.
+   * Records an event. Locally it goes through the API (and therefore through the cycle, the roles
+   * and the limits); in the cloud, it writes to the store directly.
    *
-   * ⚠️ Escrever direto CONTORNA a API — e portanto todas as validações. É o achado S3 de
-   * docs/DIVIDA-TECNICA.md, e o caminho certo é o agente ter identidade própria e entrar pela API.
-   * Enquanto isso não existe, este é o caminho, e ele está marcado.
+   * ⚠️ Writing directly BYPASSES the API, and therefore every validation. The right path is for
+   * the agent to have an identity of its own and come in through the API. Until that exists, this
+   * is the path — and it is marked as such.
    */
   async incluir(evento: Record<string, unknown>): Promise<string> {
     const autor = `agente via ${await this.#contaComToken().catch(() => 'local')}`;
@@ -198,7 +200,7 @@ export class Fonte {
       body: JSON.stringify({
         writes: [{
           update: { name: `projects/${this.#projeto}/databases/(default)/documents/eventos/${id}`, fields: campos },
-          currentDocument: { exists: false },                     // só inclui, nunca sobrescreve
+          currentDocument: { exists: false },                     // insert only, never overwrite
           updateTransforms: [{ fieldPath: 'quando', setToServerValue: 'REQUEST_TIME' }],
         }],
       }),

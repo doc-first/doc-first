@@ -1,28 +1,132 @@
 {
   "_leia": [
-    "Casos-ouro do ciclo do pedido: o MESMO log de eventos, o MESMO estado esperado, checado em C# e",
-    "em Python. Existe porque a trava de corrida entrou no C# em 17/09 e não foi levada ao pedidos.py:",
-    "os dois calculavam estados diferentes para o mesmo histórico, e nada avisava.",
-    "Quem mexer no ciclo mexe aqui, e as duas linguagens têm de continuar concordando."
+    "Gold cases for the request cycle: the SAME event log, the SAME expected state.",
+    "",
+    "They exist because this state machine once lived in several languages at once, and the copies",
+    "drifted without anyone noticing: a race guard was added to one of them and not to the others,",
+    "and from then on the two computed different states for the same history.",
+    "",
+    "The cases outlived the copies. Whoever changes the cycle changes these too — and if a change",
+    "here is not deliberate, it is a regression."
   ],
   "casos": [
-    { "nome": "pedido de revisor nasce aberto", "autorEhAdmin": false, "eventos": [], "esperado": "aberto" },
-    { "nome": "pedido de admin nasce aprovado", "autorEhAdmin": true, "eventos": [], "esperado": "aprovado" },
-    { "nome": "ultimo evento manda", "autorEhAdmin": false,
-      "eventos": [{"estado":"recusado","de":"aberto"},{"estado":"aprovado","de":"recusado"}], "esperado": "aprovado" },
-    { "nome": "quem perdeu a corrida e ignorado", "autorEhAdmin": false,
-      "eventos": [{"estado":"aprovado","de":"aberto"},{"estado":"pergunta","de":"aberto"}], "esperado": "aprovado" },
-    { "nome": "tres simultaneas: so a primeira vale", "autorEhAdmin": false,
-      "eventos": [{"estado":"recusado","de":"aberto"},{"estado":"aprovado","de":"aberto"},{"estado":"pergunta","de":"aberto"}],
-      "esperado": "recusado" },
-    { "nome": "evento antigo sem de continua valendo", "autorEhAdmin": false,
-      "eventos": [{"estado":"aprovado"}], "esperado": "aprovado" },
-    { "nome": "sequencia legitima ate aplicado", "autorEhAdmin": false,
-      "eventos": [{"estado":"aprovado","de":"aberto"},{"estado":"analise","de":"aprovado"},{"estado":"aplicado","de":"analise"}],
-      "esperado": "aplicado" },
-    { "nome": "complemento devolve recusado para triagem", "autorEhAdmin": false,
-      "eventos": [{"estado":"recusado","de":"aberto"},{"complemento":true}], "esperado": "aberto" },
-    { "nome": "complemento nao mexe em aprovado", "autorEhAdmin": false,
-      "eventos": [{"estado":"aprovado","de":"aberto"},{"complemento":true}], "esperado": "aprovado" }
+    {
+      "nome": "a reviewer request is born open",
+      "autorEhAdmin": false,
+      "eventos": [],
+      "esperado": "aberto"
+    },
+    {
+      "nome": "an admin request is born approved",
+      "autorEhAdmin": true,
+      "eventos": [],
+      "esperado": "aprovado"
+    },
+    {
+      "nome": "the last event wins",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "recusado",
+          "de": "aberto"
+        },
+        {
+          "estado": "aprovado",
+          "de": "recusado"
+        }
+      ],
+      "esperado": "aprovado"
+    },
+    {
+      "nome": "whoever lost the race is ignored",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "aprovado",
+          "de": "aberto"
+        },
+        {
+          "estado": "pergunta",
+          "de": "aberto"
+        }
+      ],
+      "esperado": "aprovado"
+    },
+    {
+      "nome": "three at once: only the first counts",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "recusado",
+          "de": "aberto"
+        },
+        {
+          "estado": "aprovado",
+          "de": "aberto"
+        },
+        {
+          "estado": "pergunta",
+          "de": "aberto"
+        }
+      ],
+      "esperado": "recusado"
+    },
+    {
+      "nome": "an old event with no from still counts",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "aprovado"
+        }
+      ],
+      "esperado": "aprovado"
+    },
+    {
+      "nome": "a legitimate sequence through to applied",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "aprovado",
+          "de": "aberto"
+        },
+        {
+          "estado": "analise",
+          "de": "aprovado"
+        },
+        {
+          "estado": "aplicado",
+          "de": "analise"
+        }
+      ],
+      "esperado": "aplicado"
+    },
+    {
+      "nome": "a supplement sends a rejected request back to triage",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "recusado",
+          "de": "aberto"
+        },
+        {
+          "complemento": true
+        }
+      ],
+      "esperado": "aberto"
+    },
+    {
+      "nome": "a supplement does not touch an approved request",
+      "autorEhAdmin": false,
+      "eventos": [
+        {
+          "estado": "aprovado",
+          "de": "aberto"
+        },
+        {
+          "complemento": true
+        }
+      ],
+      "esperado": "aprovado"
+    }
   ]
 }

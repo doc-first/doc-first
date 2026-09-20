@@ -8,9 +8,9 @@ import { Fonte } from './remote.ts';
 import type { Evento } from '../api/types.ts';
 
 /**
- * A ferramenta do agente: ler os pedidos que os revisores fizeram no site, ver o contexto, medir o
- * impacto e registrar o andamento. NUNCA altera conteúdo — quem altera é o agente, com o dono, em
- * commit com os trailers `Pedido:` e `Solicitado-por:`.
+ * The agent's tool: read the change requests reviewers made on the site, see the context, measure
+ * the impact, and record progress. It NEVER edits content — the agent does that, with the owner,
+ * in a commit carrying the request trailers.
  */
 
 export interface Pedido extends Evento {
@@ -23,8 +23,8 @@ export function carregarCiclo(raiz: string) {
 }
 
 /**
- * O rótulo que a pessoa lê. Mora aqui, e não no núcleo: desde 2026-09-19 a regra não carrega texto de
- * interface — ela devolve a chave, e cada borda resolve no idioma de quem está lendo.
+ * The label a person reads. It lives here, not in the core: the rule carries no interface text —
+ * it returns the key, and each edge resolves it in the reader's language.
  */
 const rotuloDe = (ciclo: ReturnType<typeof createCycle>, estado: string) =>
   ciclo.table.states[estado]?.label ?? estado;
@@ -33,12 +33,12 @@ export function papeisDoAmbiente() {
   return createRoles(process.env.REVISAO_OWNER, process.env.REVISAO_ADMINS);
 }
 
-/** Reduz os eventos a pedidos com estado — usando o MESMO núcleo que o servidor e o navegador. */
+/** Reduces events to requests with a state — using the SAME core as the server and the browser. */
 export function pedidos(raiz: string, eventos: Evento[]): Pedido[] {
   const ciclo = carregarCiclo(raiz);
   const papeis = papeisDoAmbiente();
-  // O núcleo fala inglês, e `Pedido.estado` também — quem traduz para o que a pessoa lê é a impressão,
-  // logo abaixo. Ver review/core/legacy.js.
+  // The core speaks English, and so does `Pedido.estado` — what translates to what a person reads
+  // is the printing, just below. See review/core/legacy.js.
   const paraONucleo = eventos.map(doHistorico);
   return eventos.filter((e) => e.tipo === 'pedido').map((p) => ({
     ...p,
@@ -109,7 +109,8 @@ export async function ver(raiz: string, fonte: Fonte, prefixo: string) {
   if (p.historico.length) {
     console.log('\nConversa:');
     for (const e of p.historico) {
-      // `e.dados.estado` vem do registro, ainda em pt-BR: traduzir antes de procurar o rótulo.
+      // `e.dados.estado` comes from the record, still in Portuguese: translate before looking up
+      // the label.
       const que = e.tipo === 'complemento' ? 'acrescentou'
         : (rotuloDe(ciclo, estadoAtual(String(e.dados?.estado ?? ''))) || e.tipo);
       console.log(`  ${quando(e.quando)}  ${e.autor}  ${que}`);
@@ -118,7 +119,7 @@ export async function ver(raiz: string, fonte: Fonte, prefixo: string) {
   }
 }
 
-/** Onde mais o assunto aparece — a análise de impacto antes de alterar. */
+/** Where else the subject shows up — the impact analysis you run before editing. */
 export async function impacto(raiz: string, fonte: Fonte, prefixo: string, termos: string[]) {
   const eventos = await fonte.eventos();
   const p = achar(pedidos(raiz, eventos), prefixo);
@@ -162,8 +163,9 @@ export async function resumo(raiz: string, fonte: Fonte) {
 }
 
 /**
- * Registra o andamento de um pedido — o que o revisor vê no painel do trecho.
- * O agente só usa os estados DELE: aprovar, recusar e perguntar é triagem do dono, no site.
+ * Records progress on a request — what the reviewer sees in the block's panel.
+ * The agent only uses ITS OWN states: approving, rejecting and asking is the owner's triage, on
+ * the site.
  */
 export async function estado(raiz: string, fonte: Fonte, prefixo: string, novo: string,
                              mensagem: string, extra: { commit?: string; caixas?: string } = {}) {
@@ -171,8 +173,8 @@ export async function estado(raiz: string, fonte: Fonte, prefixo: string, novo: 
   const eventos = await fonte.eventos();
   const p = achar(pedidos(raiz, eventos), prefixo);
 
-  // A pessoa digita o estado na linha de comando, e aprendeu a digitar `analise`. O nome antigo
-  // continua valendo — quem migra a língua do código não faz o usuário remigrar o dedo.
+  // People type the state on the command line, and they learned the old names. Those keep
+  // working — migrating the language of the code does not migrate anyone's fingers.
   const alvo = estadoAtual(novo);
   if (!ciclo.agentStates.includes(alvo)) {
     throw new Error(`o agente só usa: ${ciclo.agentStates.map(estadoEmPortugues).join(', ')} ` +
@@ -186,7 +188,8 @@ export async function estado(raiz: string, fonte: Fonte, prefixo: string, novo: 
     throw new Error('aplicado precisa de --commit SHA (o rastro liga pedido ↔ commit)');
   }
 
-  // Grava em pt-BR, como o resto do registro: o front ainda lê assim. Ver legacy.js.
+  // Written in Portuguese, like the rest of the record: the front end still reads it that way.
+  // See legacy.js.
   const dados: Record<string, string> = {
     pedido: p.id, estado: estadoEmPortugues(alvo), de: estadoEmPortugues(p.estado),
   };

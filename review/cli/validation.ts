@@ -8,23 +8,23 @@ import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
 import { Fonte } from './remote.ts';
 
 /**
- * A trava de validação: um trecho aprovado não muda sem permissão, e não existe marca de aprovação
- * sem rastro.
+ * The validation lock: an approved block does not change without permission, and no approval mark
+ * exists without a trail.
  *
- * É a peça mais crítica do método — decide se uma aprovação humana ainda vale.
+ * The most critical piece of the method — it decides whether a human approval still holds.
  */
 
 export interface Registro {
   [id: string]: { arquivo: string; data: string; digital_texto: string; digital?: string;
                   origem?: string; evento?: string; texto?: string; migrado_de?: string[];
-                  /** A digital que CADA dependência tinha no momento do ✓. Sem isto não há como
-                   *  saber depois que a base mudou — a digital do próprio trecho não denuncia. */
+                  /** The fingerprint EACH dependency had at the moment of the ✓. Without this there is
+                   *  no way to tell later that the base moved — the block's own fingerprint stays silent. */
                   depende?: Record<string, string> };
 }
 
 /**
- * Onde o registro de aprovações mora. Vem do `doc-first.json` (`conteudo.registro`), não do código:
- * `docs/validacoes.json` era uma decisão do projeto de origem, escrita dentro do motor.
+ * Where the approval registry lives. It comes from `doc-first.json` (`conteudo.registro`), not from
+ * the code: `docs/validacoes.json` was a decision of the first project, written inside the engine.
  */
 const caminhoRegistro = (raiz: string) =>
   join(raiz, ...readConfig(raiz, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env)
@@ -41,7 +41,7 @@ export function salvar(raiz: string, reg: Registro) {
   writeFileSync(caminhoRegistro(raiz), JSON.stringify(ordenado, null, 1) + '\n', 'utf8');
 }
 
-/** Acusa o que mudou depois de validado, e o que está marcado sem registro. */
+/** Flags what changed after being validated, and what is marked without a registry entry. */
 export async function conferir(raiz: string): Promise<number> {
   const reg = carregar(raiz);
   const trechos = await lerTrechos(raiz);
@@ -62,11 +62,11 @@ export async function conferir(raiz: string): Promise<number> {
 }
 
 /**
- * Marca de validado no HTML que NÃO tem registro correspondente.
+ * A validated mark in the HTML with NO matching registry entry.
  *
- * Provado em 2026-09-18: sem esta varredura, um `data-validado` escrito à mão criava uma aprovação do
- * nada — e o site a exibe, porque o selo vem do atributo. Aprovação sem rastro, num método cuja tese
- * é aprovação rastreável.
+ * Proved on 2026-09-18: without this sweep, a hand-written `data-validado` created an approval out of
+ * nothing — and the site shows it, because the seal comes from the attribute. Approval with no trail,
+ * in a method whose thesis is traceable approval.
  */
 export async function orfaos(raiz: string, reg: Registro, arquivos?: string[]): Promise<number> {
   let achados = 0;
@@ -89,7 +89,7 @@ export async function orfaos(raiz: string, reg: Registro, arquivos?: string[]): 
   return achados;
 }
 
-/** Grava a trava de um trecho: marca o HTML e registra a digital. */
+/** Writes a block's lock: marks the HTML and records the fingerprint. */
 export async function marcar(raiz: string, reg: Registro, id: string, quando: string,
                              origem: string, evento?: string,
                              digitaisAgora?: Map<string, string>): Promise<string | null> {
@@ -108,9 +108,9 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
   const texto = copia.textContent ?? '';
   const digital = await fingerprintOfText(texto);
 
-  // De que este trecho depende, e como cada dependência estava AGORA. Guardar a foto das
-  // dependências é o que permite, meses depois, dizer "o texto continua igual mas a base mudou".
-  // Sem isto o vermelho do semáforo não teria com o que comparar.
+  // What this block depends on, and how each dependency looked RIGHT NOW. Keeping the snapshot of the
+  // dependencies is what allows saying, months later, "the text is still the same but the base moved".
+  // Without it the red light would have nothing to compare against.
   const declaradas = (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean);
   const depende: Record<string, string> = {};
   for (const outro of declaradas) {
@@ -119,10 +119,10 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
     else console.log(`  ⚠ ${id} declara depender de ${outro}, que não existe`);
   }
 
-  // O navegador precisa de duas fotos para pintar o semáforo sem consultar o servidor:
-  //   data-digital-validada  o texto que foi aprovado  → sem ela não há 🟡
-  //   data-dependia-de       o chão naquele momento    → sem ela não há 🔴
-  // O JSON é a verdade; estes atributos são a cópia que viaja com a página.
+  // The browser needs two snapshots to paint the traffic light without asking the server:
+  //   data-digital-validada  the text that was approved  → without it there is no 🟡
+  //   data-dependia-de       the ground at that moment   → without it there is no 🔴
+  // The JSON is the truth; these attributes are the copy that travels with the page.
   const atributos: Record<string, string> = { 'data-digital-validada': digital };
   if (Object.keys(depende).length) {
     atributos['data-dependia-de'] = JSON.stringify(depende).replace(/"/g, '&quot;');
@@ -147,14 +147,15 @@ export async function marcar(raiz: string, reg: Registro, id: string, quando: st
   return digital;
 }
 
-/** Traz para o repositório os ✓ que o dono deu no site. Só os dele: aprovação de revisor não trava. */
+/** Brings into the repository the ✓ the owner gave on the site. Only his: a reviewer's approval does not lock. */
 export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: string } = {}) {
   const dono = (opcoes.dono ?? process.env.REVISAO_OWNER ?? '').toLowerCase();
   if (!dono) throw new Error('defina REVISAO_OWNER: é o ✓ dele que vira trava.');
 
-  // A nuvem fora do ar não pode derrubar a retomada. O registro no repositório é a fonte do que já
-  // está validado; a nuvem só acrescenta o que veio do site. Sem ela, o placar local ainda vale —
-  // e o que NÃO pode acontecer é a sessão seguir sem saber que leu um retrato parado.
+  // The cloud being down must not take the whole session down with it. The registry in the repository
+  // is the source of what is already validated; the cloud only adds what came from the site. Without
+  // it the local score still holds — what must NOT happen is the session going on unaware it read a
+  // frozen snapshot.
   let eventos: Awaited<ReturnType<typeof fonte.eventos>>;
   try {
     eventos = await fonte.eventos();

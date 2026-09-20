@@ -1,13 +1,13 @@
 /**
- * O semáforo. O caso que mais importa é o VERMELHO: o texto do trecho não mudou, e mesmo assim a
- * validação dele deixou de ser confiável porque a base mudou. Nenhuma digital deste trecho
- * denuncia isso — é preciso guardar o que as dependências eram no momento do ✓.
+ * The traffic light. The case that matters most is RED: the block's text did not change, and yet
+ * its validation stopped being trustworthy because the ground moved. No fingerprint of this block
+ * denounces that — you have to keep what the dependencies were at the moment of the ✓.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { stateOf, trafficLight, dependentsOf } from '../core/validity.js';
 
-const trecho = (id, fingerprint, dependsOn = []) => [id, { id, fingerprint, dependsOn }];
+const block = (id, fingerprint, dependsOn = []) => [id, { id, fingerprint, dependsOn }];
 
 test('white: nobody has validated it yet', () => {
   const r = stateOf({ id: 'A.1.1', fingerprint: 'aaa' }, undefined, new Map());
@@ -26,8 +26,8 @@ test("yellow: the block's own text changed after the ✓", () => {
 });
 
 test('RED: the text is unchanged, but the ground moved', () => {
-  // Este é o caso que justifica o módulo existir. A digital do trecho bate — ele está idêntico ao
-  // que foi aprovado. O que mudou foi a regra em que ele se apoia.
+  // This is the case that justifies the module existing. The block's fingerprint matches — it is
+  // identical to what was approved. What moved was the rule it leans on.
   const agora = new Map([['B.2.1', 'MUDOU']]);
   const r = stateOf(
     { id: 'A.1.1', fingerprint: 'aaa', dependsOn: ['B.2.1'] },
@@ -39,8 +39,8 @@ test('RED: the text is unchanged, but the ground moved', () => {
 });
 
 test('red when the dependency VANISHES, too', () => {
-  // Apontar para um trecho que não existe mais é tão quebrado quanto apontar para um que mudou —
-  // e é mais fácil de acontecer, porque apagar não deixa rastro no texto de quem dependia.
+  // Pointing at a block that no longer exists is as broken as pointing at one that changed — and
+  // easier to do, because deleting leaves no trace in the text of whoever depended on it.
   const r = stateOf(
     { id: 'A.1.1', fingerprint: 'aaa', dependsOn: ['SUMIU.1.1'] },
     { digital_texto: 'aaa', depende: { 'SUMIU.1.1': 'existia' } },
@@ -51,8 +51,8 @@ test('red when the dependency VANISHES, too', () => {
 });
 
 test("yellow beats red: if the block's own text changed, that is the problem to fix", () => {
-  // Ordem importa. Dizer "a base mudou" para quem também reescreveu o próprio texto manda a pessoa
-  // olhar o lugar errado — primeiro se reaprova o que está na frente dos olhos.
+  // Order matters. Telling someone "the ground moved" when they also rewrote the text sends them
+  // to the wrong place — you re-approve what is in front of your eyes first.
   const r = stateOf(
     { id: 'A.1.1', fingerprint: 'NOVO', dependsOn: ['B.2.1'] },
     { digital_texto: 'aaa', depende: { 'B.2.1': 'era-assim' } },
@@ -62,30 +62,30 @@ test("yellow beats red: if the block's own text changed, that is the problem to 
 });
 
 test('the tally for the whole documentation', () => {
-  const trechos = new Map([
-    trecho('A.1.1', 'aaa'),                     // validado, intacto  → verde
-    trecho('A.1.2', 'NOVO'),                    // texto mudou        → amarelo
-    trecho('A.1.3', 'ccc', ['A.1.4']),          // base mudou         → vermelho
-    trecho('A.1.4', 'MUDOU'),                   // nunca validado     → branco
-    trecho('A.1.5', 'eee'),                     // nunca validado     → branco
+  const blocks = new Map([
+    block('A.1.1', 'aaa'),                     // validated, intact  → green
+    block('A.1.2', 'NOVO'),                    // text changed       → yellow
+    block('A.1.3', 'ccc', ['A.1.4']),          // ground moved       → red
+    block('A.1.4', 'MUDOU'),                   // never validated    → white
+    block('A.1.5', 'eee'),                     // never validated    → white
   ]);
-  const registro = {
+  const records = {
     'A.1.1': { digital_texto: 'aaa' },
     'A.1.2': { digital_texto: 'antigo' },
     'A.1.3': { digital_texto: 'ccc', depende: { 'A.1.4': 'era-assim' } },
   };
-  const { tally, byBlock } = trafficLight(trechos, registro);
+  const { tally, byBlock } = trafficLight(blocks, records);
   assert.deepEqual(tally, { none: 2, valid: 1, stale: 1, broken: 1 });
   assert.equal(byBlock.get('A.1.3').state, 'broken');
 });
 
 test('what depends on a block — the question people ask before editing', () => {
-  const trechos = new Map([
-    trecho('A.1.1', 'aaa'),
-    trecho('A.2.1', 'bbb', ['A.1.1']),
-    trecho('A.3.1', 'ccc', ['A.1.1', 'A.2.1']),
-    trecho('A.4.1', 'ddd'),
+  const blocks = new Map([
+    block('A.1.1', 'aaa'),
+    block('A.2.1', 'bbb', ['A.1.1']),
+    block('A.3.1', 'ccc', ['A.1.1', 'A.2.1']),
+    block('A.4.1', 'ddd'),
   ]);
-  assert.deepEqual(dependentsOf('A.1.1', trechos).sort(), ['A.2.1', 'A.3.1']);
-  assert.deepEqual(dependentsOf('A.4.1', trechos), []);
+  assert.deepEqual(dependentsOf('A.1.1', blocks).sort(), ['A.2.1', 'A.3.1']);
+  assert.deepEqual(dependentsOf('A.4.1', blocks), []);
 });
