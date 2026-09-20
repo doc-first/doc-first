@@ -62,5 +62,7 @@ test('every key exists in every language', () => {
   const holes = i18n.missing().filter((h) => !h.key.startsWith('_'));
   assert.deepEqual(holes, [],
     `keys missing per language:\n${holes.map((h) => `  ${h.lang}: ${h.key}`).join('\n')}`);
-  assert.ok(i18n.languages.length >= 2, 'a translator with one language proves nothing');
+  // The engine ships English only. The check still earns its place: it is what will catch the
+  // missing key on the day somebody drops a second dictionary in — see examples/locales/.
+  assert.ok(i18n.languages.includes('en'), 'English is the fallback and has to be there');
 });

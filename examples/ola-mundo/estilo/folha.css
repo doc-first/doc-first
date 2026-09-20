@@ -1,5 +1,5 @@
-/* O mínimo para a página ficar legível e o painel de revisão funcionar.
-   Não é design: é o contrato em forma de CSS. */
+/* The minimum for the page to be readable and the review panel to work.
+   This is not design: it is the contract written as CSS. */
 
 body.doc { font: 16px/1.6 system-ui, sans-serif; color: #222; margin: 0; background: #f7f7f8; }
 .doc-pagina { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; background: #fff;
@@ -11,18 +11,18 @@ h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
 h2 .n { color: #0883C5; margin-right: .3em; }
 code { background: #eef1f4; border-radius: .2rem; padding: .1em .35em; font-size: .9em; }
 
-/* ⚠️ position: relative é EXIGÊNCIA do motor, não estética. O botão de revisão é posicionado
-   dentro do trecho; sem isto ele escapa para o canto da página. */
+/* ⚠️ position: relative is a REQUIREMENT of the engine, not a matter of taste. The review button
+   is placed inside the block; without this it escapes to the corner of the page. */
 .frase, .bloco { position: relative; margin: 0 0 1rem; padding: .85rem 1rem;
                  border: 1px solid #e3e6ea; border-radius: .4rem; background: #fff; }
 .frase { border-left: 3px solid #0883C5; }
 .bloco p { margin: 0; }
 
-/* O selo do trecho, quando o painel NÃO está ligado (sem servidor, abrindo o arquivo direto). */
+/* The block's stamp, for when the panel is NOT on (no server, file opened straight from disk). */
 .frase[data-cod]::after, .bloco[data-cod]::after {
   content: attr(data-cod); position: absolute; top: -.6rem; right: .6rem; font-size: .7rem;
   color: #6b7280; background: #f7f7f8; padding: 0 .35rem; border-radius: .2rem;
 }
-/* Quando o painel liga, ele põe o próprio botão. Esta regra tira o selo estático para não
-   aparecerem dois. */
+/* Once the panel turns on, it puts in a button of its own. This rule drops the static stamp so
+   the two do not show up side by side. */
 body.rv-ativa .frase[data-cod]::after, body.rv-ativa .bloco[data-cod]::after { content: none; }

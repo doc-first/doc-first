@@ -1,29 +1,32 @@
-/* O painel de revisão do Doc First — o CSS que o motor precisa.
+/* The Doc First review panel — the CSS the engine needs.
  *
- * Saiu de dentro do CSS do documento do projeto de origem, onde vivia junto com a tipografia da
- * folha. Eram dois arquivos num: as linhas do conteúdo e as do motor, no mesmo lugar.
+ * It came out of the document CSS of the project it was born in, where it lived alongside the
+ * typography of the sheet. That was two files in one: the content lines and the engine lines, in the
+ * same place.
  *
- * Um projeto que adote o Doc First carrega ESTE arquivo e escreve o seu próprio CSS de documento.
- * As classes aqui são as que review/web/review.js cria — mudar um nome aqui quebra o painel.
+ * A project adopting Doc First loads THIS file and writes its own document CSS.
+ * The classes here are the ones review/web/review.js creates — rename one here and the panel breaks.
  */
 
-/* ------------------------------------------------ revisão Doc First (review/web/review.js)
-   Só ativa com a API (body.rv-ativa). O número da quina vira botão; nada novo aparece na página. */
-/* Genérico de propósito: era uma lista fixa de sete classes de caixa, e num projeto com outros
-   nomes o selo estático ficava por baixo do botão real. */
+/* ------------------------------------------------ Doc First review (review/web/review.js)
+   Only active with the API (body.rv-ativa). The corner number becomes a button; nothing new shows up
+   on the page. */
+/* Generic on purpose: it used to be a fixed list of seven box classes, and in a project with other
+   names the static label sat underneath the real button. */
 body.rv-ativa main [data-cod]::after { content: none !important; }
-/* #5F6E7C, não #8795A3: o selo tem ~9,6px e o antigo dava 3,06:1 sobre branco, abaixo dos 4,5:1 da
-   WCAG 1.4.3 — e este é o elemento que o revisor clica em cada trecho. O novo dá 5,24:1 sobre branco
-   e 4,93:1 sobre o fundo da página, medidos; passa nos dois. */
+/* #5F6E7C, not #8795A3: the label is ~9.6px and the old one gave 3.06:1 on white, below WCAG 1.4.3's
+   4.5:1 — and this is the element the reviewer clicks on every block. The new one gives 5.24:1 on
+   white and 4.93:1 on the page background, both measured; it passes on both. */
 .rv-num { position: absolute; top: 0; right: .9rem; transform: translateY(-50%); z-index: 3; cursor: pointer;
   font: 500 .6rem/1 ui-monospace, Menlo, monospace; letter-spacing: .02em; color: #5F6E7C;
   background: #FFF; border: 1px solid var(--borda); border-radius: 6px; padding: .28rem .45rem; min-height: 22px;
   display: inline-flex; align-items: center; gap: .3rem; }
-/* Área de toque de 44px no celular, sem engordar o selo. quem valida costuma validar pelo telefone, e o selo tem
-   28px de altura — abaixo dos 44 que a WCAG 2.5.5 e o guia da Apple pedem, e ele é justamente o que
-   se precisa acertar para abrir cada trecho. O ::after invisível estende só a área sensível; medido
-   162px de folga entre selos vizinhos, então não há risco de um roubar o toque do outro.
-   Só em tela de toque: no desktop, uma área invisível maior atrapalharia o hover. */
+/* A 44px touch target on the phone, without fattening the label. Whoever validates usually validates
+   from the phone, and the label is 28px tall — below the 44 that WCAG 2.5.5 and Apple's guide ask
+   for, and it is precisely what you have to hit to open each block. The invisible ::after extends
+   only the sensitive area; measured 162px of slack between neighbouring labels, so there is no risk
+   of one stealing the other's touch.
+   Touch screens only: on the desktop, a larger invisible area would get in the way of hover. */
 @media (pointer: coarse) {
   .rv-num::after { content: ''; position: absolute; inset: -8px -6px; }
 }
@@ -94,35 +97,37 @@ body.rv-ativa main [data-cod]::after { content: none !important; }
 .rv-estado--aprovado, .rv-estado--analise, .rv-estado--aguardando { background: #EEF6FC; color: #0A6FA6; }
 .rv-estado--pergunta { background: #FDF2E3; color: #8A5A12; }
 
-/* O menu lateral (.sh-*) e a fila de triagem consolidada ainda não vieram: o shell do projeto de
-   origem trazia o nome do produto, os grupos de páginas e dois PDFs escritos no código. Levar
-   isso seria levar um projeto inteiro junto. Entram quando o menu virar configuração.
-   A triagem funciona: ela acontece dentro do painel, em cada trecho. */
+/* The side menu (.sh-*) and the consolidated triage queue have not come across yet: the shell of the
+   original project carried the product name, the page groups and two PDFs written into the code.
+   Bringing that would bring a whole project along with it. They come in when the menu becomes
+   configuration.
+   Triage works: it happens inside the panel, on each block. */
 
-/* .rv-alerta existia no JavaScript (review.js cria o aviso "não deu para carregar o estado") e em
-   CSS nenhum. O aviso nascia sem estilo desde sempre. */
+/* .rv-alerta existed in the JavaScript (review.js creates the "could not load the state" warning) and
+   in no CSS at all. The warning had been born unstyled from the start. */
 .rv-alerta { margin: 0; padding: .7rem 1rem; background: #FDF3D7; border-bottom: 1px solid #E4C96B;
              color: #5A4708; font-size: .9rem; text-align: center; }
 
-/* ---------------------------------------------------------------- o semáforo
-   Quatro estados, e só dois deles pedem ação. A cor não é enfeite: é a única forma de ver, numa
-   página de cinquenta trechos, onde parar. */
+/* ---------------------------------------------------------------- the traffic light
+   Four states, and only two of them ask for action. The colour is not decoration: it is the only way
+   to see, on a page of fifty blocks, where to stop. */
 
-/* 🟡 o texto mudou depois do ✓ — alguém precisa reaprovar o texto novo */
+/* 🟡 the text changed after the ✓ — someone has to approve the new text */
 .rv-num--stale {
   background: #FDF3D7; border-color: #E4C96B; color: #5A4708;
 }
 
-/* 🔴 o texto está IGUAL, mas mudou algo de que ele depende.
-   Este é o único estado que ninguém descobre lendo a página — porque na página nada mudou.
-   Por isso ele é o mais forte visualmente: é o que precisa interromper a leitura. */
+/* 🔴 the text is THE SAME, but something it depends on changed.
+   This is the only state nobody discovers by reading the page — because on the page nothing changed.
+   That is why it is the strongest one visually: it is the one that has to interrupt the reading. */
 .rv-num--broken {
   background: #FBE9E7; border-color: #C94A4A; color: #8A2B2B; font-weight: 700;
 }
 .rv-num--broken::before { content: '!'; margin-right: .15em; }
 
-/* O aviso dentro do painel, quando o trecho está vermelho. Explica a causa, porque "vermelho" sem
-   motivo faz a pessoa reaprovar no susto — que é exatamente o que a trava existe para impedir. */
+/* The warning inside the panel, when the block is red. It explains the cause, because "red" with no
+   reason makes a person re-approve out of fright — which is exactly what the lock exists to
+   prevent. */
 .rv-quebrado {
   margin: 0 0 .75rem; padding: .7rem .9rem; border-radius: .4rem;
   background: #FBE9E7; border: 1px solid #C94A4A; color: #8A2B2B; font-size: .9rem;

@@ -1,16 +1,16 @@
 {
   "_leia": [
-    "O GABARITO. Copie esta pasta para o seu projeto, troque o owner, e comece a escrever.",
+    "THE TEMPLATE. Copy this folder into your project, swap the owner, and start writing.",
     "",
-    "As dez seções são a ordem em que uma documentação de produto costuma ficar de pé:",
-    "por que existe → quem pode o quê → como se parece → o que a pessoa vê → o que falta decidir →",
-    "de que é feito → como os dados se ligam → o fluxo ponta a ponta → a arquitetura → as fronteiras.",
+    "The ten sections are the order in which product documentation usually gets on its feet:",
+    "why it exists → who can do what → what it looks like → what the person sees → what is still open →",
+    "what it is built from → how the data connects → the flow end to end → the architecture → the edges.",
     "",
-    "Cada página traz, no próprio texto revisável, o que escrever ali e o que NÃO escrever.",
-    "Apague o que não servir. Um gabarito que obriga vira burocracia."
+    "Each page carries, in its own reviewable text, what to write there and what NOT to write.",
+    "Delete whatever does not serve you. A template that forces turns into paperwork."
   ],
-  "nome": "Gabarito",
-  "owner": "voce@exemplo.org",
+  "nome": "Template",
+  "owner": "you@example.org",
   "conteudo": {
     "pastas": [
       "00-tipos",
@@ -28,6 +28,6 @@
     "registro": "aprovacoes.json",
     "inicio": "/00-tipos/Y01.html",
     "recortar": "",
-    "exemplosDePagina": "D01, P01, S01, T01, X01, K01, M01, U01, C01 ou I01"
+    "exemplosDePagina": "D01, P01, S01, T01, X01, K01, M01, U01, C01 or I01"
   }
 }

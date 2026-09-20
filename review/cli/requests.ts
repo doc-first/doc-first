@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { createCycle } from '../core/cycle.js';
 import { doHistorico, estadoAtual, estadoEmPortugues } from '../core/legacy.js';
 import { createRoles } from '../core/roles.js';
-import { lerTrechos, type Trecho } from './pages.ts';
+import { lerTrechos } from './pages.ts';
 import { Fonte } from './remote.ts';
 import type { Evento } from '../api/types.ts';
 

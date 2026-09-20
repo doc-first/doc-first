@@ -1,31 +1,31 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A02 · Uma segunda página, para provar a navegação</title>
+<title>A02 · A second page, to prove navigation works</title>
 <link rel="stylesheet" href="../estilo/folha.css">
 <link rel="stylesheet" href="/review/web/painel.css">
 </head>
 <body class="doc">
 <main class="doc-pagina">
 
-  <h1 class="doc-titulo"><span class="doc-titulo__cod">A02</span> Uma segunda página</h1>
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">A02</span> A second page</h1>
 
   <p class="frase" data-id="A02.1.1" data-cod="1.1">
-    Existe para provar que o motor lida com mais de uma folha, e que os códigos não colidem.
+    It exists to prove the engine handles more than one sheet, and that the codes do not collide.
   </p>
 
   <div class="bloco" data-id="A02.1.2" data-cod="1.2">
-    <p>O código de cada trecho começa com o código da página. É assim que o motor sabe a que folha
-    um evento pertence sem precisar guardar o caminho do arquivo.</p>
+    <p>Every block code starts with the code of its page. That is how the engine knows which sheet
+    an event belongs to without having to store the file path.</p>
   </div>
 
 </main>
 
-<!-- O painel de revisão. A ordem importa: common.js define window.DOC_FIRST, que os outros usam.
-     review.js é script clássico de propósito — ele monta os botões antes do primeiro paint.
-     core-web.js é módulo, e por isso chega em paralelo sem bloquear. -->
+<!-- The review panel. Order matters: common.js defines window.DOC_FIRST, which the others use.
+     review.js is a classic script on purpose — it builds the buttons before the first paint.
+     core-web.js is a module, so it arrives in parallel without blocking. -->
 <script src="/review/web/common.js"></script>
 <script src="/review/web/review.js"></script>
 <script type="module" src="/review/web/core-web.js"></script>

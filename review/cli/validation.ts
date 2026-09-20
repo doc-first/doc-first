@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
-import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
+import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto } from './pages.ts';
 import { readConfig } from '../core/config.js';
 import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
 import { Fonte } from './remote.ts';

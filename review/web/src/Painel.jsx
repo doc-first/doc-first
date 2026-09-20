@@ -1,41 +1,42 @@
 /**
- * O painel de revisão, em React. É a janela que abre quando alguém clica no número de um trecho.
+ * The review panel, in React. It is the window that opens when someone clicks a block's number.
  *
- * O que ele NÃO faz, e é o ponto: não calcula o ciclo do pedido. `situacao` vem pronta do servidor,
- * e `situacao.triagem` é a lista de destinos permitidos — é ela que decide quais botões existem.
- * Quando o front calculava isso, ele e o servidor discordavam sobre o mesmo pedido.
+ * What it does NOT do, and that is the point: it does not compute the request cycle. `situacao`
+ * arrives ready from the server, and `situacao.triagem` is the list of allowed destinations — that
+ * list is what decides which buttons exist. When the front end computed this, it and the server
+ * disagreed about the same request.
  */
 import { useEffect, useRef, useState } from 'react';
-import { registrar } from './api.js';
 import { doTrecho, porQuando } from './estado.js';
 
 const dia = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '');
-const quem = (email, eu) => (email === eu ? 'Você' : email);
+const quem = (email, eu) => (email === eu ? 'You' : email);
 
 function Selo({ situacao, validadoEm }) {
-  if (validadoEm) return <b className="rv-selo rv-selo--repo">✓ validado em {dia(validadoEm)}</b>;
-  if (situacao.aprovado) return <b className="rv-selo rv-selo--ok">✓ aprovado</b>;
+  if (validadoEm) return <b className="rv-selo rv-selo--repo">✓ validated on {dia(validadoEm)}</b>;
+  if (situacao.aprovado) return <b className="rv-selo rv-selo--ok">✓ approved</b>;
   if (situacao.vencidas.length) {
-    return <b className="rv-selo rv-selo--aviso">o texto mudou desde a aprovação</b>;
+    return <b className="rv-selo rv-selo--aviso">the text changed after the approval</b>;
   }
   if (situacao.abertos.length) {
-    return <b className="rv-selo rv-selo--pedido">{situacao.abertos.length} pedido(s) em andamento</b>;
+    return <b className="rv-selo rv-selo--pedido">{situacao.abertos.length} request(s) in progress</b>;
   }
   return null;
 }
 
 const ROTULO = {
-  aberto: 'Aguardando triagem', aprovado: 'Aprovado', recusado: 'Recusado',
-  pergunta: 'Pergunta para quem pediu', analise: 'Em aplicação',
-  aguardando: 'Em aplicação · dúvida', aplicado: 'Aplicado',
+  aberto: 'Awaiting triage', aprovado: 'Approved', recusado: 'Declined',
+  pergunta: 'Question for the requester', analise: 'Being applied',
+  aguardando: 'Being applied · question', aplicado: 'Applied',
 };
 
 /**
- * A triagem do dono: decidir o destino de um pedido que alguém fez.
+ * The owner's triage: deciding where a request someone filed goes next.
  *
- * Os botões vêm de `situacao.triagem`, que o SERVIDOR calcula — não uma lista escrita aqui. É o que
- * impede o front e o servidor de discordarem: num pedido já aprovado a triagem vem vazia, e o
- * botão "Aprovar" simplesmente não existe, em vez de existir e falhar no clique.
+ * The buttons come from `situacao.triagem`, which the SERVER computes — not a list written here.
+ * That is what keeps the front end and the server from disagreeing: on an already approved request
+ * the triage arrives empty, and the "Approve" button simply does not exist, instead of existing and
+ * failing on click.
  */
 function Triagem({ pedido, aoDecidir }) {
   const [destino, setDestino] = useState(null);
@@ -50,7 +51,7 @@ function Triagem({ pedido, aoDecidir }) {
   const precisaMotivo = destino && (s.exigeMotivo ?? []).includes(destino);
 
   async function decidir() {
-    if (precisaMotivo && !motivo.trim()) { setErro('diga o motivo ou a pergunta'); return; }
+    if (precisaMotivo && !motivo.trim()) { setErro('give the reason, or the question'); return; }
     setIndo(true); setErro('');
     try {
       await aoDecidir({
@@ -69,7 +70,7 @@ function Triagem({ pedido, aoDecidir }) {
   return (
     <div className="rv-triagem">
       <p className="rv-estado">
-        Pedido de {pedido.autor}: <b>{ROTULO[s.estado] ?? s.estado}</b>
+        Request from {pedido.autor}: <b>{ROTULO[s.estado] ?? s.estado}</b>
       </p>
       {destinos.map((d) => (
         <button key={d} type="button" data-t={d}
@@ -82,10 +83,10 @@ function Triagem({ pedido, aoDecidir }) {
         <div className="rv-form">
           {precisaMotivo ? (
             <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
-                      placeholder={destino === 'pergunta' ? 'O que você quer perguntar?' : 'Por que está recusando?'} />
+                      placeholder={destino === 'pergunta' ? 'What do you want to ask?' : 'Why are you declining it?'} />
           ) : null}
           <button type="button" className="rv-enviar" onClick={decidir} disabled={indo}>
-            {indo ? 'registrando…' : `Confirmar: ${ROTULO[destino] ?? destino}`}
+            {indo ? 'recording…' : `Confirm: ${ROTULO[destino] ?? destino}`}
           </button>
         </div>
       ) : null}
@@ -98,15 +99,15 @@ function Historico({ eventos, eu }) {
   if (!eventos.length) return null;
   return (
     <div className="rv-hist">
-      <h4 className="rv-hist-titulo">O que já aconteceu aqui</h4>
+      <h4 className="rv-hist-titulo">What has happened here</h4>
       {[...eventos].sort(porQuando).map((e) => (
         <p key={e.id} className={`rv-h rv-h--${e.tipo === 'aprovacao' ? 'aprov' : 'pedido'}`}>
           <span className="rv-estado">{dia(e.quando)}</span> {quem(e.autor, eu)}
-          {e.tipo === 'aprovacao' ? ' aprovou' : ' pediu alteração'}
+          {e.tipo === 'aprovacao' ? ' approved' : ' requested a change'}
           {e.texto ? <>: {e.texto}</> : null}
           {e.foto ? (
             <details className="rv-foto">
-              <summary>o texto de então</summary>
+              <summary>the text at the time</summary>
               <p>{e.foto}</p>
             </details>
           ) : null}
@@ -135,14 +136,15 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
   const situacao = doTrecho(eventos, trecho.id, trecho.digital);
 
   async function enviar(tipo) {
-    if (tipo === 'pedido' && !texto.trim()) { setErro('escreva o que precisa mudar'); return; }
+    if (tipo === 'pedido' && !texto.trim()) { setErro('write what needs to change'); return; }
     setEnviando(true); setErro('');
     try {
       await aoRegistrar({
         tipo, pagina: trecho.pagina, caixa: trecho.id, digital: trecho.digital,
         texto: texto.trim() || null,
-        // A foto é o texto no instante do registro, e tem de ser O MESMO que a digital considerou.
-        // Senão o histórico mostra uma coisa e a digital fala de outra.
+        // The snapshot is the text at the instant of recording, and it has to be THE SAME text the
+        // fingerprint looked at. Otherwise the history shows one thing and the fingerprint talks
+        // about another.
         foto: trecho.texto,
         dados: tipo === 'pedido' ? { categoria } : null,
       });
@@ -157,58 +159,59 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
   return (
     <dialog className="rv-painel" data-revisao-ui ref={dlg} onClose={aoFechar}>
       <header className="rv-cabeca">
-        <h3>Trecho {trecho.cod}</h3>
-        <button type="button" className="rv-fechar" onClick={aoFechar} aria-label="Fechar">✕</button>
+        <h3>Block {trecho.cod}</h3>
+        <button type="button" className="rv-fechar" onClick={aoFechar} aria-label="Close">✕</button>
       </header>
 
       <p className="rv-resumo">{trecho.resumo}</p>
       <p className="rv-situacao"><Selo situacao={situacao} validadoEm={trecho.validado} /></p>
 
-      {/* Vermelho sem motivo faz a pessoa reaprovar no susto — que é o que a trava existe para
-          impedir. Então o painel diz O QUE mudou, e manda olhar lá antes de decidir aqui. */}
+      {/* Red with no reason makes a person re-approve out of fright — which is exactly what the lock
+          exists to prevent. So the panel says WHAT changed, and sends them to look there before
+          deciding here. */}
       {trecho.semaforo?.cor === 'broken' ? (
         <div className="rv-quebrado">
-          <b>Este texto não mudou, mas o chão mudou.</b>
-          Ele depende de {trecho.semaforo.culpados.map((c) => <code key={c}>{c}</code>)},
-          {' '}e isso foi alterado depois que você aprovou aqui. Confira se ainda é verdade antes
-          de aprovar de novo.
+          <b>This text has not changed, but the ground under it has.</b>
+          It depends on {trecho.semaforo.culpados.map((c) => <code key={c}>{c}</code>)},
+          {' '}and that changed after you approved here. Check it is still true before approving
+          again.
         </div>
       ) : null}
 
       <div className="rv-acoes">
         {podeAprovar && !situacao.aprovado ? (
           <button type="button" onClick={() => enviar('aprovacao')} disabled={enviando}>
-            ✓ Aprovar este trecho
+            ✓ Approve this block
           </button>
         ) : null}
         <button type="button" className={aba === 'pedido' ? 'rv-ativa' : ''}
                 onClick={() => setAba(aba === 'pedido' ? null : 'pedido')}>
-          Pedir alteração
+          Request a change
         </button>
       </div>
 
       {aba === 'pedido' ? (
         <div className="rv-form">
           <label>
-            O que é
+            What it is
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              <option value="texto">Ajustar texto</option>
-              <option value="termo">Trocar um termo</option>
-              <option value="remover">Remover</option>
-              <option value="duvida">Dúvida</option>
+              <option value="texto">Adjust the text</option>
+              <option value="termo">Change a term</option>
+              <option value="remover">Remove</option>
+              <option value="duvida">Question</option>
             </select>
           </label>
           <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={4}
-                    placeholder="O que precisa mudar, e por quê." />
+                    placeholder="What needs to change, and why." />
           <button type="button" className="rv-enviar" onClick={() => enviar('pedido')} disabled={enviando}>
-            {enviando ? 'enviando…' : 'Enviar pedido'}
+            {enviando ? 'sending…' : 'Send request'}
           </button>
         </div>
       ) : null}
 
       {erro ? <p className="rv-aviso">{erro}</p> : null}
 
-      {/* A triagem só aparece para quem pode triar, e só nos pedidos que ainda têm destino. */}
+      {/* Triage shows only for whoever can triage, and only on requests that still have a destination. */}
       {podeAprovar
         ? situacao.pedidos.map((p) => <Triagem key={p.id} pedido={p} aoDecidir={aoRegistrar} />)
         : null}

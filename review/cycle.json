@@ -9,7 +9,7 @@
     "Agora: a API e a ferramenta do agente leem ESTE arquivo, e o JavaScript não calcula estado nenhum —",
     "recebe pronto da API. Mexeu aqui, mexeu em todo lugar.",
     "",
-    "As CHAVES e os ESTADOS são em inglês desde 2026-09-19 (docs/VOCABULARIO-EN.md). Os RÓTULOS",
+    "As CHAVES e os ESTADOS são em inglês desde 2026-09-19 (docs/GLOSSARY.md). Os RÓTULOS",
     "continuam em pt-BR: quem revisa é médico e brasileiro. Evento gravado com o nome antigo do",
     "estado continua valendo — quem traduz na leitura é review/core/legacy.js."
   ],

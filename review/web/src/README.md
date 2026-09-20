@@ -1,46 +1,47 @@
-# O painel em React
+# The panel, in React
 
-O painel de revisão, escrito em React. `review/web/painel-react.js` é o resultado empacotado, e é
-**versionado de propósito**: o Doc First promete "clona e roda", e um bundle que só existe depois
-de `npm install` quebraria essa promessa.
+The review panel, written in React. `review/web/painel-react.js` is the bundled result, and it is
+**committed on purpose**: this project promises "clone and run", and a bundle that only exists after
+`npm install` would break that promise.
 
-    npm run build:web      # gera review/web/painel-react.js
+    npm run build:web      # produces review/web/painel-react.js
 
-O CI confere que o gerado está em dia. Mexeu aqui, rode e commite.
+CI checks the built file is not stale. Touch anything here, run it and commit the result.
 
-## O que mora onde
+## What lives where
 
-| Arquivo | O que é |
+| File | What it is |
 |---|---|
-| `entrada.jsx` | a ponte com a página: acha os trechos, cria os botões, monta o React |
-| `Painel.jsx` | a janela: selo, ações, formulário de pedido, histórico |
-| `api.js` | as três rotas da API, e a digital (que vem do núcleo, não de uma cópia) |
-| `estado.js` | o estado de um trecho a partir dos eventos |
+| `entrada.jsx` | the bridge to the page: finds the blocks, creates the buttons, mounts React |
+| `Painel.jsx` | the dialog: badge, actions, request form, triage, history |
+| `api.js` | the three API routes, and the fingerprint (which comes from the core, not a copy) |
+| `estado.js` | a block's state, derived from the events |
 
-## Duas regras que não se quebram
+## Two rules that do not bend
 
-**O React não é dono da página.** Os botões são criados no DOM da página, não por componente: a
-página é de quem adota o método, e pode ser HTML, Astro, Jekyll ou o que for. O React monta só a
-janela, num `<div>` no fim do `<body>`.
+**React does not own the page.** The buttons are created in the page's own DOM, not by a component:
+the page belongs to whoever adopts the method, and it may be HTML, Astro, Jekyll or anything else.
+React mounts only the dialog, in a `<div>` at the end of `<body>`.
 
-**Tudo que entra em `<main>` leva `data-revisao-ui`.** O texto injetado entra na conta da digital,
-e a digital é o que decide se uma aprovação humana ainda vale. Esquecer isso derruba todas as
-aprovações da página de uma vez, sem erro nenhum.
+**Everything entering `<main>` carries `data-revisao-ui`.** Injected text enters the fingerprint, and
+the fingerprint is what decides whether a human approval still holds. Forgetting it knocks down
+every approval on the page at once, with no error at all.
 
-## A triagem, e por que os botões não estão escritos aqui
+## Triage, and why the buttons are not listed here
 
-Quem pode triar vê, em cada pedido, os destinos possíveis — e essa lista vem de `situacao.triagem`,
-calculada pelo **servidor**. Não há lista de estados escrita no front.
+Whoever can triage sees, on each request, the possible destinations — and that list comes from
+`situacao.triagem`, computed by the SERVER. There is no list of states written in the front end.
 
-É o que impede front e servidor de discordarem: num pedido já aprovado a triagem vem vazia, e o
-botão "Aprovar" simplesmente não existe, em vez de existir e falhar no clique. E um pedido do
-próprio dono nasce aprovado — ele não tria a si mesmo —, então a triagem não aparece.
+That is what keeps the two from disagreeing: on an already-approved request the triage list comes
+back empty, and the "Approve" button simply does not exist, instead of existing and failing on
+click. A request made by the owner is born approved — they do not triage themselves — so no triage
+appears at all.
 
-Recusar e perguntar exigem motivo, e o painel barra antes de chamar a API.
+Rejecting and asking require a reason, and the panel blocks before calling the API.
 
-## O que ainda não faz
+## What it does not do yet
 
-O menu lateral e a fila de triagem consolidada. Hoje a triagem acontece dentro do painel, trecho a
-trecho, o que basta para revisar; falta a visão de "todos os pedidos abertos do projeto".
+The side menu and the consolidated triage queue. Triage works inside the panel, block by block,
+which is enough to review; what is missing is the "every open request in the project" view.
 
-Os dois painéis convivem: `ola-mundo` usa o clássico (`review.js`), `gabarito` usa o React.
+Two panels coexist: `ola-mundo` uses the classic one (`review.js`), `gabarito` uses React.

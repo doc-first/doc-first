@@ -1,33 +1,34 @@
-/* O que TODA página revisável precisa, num lugar só. Carregado antes dos outros scripts.
+/* What EVERY reviewable page needs, in a single place. Loaded before the other scripts.
 
-   Por que existe (revisão de dívida, 2026-09-17): cinco arquivos independentes resolviam cada um por
-   si os mesmos quatro problemas — escapar HTML, formatar data, ordenar evento e conhecer os rótulos
-   de estado. `esc()` estava copiada SEIS vezes, e a cópia do navegacao.js era diferente das outras:
-   sem o guarda de nulo, ela escrevia a palavra "undefined" na página. Comparar cópias para achar a
-   divergente é exatamente o trabalho que a metodologia promete eliminar.
+   Why it exists (debt review, 2026-09-17): five independent files each solved the same four
+   problems on their own — escaping HTML, formatting a date, sorting events and knowing the state
+   labels. `esc()` was copied SIX times, and the copy in navegacao.js was different from the rest:
+   with no null guard, it wrote the word "undefined" onto the page. Comparing copies to find the odd
+   one out is exactly the work the methodology promises to eliminate.
 
-   Sem módulo ES6 e sem build de propósito: é <script> como os outros, e quem adotar o método não
-   precisa de ferramenta nenhuma para ler isto. */
+   No ES6 module and no build, on purpose: this is a <script> like the others, and whoever adopts the
+   method needs no tooling at all to read it. */
 (function () {
   'use strict';
 
   var A = window.DOC_FIRST = window.DOC_FIRST || {};
 
-  /* O núcleo compartilhado (review/core/) chega por módulo, em paralelo — ver js/core-web.js.
-     A promessa nasce aqui para que quem carregue antes dele não perca o aviso. */
+  /* The shared core (review/core/) arrives as a module, in parallel — see js/core-web.js.
+     The promise is born here so that whoever loads before it does not miss the signal. */
   if (!A.nucleoPronto) {
     A.nucleoPronto = new Promise(function (ok) { A._nucleoResolve = ok; });
   }
 
-  /** Escapa para interpolar em HTML. Inclui aspas simples: atributo com aspas simples também existe. */
+  /** Escapes for interpolation into HTML. Single quotes included: an attribute quoted with single
+      quotes exists too. */
   A.esc = function (t) {
     return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   };
 
-  /** Data curta para humano: "17/09 14:32". Devolve '' para data ausente ou inválida —
-      `new Date('')` produzia o literal "Invalid Date Invalid Date" na tela. */
+  /** Short date for a human: "17/09 14:32". Returns '' for a missing or invalid date —
+      `new Date('')` produced the literal "Invalid Date Invalid Date" on screen. */
   A.quando = function (iso) {
     if (!iso) return '';
     var d = new Date(iso);
@@ -36,46 +37,47 @@
            d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  /** Ordena eventos do mais antigo ao mais novo.
-      O comparador anterior (`a.quando < b.quando ? -1 : 1`) NUNCA devolvia 0, então para dois eventos
-      no mesmo instante cmp(a,b) e cmp(b,a) davam 1 — contrato de sort violado, ordem indefinida pela
-      especificação. Como o estado de um pedido é decidido pelo ÚLTIMO evento da ordenação, dois
-      navegadores podiam mostrar estados diferentes para o mesmo pedido. */
+  /** Sorts events from oldest to newest.
+      The previous comparator (`a.quando < b.quando ? -1 : 1`) NEVER returned 0, so for two events at
+      the same instant cmp(a,b) and cmp(b,a) both gave 1 — sort's contract violated, order left
+      undefined by the specification. Since a request's state is decided by the LAST event in the
+      ordering, two browsers could show different states for the same request. */
   A.porQuando = function (a, b) {
     return String(a.quando || '').localeCompare(String(b.quando || ''));
   };
 
-  /** Rótulos do ciclo do pedido, na interface. ⚠️ Enquanto o ciclo viver em cinco implementações
-      (C#, pedidos.py, revisao.js, shell.js, triagem.html), estes rótulos são a única parte já
-      unificada — Python dizia "Para triar" onde o JS dizia "Aguardando triagem". Ver
-      docs/DIVIDA-TECNICA.md, seção "A raiz". */
+  /** Labels of the request cycle, in the interface. ⚠️ While the cycle lives in five
+      implementations (C#, pedidos.py, revisao.js, shell.js, triagem.html), these labels are the only
+      part already unified — Python said "To triage" where JS said "Awaiting triage". See
+      docs/DIVIDA-TECNICA.md, section "A raiz". */
   A.ESTADOS_PEDIDO = {
-    aberto: 'Aguardando triagem', aprovado: 'Aprovado', recusado: 'Recusado',
-    pergunta: 'Pergunta para quem pediu', analise: 'Em aplicação',
-    aguardando: 'Em aplicação · dúvida', aplicado: 'Aplicado'
+    aberto: 'Awaiting triage', aprovado: 'Approved', recusado: 'Declined',
+    pergunta: 'Question for the requester', analise: 'Being applied',
+    aguardando: 'Being applied · question', aplicado: 'Applied'
   };
 
-  A.CATEGORIAS = [['texto', 'Ajustar texto'], ['termo', 'Trocar um termo'],
-                  ['remover', 'Remover'], ['duvida', 'Dúvida']];
+  A.CATEGORIAS = [['texto', 'Adjust the text'], ['termo', 'Change a term'],
+                  ['remover', 'Remove'], ['duvida', 'Question']];
 
-  A.rotuloEstado = function (e) { return A.ESTADOS_PEDIDO[e] || e || 'Aguardando triagem'; };
+  A.rotuloEstado = function (e) { return A.ESTADOS_PEDIDO[e] || e || 'Awaiting triage'; };
 
   A.rotuloCategoria = function (c) {
     for (var i = 0; i < A.CATEGORIAS.length; i++) if (A.CATEGORIAS[i][0] === c) return A.CATEGORIAS[i][1];
-    return 'Pedido';
+    return 'Request';
   };
 
-  /** Quem sou eu, uma vez por página. shell.js e revisao.js pediam /api/eu cada um por sua conta —
-      duas requisições idênticas em cada uma das 36 folhas, a cada navegação. A resposta não muda
-      durante a visita, então a promessa é guardada e reaproveitada. */
+  /** Who I am, once per page. shell.js and revisao.js each asked /api/eu on their own — two
+      identical requests on each of the 36 sheets, on every navigation. The answer does not change
+      during the visit, so the promise is kept and reused. */
   var _eu = null;
   A.eu = function () {
     if (!_eu) _eu = A.api('/eu');
     return _eu;
   };
 
-  /** Busca na API com o erro à vista. Um `fetch(...).then(r => r.json())` sem checar `ok` estoura
-      dentro do json() quando o servidor devolve HTML de erro — e some, se o catch for vazio. */
+  /** Fetches the API with the error in plain sight. A `fetch(...).then(r => r.json())` that never
+      checks `ok` blows up inside json() when the server answers with an HTML error page — and
+      vanishes, if the catch is empty. */
   A.api = function (caminho, corpo) {
     var opcoes = corpo
       ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo), credentials: 'same-origin' }

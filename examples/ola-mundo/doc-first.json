@@ -1,21 +1,21 @@
 {
   "_leia": [
-    "O exemplo mínimo do Doc First. Copie esta pasta, troque o owner pelo seu e-mail, e você tem",
-    "uma documentação revisável funcionando.",
+    "The smallest working example of Doc First. Copy this folder, swap the owner for your e-mail,",
+    "and you have reviewable documentation running.",
     "",
     "  docker run -p 8080:8080 -v dados:/dados \\",
     "    -v $PWD/examples/ola-mundo:/conteudo -e REVISAO_SITE=/conteudo \\",
-    "    -e REVISAO_OWNER=voce@exemplo.org doc-first"
+    "    -e REVISAO_OWNER=you@example.org doc-first"
   ],
 
-  "nome": "Olá mundo",
-  "owner": "voce@exemplo.org",
+  "nome": "Hello world",
+  "owner": "you@example.org",
 
   "conteudo": {
     "pastas": ["paginas"],
     "registro": "aprovacoes.json",
     "inicio": "/paginas/A01.html",
     "recortar": "paginas/",
-    "exemplosDePagina": "A01 ou A02"
+    "exemplosDePagina": "A01 or A02"
   }
 }

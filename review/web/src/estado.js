@@ -1,27 +1,28 @@
 /**
- * O estado de um trecho, a partir dos eventos. Nenhuma regra de ciclo mora aqui: o servidor manda
- * `situacao` pronta em cada pedido, e o painel obedece.
+ * A block's state, derived from the events. No cycle rule lives here: the server sends `situacao`
+ * ready on every request, and the panel obeys.
  *
- * Era assim no painel clássico e continua sendo, de propósito. Quando o front calculava estado, ele
- * e o servidor discordavam — o mesmo pedido aparecia "Aprovado" num lugar e "Aguardando" no outro.
+ * That was true of the classic panel and stays true, on purpose. When the front end computed state,
+ * it and the server disagreed — the same request showed as "Approved" in one place and "Awaiting"
+ * in the other.
  */
 
 /**
- * O semáforo de um trecho, do ponto de vista do navegador.
+ * A block's traffic light, from the browser's point of view.
  *
- * O 🔴 não sai dos eventos: ele sai da comparação entre o que o trecho declara depender e como
- * essas dependências estão AGORA na página. É por isso que ele é calculado aqui e não vem do
- * servidor — só o navegador tem o texto renderizado de todos os trechos ao mesmo tempo.
+ * 🔴 does not come from the events: it comes from comparing what the block declares it depends on
+ * against how those dependencies look RIGHT NOW on the page. That is why it is computed here and
+ * not sent by the server — only the browser has the rendered text of every block at once.
  *
  * @param {{validado: string|null, depende: string[], dependiaDe?: Record<string,string>}} trecho
- * @param {Map<string,string>} digitaisAgora  id → digital de cada trecho da página
+ * @param {Map<string,string>} digitaisAgora  id → current fingerprint of every block on the page
  */
 export function semaforoDo(trecho, situacao, digitaisAgora) {
   if (!situacao.aprovado && !trecho.validado) return { cor: 'none', culpados: [] };
 
-  // 🟡 pelo repositório: a digital gravada no ✓ não bate com a do texto que está na tela agora.
-  // Sem este atributo, um trecho reescrito continuaria verde no navegador — o `data-validado`
-  // sozinho só diz QUE foi validado, não SOBRE QUAL texto.
+  // 🟡 from the repository: the fingerprint recorded at the ✓ does not match the text on screen.
+  // Without this attribute a rewritten block would stay green in the browser — `data-validado`
+  // alone only says THAT it was validated, not WHICH text was.
   if (trecho.digitalValidada && trecho.digitalValidada !== trecho.digital) {
     return { cor: 'stale', culpados: [] };
   }
@@ -41,8 +42,8 @@ export function doTrecho(eventos, id, digitalAtual) {
   const aprovacoes = meus.filter((e) => e.tipo === 'aprovacao');
   const pedidos = meus.filter((e) => e.tipo === 'pedido');
 
-  // Uma aprovação só vale para o texto que ela aprovou. Mudou o texto, a digital muda, e a
-  // aprovação passa a ser história — não some, mas não vale mais.
+  // An approval only holds for the text it approved. Change the text, the fingerprint changes,
+  // and the approval becomes history — it does not disappear, it just stops counting.
   const valendo = aprovacoes.filter((e) => e.digital === digitalAtual);
   const vencidas = aprovacoes.filter((e) => e.digital !== digitalAtual);
 

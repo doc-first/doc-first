@@ -1,28 +1,29 @@
-/* Ponte entre o núcleo compartilhado (ESM, em review/core/) e os scripts clássicos das páginas.
+/* The bridge between the shared core (ESM, in review/core/) and the pages' classic scripts.
  *
- * Por que uma ponte, e não converter tudo para módulo: script de módulo é `defer` por definição, e o
- * revisao.js PRECISA ser clássico para montar os botões antes do primeiro paint — foi assim que a
- * piscada relatada em 17/09 foi corrigida. Módulo aqui desfaria aquela correção.
+ * Why a bridge, instead of turning everything into a module: a module script is `defer` by
+ * definition, and revisao.js MUST be classic to build the buttons before the first paint — that is
+ * how the flicker reported on 17/09 was fixed. A module here would undo that fix.
  *
- * Então o núcleo chega em paralelo e avisa quando está pronto. A digital só é usada depois da
- * montagem, então nada se perde. Quem precisa dela faz:  await window.DOC_FIRST.nucleoPronto
+ * So the core arrives in parallel and announces when it is ready. The fingerprint is only used after
+ * mounting, so nothing is lost. Whoever needs it does:  await window.DOC_FIRST.nucleoPronto
  */
 import { fingerprintOfElement, fingerprintOfText, textOfElement, normalize, SIZE } from '../core/fingerprint.js';
 
 const A = (window.DOC_FIRST = window.DOC_FIRST || {});
 
-/* As CHAVES continuam em pt-BR: quem as lê é o front, que ainda não foi traduzido (camada 2,
-   passo 5). A ponte é o lugar certo para essa costura — um mapa num arquivo só, em vez de dois
-   nomes para a mesma função espalhados pelas páginas.
-   `criarCiclo` saiu daqui: o front NÃO calcula ciclo, recebe `situacao` pronta da API. Ele estava
-   exportado sem nenhum uso, e exportar o que ninguém chama é convidar alguém a reimplementar. */
+/* The KEYS stay in pt-BR: what reads them is the front end, whose identifiers have not been
+   translated (layer 2, step 5). The bridge is the right place for that seam — one map in one file,
+   instead of two names for the same function scattered across the pages.
+   `criarCiclo` left here: the front end does NOT compute the cycle, it receives `situacao` ready
+   from the API. It was exported without a single caller, and exporting what nobody calls is an
+   invitation to reimplement it. */
 A.nucleo = {
   digitalDoElemento: fingerprintOfElement, digitalDoTexto: fingerprintOfText,
   textoDoElemento: textOfElement, normalizar: normalize, TAMANHO: SIZE,
 };
-A.digital = fingerprintOfElement;       // o nome que revisao.js já usava
+A.digital = fingerprintOfElement;       // the name revisao.js already used
 
-// quem esperava pelo núcleo pode seguir
+// whoever was waiting for the core can go ahead
 (A._nucleoResolve || (() => {}))();
 A.nucleoPronto = Promise.resolve();
 document.dispatchEvent(new CustomEvent('doc-first:nucleo'));

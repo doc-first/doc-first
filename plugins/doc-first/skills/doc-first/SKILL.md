@@ -57,7 +57,7 @@ aplicar e de quem. **Nunca proponha validar trecho por trecho no chat** — a va
 | Núcleo compartilhado (digital, ciclo, papéis, limites) | `review/core/` — roda no navegador **e** no servidor |
 | API e site | `review/api/` (TypeScript, sem build) |
 | Ferramenta do agente | `review/cli/doc-first.ts` |
-| O método por escrito | `docs/METODOLOGIA-DOC-FIRST.md` |
+| O método por escrito | `docs/METHOD.md` |
 | Dívida conhecida | `docs/DIVIDA-TECNICA.md` |
 
 ## Armadilhas que já custaram caro aqui

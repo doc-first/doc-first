@@ -1,46 +1,46 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>U01 · Um caso de uso, ponta a ponta</title>
+<title>U01 · One use case, end to end</title>
 <link rel="stylesheet" href="../estilo/folha.css">
 <link rel="stylesheet" href="/review/web/painel.css">
 </head>
 <body class="doc">
 <main class="doc-pagina">
 
-  <h1 class="doc-titulo"><span class="doc-titulo__cod">U01</span> Um caso de uso, ponta a ponta</h1>
+  <h1 class="doc-titulo"><span class="doc-titulo__cod">U01</span> One use case, end to end</h1>
 
-  <p class="frase" data-id="U01.0.1" data-cod="0.1">Uma folha por caso. O caso de uso é onde as outras folhas se encontram: ele usa os papéis, passa pelas telas, move as entidades. É também a folha que <b>mais fica vermelha</b> — e isso é o método funcionando.</p>
+  <p class="frase" data-id="U01.0.1" data-cod="0.1">One sheet per case. The use case is where the other sheets meet: it uses the roles, passes through the screens, moves the entities. It is also the sheet that <b>turns red most often</b> — and that is the method working.</p>
 
-  <h2><span class="n">1</span> A situação</h2>
-  <p class="lead-secao">Quem, querendo o quê, e por quê agora.</p>
+  <h2><span class="n">1</span> The situation</h2>
+  <p class="lead-secao">Who, wanting what, and why now.</p>
 
   <div class="bloco" data-id="U01.1.1" data-cod="1.1">
-    <p>Comece pela pessoa e pelo momento. "A enfermeira recebe um alerta às 7h da manhã" diz mais que "o sistema notifica o usuário".</p>
+    <p>Start with the person and the moment. "The nurse gets an alert at 7 in the morning" says more than "the system notifies the user".</p>
   </div>
 
-  <h2><span class="n">2</span> O fluxo</h2>
-  <p class="lead-secao">Passo a passo, com o que trafega em cada um.</p>
+  <h2><span class="n">2</span> The flow</h2>
+  <p class="lead-secao">Step by step, with what travels in each one.</p>
 
   <div class="bloco" data-id="U01.2.1" data-cod="2.1">
-    <p>Diagrama, em texto — para entrar no semáforo como qualquer outro trecho:</p>
+    <p>The diagram, as text — so it falls under the traffic light like any other block:</p>
     <pre><code class="mermaid">flowchart TD
-  A[a pessoa faz algo] --> B{o sistema decide}
-  B -->|caminho feliz| C[acontece o esperado]
-  B -->|e quando não| D[o que acontece então]</code></pre>
+  A[the person does something] --> B{the system decides}
+  B -->|happy path| C[what was expected happens]
+  B -->|and when it does not| D[what happens instead]</code></pre>
   </div>
 
   <div class="bloco" data-id="U01.2.2" data-cod="2.2">
-    <p>Numere os passos e diga, em cada um, <b>o que sai de onde</b>. O passo que ninguém escreve é sempre o que quebra na integração.</p>
+    <p>Number the steps and say, at each one, <b>what leaves where</b>. The step nobody writes down is always the one that breaks at integration.</p>
   </div>
 
-  <h2><span class="n">3</span> Quando dá errado</h2>
-  <p class="lead-secao">Os caminhos infelizes, que são a maioria do código.</p>
+  <h2><span class="n">3</span> When it goes wrong</h2>
+  <p class="lead-secao">The unhappy paths, which are most of the code.</p>
 
   <div class="bloco" data-id="U01.3.1" data-cod="3.1">
-    <p>Um por linha: o que falha, o que a pessoa vê, e o que o sistema faz. O caminho feliz é o que menos dá trabalho; estes é que decidem o prazo.</p>
+    <p>One per line: what fails, what the person sees, what the system does. The happy path is the least work; these are what set the deadline.</p>
   </div>
 
 </main>

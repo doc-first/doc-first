@@ -1,12 +1,13 @@
 /**
- * A ponte entre a página de documentação (HTML de qualquer projeto) e o painel React.
+ * The bridge between a documentation page (HTML from any project) and the React panel.
  *
- * O contrato com a página é o mesmo do painel clássico, e tem de continuar sendo: `.doc-titulo__cod`
- * com o código da página, trechos com `data-id` e `data-cod` dentro de `<main>`, e — a regra que
- * mais derruba aprovação quando esquecida — `data-revisao-ui` em tudo que o JavaScript injeta.
+ * The contract with the page is the same as the classic panel's, and has to stay that way:
+ * `.doc-titulo__cod` holding the page code, blocks with `data-id` and `data-cod` inside `<main>`,
+ * and — the rule that knocks down the most approvals when forgotten — `data-revisao-ui` on
+ * everything JavaScript injects.
  *
- * O botão de cada trecho é criado aqui, no DOM da página, e não pelo React: a página é de quem
- * adota o método, e o React não é dono dela. O React monta só a janela.
+ * Each block's button is created here, in the page's own DOM, not by React: the page belongs to
+ * whoever adopts the method, and React does not own it. React mounts only the dialog.
  */
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
@@ -46,7 +47,7 @@ function App({ trechos }) {
     })().catch((e) => desligar(e));
   }, []);
 
-  // O número de cada trecho vira botão, e o SEMÁFORO pinta nele: ⚪ 🟢 🟡 🔴.
+  // Each block's number becomes a button, and the TRAFFIC LIGHT paints it: ⚪ 🟢 🟡 🔴.
   useEffect(() => {
     const digitaisAgora = new Map(trechos.map((t) => [t.id, t.digital]));
     for (const t of trechos) {
@@ -59,7 +60,7 @@ function App({ trechos }) {
         + (cor === 'broken' ? ' rv-num--broken' : '')
         + (situacao.abertos.length ? ' rv-num--pedido' : '');
       t.botao.title = cor === 'broken'
-        ? `o texto está igual, mas mudou: ${culpados.join(', ')}`
+        ? `the text is unchanged, but this moved: ${culpados.join(', ')}`
         : '';
       t.botao.onclick = () => setAberto(t);
     }
@@ -78,11 +79,11 @@ function App({ trechos }) {
 }
 
 /**
- * Sem API, sem sessão ou com erro: a página volta ao estático, inteira e legível.
+ * No API, no session, or an error: the page falls back to static, whole and readable.
  *
- * O `motivo` não é decoração. A primeira versão fazia `.catch(() => desligar())` e engolia tudo —
- * o painel simplesmente não aparecia, sem uma linha no console, e não havia como descobrir por quê
- * a não ser lendo o código.
+ * The `motivo` argument is not decoration. The first version did `.catch(() => desligar())` and
+ * swallowed everything — the panel simply did not appear, without a line in the console, and there
+ * was no way to find out why other than reading the code.
  */
 function desligar(motivo) {
   if (motivo) console.warn('[doc-first] painel desligado:', motivo);
@@ -96,14 +97,15 @@ async function iniciar() {
   const trechos = [];
   for (const el of document.querySelectorAll('main [data-id][data-cod]')) {
     const cod = el.getAttribute('data-cod');
-    if (!/^\d+\.\d/.test(cod)) continue;               // título e subtítulo não ganham botão
+    if (!/^\d+\.\d/.test(cod)) continue;               // headings and subheadings get no button
 
     const botao = document.createElement('button');
     botao.type = 'button';
     botao.className = 'rv-num';
     botao.textContent = cod;
-    botao.setAttribute('data-revisao-ui', '');          // ⚠️ sem isto, a digital muda e tudo cai
-    botao.setAttribute('aria-label', `Trecho ${cod}. Abrir revisão`);
+    botao.setAttribute('data-revisao-ui', '');          // ⚠️ without this the fingerprint moves
+                                                       //    and every approval falls
+    botao.setAttribute('aria-label', `Block ${cod}. Open review`);
     el.appendChild(botao);
 
     trechos.push({
@@ -113,7 +115,7 @@ async function iniciar() {
       validado: el.getAttribute('data-validado'),
       depende: (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean),
       digitalValidada: el.getAttribute('data-digital-validada'),
-      // A foto das dependências no momento do ✓, que o servidor injeta no HTML ao marcar.
+      // The snapshot of the dependencies at the moment of the ✓, injected into the HTML on mark.
       dependiaDe: JSON.parse(el.getAttribute('data-dependia-de') || '{}'),
       resumo: resumoDe(el),
       texto: textoVisivel(el),

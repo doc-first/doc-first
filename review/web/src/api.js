@@ -1,8 +1,8 @@
 /**
- * O cliente da API de revisão. É a única parte do painel que conhece HTTP.
+ * The review API client. The only part of the panel that knows HTTP.
  *
- * Tudo aqui é do MOTOR: as rotas não mudam de projeto para projeto. O que muda é o conteúdo que
- * as folhas trazem, e disso o painel não sabe nada.
+ * Everything here belongs to the ENGINE: the routes do not change from project to project. What
+ * changes is the content the pages carry, and the panel knows nothing about that.
  */
 
 const API = '/api';
@@ -20,14 +20,15 @@ export const eventosDaPagina = (pagina) => fala(`/eventos?pagina=${encodeURIComp
 export const registrar = (evento) => fala('/eventos', evento);
 
 /**
- * A digital do trecho, calculada pelo MESMO código que o servidor usa — não por uma cópia.
- * É isto que faz uma aprovação valer: o texto que o navegador viu e o que o servidor guardou são
- * o mesmo, porque a função é a mesma.
+ * The block's fingerprint, computed by the SAME code the server uses — not by a copy.
+ *
+ * This is what makes an approval mean anything: the text the browser saw and the text the server
+ * stored are the same, because the function is the same one.
  */
 export async function digitalDo(el) {
-  // Caminho ABSOLUTO, e não relativo: o import fica de fora do bundle (é o núcleo, que o servidor
-  // serve), e o navegador resolve contra a URL do bundle — não contra a pasta deste arquivo.
-  // Com `../../core/` o navegador pedia /core/fingerprint.js e recebia 404 em silêncio.
+  // ABSOLUTE path, not relative: this import stays out of the bundle (it is the core, which the
+  // server serves), and the browser resolves it against the bundle's URL — not against this file's
+  // folder. With a relative path the browser asked for /core/fingerprint.js and got a silent 404.
   const { fingerprintOfElement } = await import('/review/core/fingerprint.js');
   return fingerprintOfElement(el);
 }
