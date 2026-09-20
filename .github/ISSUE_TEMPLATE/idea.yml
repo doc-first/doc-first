@@ -1,0 +1,32 @@
+name: An idea
+description: Something the method or the tool should do and does not
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The README has a section called "What does not work yet". If your idea is already there,
+        say so and add what you would need from it — that is more useful than a new issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem, not the solution
+      description: What goes wrong today, for whom, and how often.
+      placeholder: |
+        When a reviewer approves fifty blocks in a session, there is no way to see
+        what is left without opening every page.
+    validations: { required: true }
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What you do about it today
+      description: The workaround is the strongest argument a feature request has.
+    validations: { required: true }
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you think would solve it
+      description: Optional. The problem above matters more.

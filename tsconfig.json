@@ -1,10 +1,12 @@
 {
   "//": [
-    "Não compila NADA: o Node 24 roda .ts direto, sem build, sem dist. Isto aqui existe só para",
-    "CONFERIR os tipos — `npm run tipos`. Antes deste arquivo, `tsc --noEmit` imprimia a ajuda do",
-    "compilador e saía com 0: um verde que nunca checou uma linha.",
-    "allowImportingTsExtensions é obrigatório porque o código importa './users.ts' com a extensão,",
-    "que é como o Node resolve de verdade — e não como o TypeScript costuma escrever."
+    "Compiles NOTHING: Node runs .ts directly, no build, no dist. This file exists only to CHECK",
+    "the types. Before it existed, `tsc --noEmit` printed the compiler's help and exited 0 — a",
+    "green that never checked a single line.",
+    "allowImportingTsExtensions is required because the code imports './users.ts' with the",
+    "extension, which is how Node actually resolves it, and not how TypeScript usually writes it.",
+    "noUnusedLocals and noUnusedParameters are here because ESLint does not lint TypeScript in this",
+    "project: one tool per job, and the compiler already sees more than a linter would."
   ],
   "compilerOptions": {
     "target": "esnext",
@@ -15,6 +17,8 @@
     "strict": true,
     "noUncheckedIndexedAccess": false,
     "allowImportingTsExtensions": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,

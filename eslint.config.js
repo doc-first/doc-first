@@ -1,71 +1,93 @@
 import js from '@eslint/js';
 
 /**
- * Lint do Doc First. Deliberadamente ENXUTO: o pré-commit precisa rodar em segundos, e regra que
- * ninguém entende vira `eslint-disable` espalhado pelo código.
+ * Lint for Doc First. Deliberately THIN: the pre-commit hook has to run in seconds, and a rule
+ * nobody understands turns into `eslint-disable` scattered through the code.
  *
- * O que está aqui é o que já nos mordeu de verdade neste projeto — não uma lista de boas práticas
- * copiada de algum lugar.
+ * What is here is what has actually bitten this project — not a list of good practices copied from
+ * somewhere.
  */
 export default [
-  { ignores: ['node_modules/**', 'front/telas.bak-*/**', 'publicar/site/**', 'publicar/api/**'] },
+  {
+    ignores: [
+      'node_modules/**',
+      // The panel bundle is generated and committed. Linting minified React output produces
+      // hundreds of errors about code nobody wrote and nobody will fix.
+      'review/web/painel-react.js',
+    ],
+  },
 
   js.configs.recommended,
 
   {
-    // A ponte é o único módulo do front: ela importa o núcleo e expõe em window.DOC_FIRST.
-    files: ['front/js/core-web.js'],
-    languageOptions: { ecmaVersion: 2023, sourceType: 'module',
-      globals: { window: 'readonly', document: 'readonly', CustomEvent: 'readonly' } },
+    // Node: the server, the CLI and the core.
+    // TypeScript is NOT linted here, and that is a choice: linting it needs another dependency,
+    // and `tsc --noEmit` already catches more than style — including unused locals and parameters,
+    // which is most of what a lint would add. One tool per job.
+    files: ['review/**/*.js', '*.js'],
+    ignores: ['review/web/**'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: {
+        process: 'readonly', console: 'readonly', crypto: 'readonly', fetch: 'readonly',
+        URL: 'readonly', TextEncoder: 'readonly', Buffer: 'readonly', setTimeout: 'readonly',
+      },
+    },
   },
 
   {
-    // O navegador: scripts clássicos, sem módulos, com as globais do DOM.
-    files: ['front/js/*.js'],
-    ignores: ['front/js/core-web.js'],
+    // The browser panel: classic scripts, no modules, with the DOM globals.
+    files: ['review/web/*.js'],
+    ignores: ['review/web/core-web.js', 'review/web/painel-react.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'script',
       globals: {
         window: 'readonly', document: 'readonly', location: 'readonly', fetch: 'readonly',
-        console: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly',
-        crypto: 'readonly', TextEncoder: 'readonly', CustomEvent: 'readonly',
-        setTimeout: 'readonly', clearTimeout: 'readonly', Promise: 'readonly',
-        FormData: 'readonly', CSS: 'readonly', addEventListener: 'readonly',
-        performance: 'readonly', getComputedStyle: 'readonly', Element: 'readonly',
-        matchMedia: 'readonly', alert: 'readonly',
+        console: 'readonly', crypto: 'readonly', setTimeout: 'readonly', alert: 'readonly',
+        localStorage: 'readonly', sessionStorage: 'readonly', CustomEvent: 'readonly',
+        HTMLElement: 'readonly', Element: 'readonly', TextEncoder: 'readonly',
+        FormData: 'readonly',
       },
-    },
-    rules: {
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      // catch vazio engole erro de rede E erro de programação: um bug fica invisível, sem console e
-      // sem tela. Aconteceu aqui, no contador do menu.
-      'no-empty': ['error', { allowEmptyCatch: false }],
-      eqeqeq: ['error', 'smart'],
     },
   },
 
   {
-    // O núcleo compartilhado: ESM puro, roda no navegador E no servidor.
-    files: ['review/core/*.js'],
+    // The bridge is the only module in the browser: it imports the core and publishes on
+    // window.DOC_FIRST.
+    files: ['review/web/core-web.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
-      globals: { crypto: 'readonly', TextEncoder: 'readonly', console: 'readonly' },
-    },
-    rules: {
-      'no-unused-vars': 'error',
-      'no-empty': ['error', { allowEmptyCatch: true }],   // aqui o catch vazio é deliberado e comentado
-      eqeqeq: ['error', 'smart'],
+      globals: { window: 'readonly', document: 'readonly', CustomEvent: 'readonly' },
     },
   },
 
   {
-    files: ['review/tests/*.js'],
+    // The React source of the panel, before bundling.
+    files: ['review/web/src/**/*.js', 'review/web/src/**/*.jsx'],
     languageOptions: {
-      ecmaVersion: 2023, sourceType: 'module',
-      globals: { console: 'readonly', crypto: 'readonly', process: 'readonly', URL: 'readonly' },
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: {
+        window: 'readonly', document: 'readonly', location: 'readonly', fetch: 'readonly',
+        console: 'readonly', setTimeout: 'readonly', Element: 'readonly', Attr: 'readonly',
+      },
     },
-    rules: { 'no-unused-vars': 'warn' },
+  },
+
+  {
+    // Tests run on Node with the built-in runner.
+    files: ['review/tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: {
+        process: 'readonly', console: 'readonly', globalThis: 'writable', crypto: 'readonly',
+        fetch: 'readonly', URL: 'readonly', Buffer: 'readonly', setTimeout: 'readonly',
+      },
+    },
   },
 ];
