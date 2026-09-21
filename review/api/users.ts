@@ -274,9 +274,19 @@ export async function openUserStore(
     const { UsersPostgres } = await import('./users-postgres.ts');
     return new UsersPostgres(chosen);
   }
+  // ⚠️ The value is masked before it goes into the message, and this is not caution for its own
+  // sake: a typo as ordinary as `Postgres://` or a missing slash lands here, and the string
+  // contains `user:password@host`. The message reaches console.error, which on a hosted runtime is
+  // the log collector — readable by anyone who can read logs. Elsewhere this project already
+  // takes care to log the KIND and never the URL; this was the path that undid it.
   throw new Error(
-    `REVISAO_USERS="${chosen}" is not recognised `
+    `REVISAO_USERS="${maskCredentials(chosen)}" is not recognised `
     + '(use sqlite:<path>, firestore, postgres://… or postgresql://…)');
+}
+
+/** Hides `user:password@` in anything URL-shaped, so a connection string can be quoted safely. */
+export function maskCredentials(value: string): string {
+  return value.replace(/:\/\/[^@/]*@/, '://***@');
 }
 
 /**

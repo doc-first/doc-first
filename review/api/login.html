@@ -139,7 +139,17 @@
   // outside with http://another-site becomes an open redirect, which is phishing with our domain.
   function goToDestination() {
     const asked = new URLSearchParams(location.search).get('destino') || '';
-    location.href = /^\/[^/\\]/.test(asked) ? asked : '/';
+    // ⚠️ Compared as a resolved URL, not by pattern. The pattern version blocked `//evil.example`
+    // and `\\evil.example`, and still let an open redirect through: browsers STRIP tab, CR and LF
+    // from a URL before parsing it, so a value starting with a tab passed the test and then
+    // resolved to another host. Letting the browser resolve it and checking the origin leaves no
+    // spelling to outguess.
+    let target = '/';
+    try {
+      const resolved = new URL(asked, location.origin);
+      if (resolved.origin === location.origin) target = resolved.pathname + resolved.search;
+    } catch { /* not a URL at all: stay home */ }
+    location.href = target;
   }
 </script>
 </body>

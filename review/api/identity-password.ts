@@ -45,6 +45,40 @@ export class IdentidadeSenha {
   #failures = new Map<string, { count: number; freeAt: number }>();
 
   /**
+   * A ceiling on the memory this can cost, and it is not academic.
+   *
+   * The key is the e-mail AS IT ARRIVED IN THE REQUEST BODY, and `/api/entrar` is the one route
+   * that answers without a session. So anybody, with no credential at all, could POST a different
+   * invented address in a loop and add one permanent entry per request until the process ran out
+   * of memory. Entries were only ever removed on a SUCCESSFUL login of that same key — which an
+   * attacker has no reason to perform.
+   *
+   * Two limits, because one would not be enough: a cap on how long a key may be (an e-mail is not
+   * a megabyte), and a prune of entries whose wait ended long ago. Past the cap, the oldest go.
+   */
+  static readonly MAX_EMAIL = 320;      // the longest address RFC 5321 allows
+  static readonly MAX_PASSWORD = 256;   // scrypt on a megabyte of text is a CPU bill, not a login
+  static readonly MAX_TRACKED = 10_000;
+
+  /** Overridable so a test can prove the ceiling in milliseconds instead of minutes. */
+  #maxTracked = IdentidadeSenha.MAX_TRACKED;
+  set maxTracked(n: number) { this.#maxTracked = n; }
+
+  /** How many e-mails are being counted right now. Exists so a test can prove the ceiling holds. */
+  tracked(): number { return this.#failures.size; }
+
+  /** Forgets whoever finished their wait more than an hour ago, then trims the oldest if needed. */
+  #prune() {
+    const cutoff = Date.now() - 3_600_000;
+    for (const [k, f] of this.#failures) if (f.freeAt < cutoff) this.#failures.delete(k);
+    // Map preserves insertion order, so the front is the oldest. Dropping a counter is safe: the
+    // worst case is someone getting five fresh free attempts, which is the normal state anyway.
+    while (this.#failures.size > this.#maxTracked) {
+      this.#failures.delete(this.#failures.keys().next().value!);
+    }
+  }
+
+  /**
    * How long the wait is after N failures. Free up to the fifth, then doubling, capped at 15
    * minutes.
    *
@@ -70,6 +104,11 @@ export class IdentidadeSenha {
   }
 
   async entrar(email: string, senha: string): Promise<{ pessoa: User; sessao: string } | null> {
+    // Refused before the Map is touched and before scrypt runs: an oversized field is not a login
+    // attempt, it is an attempt to make the server work. Costs nothing to say no.
+    if (email.length > IdentidadeSenha.MAX_EMAIL || senha.length > IdentidadeSenha.MAX_PASSWORD) {
+      return null;
+    }
     const key = email.trim().toLowerCase();
     const locked = this.remainingWait(key) > 0;
 
@@ -88,6 +127,9 @@ export class IdentidadeSenha {
       f.count++;
       f.freeAt = Date.now() + this.#waitAfter(f.count);
       this.#failures.set(key, f);
+      this.#prune();
+      // Pruned AFTER inserting, not before: pruning first leaves the new entry sitting one above
+      // the ceiling, which is exactly how a ceiling stops being one.
       return null;
     }
     // Only a successful login clears it. Clearing on any attempt would let an attacker reset the

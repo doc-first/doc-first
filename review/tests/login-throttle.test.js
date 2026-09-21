@@ -68,3 +68,28 @@ test('a successful login clears the count', async () => {
   for (let i = 0; i < 5; i++) assert.equal(await id.entrar('someone@example.org', 'wrong'), null);
   assert.equal(id.remainingWait('someone@example.org'), 0, 'the count restarted from zero');
 });
+
+test('an oversized e-mail or password is refused before it costs anything', async () => {
+  // `/api/entrar` is the one route that answers without a session, so its cost is the cost anyone
+  // can impose. scrypt on a megabyte of text is a CPU bill, not a login.
+  const id = new IdentidadeSenha(store(), { seguro: false });
+  await id.primeiroAcesso('someone@example.org', 'Someone');
+
+  assert.equal(await id.entrar('x'.repeat(400) + '@example.org', 'whatever'), null);
+  assert.equal(await id.entrar('someone@example.org', 'y'.repeat(300)), null);
+  assert.equal(id.remainingWait('someone@example.org'), 0, 'and it did not even count as a try');
+});
+
+test('invented e-mails cannot grow the counter without bound', async () => {
+  // The attack this closes: POST a different invented address in a loop, with no credential, and
+  // add one permanent entry per request until the process runs out of memory. Entries used to be
+  // removed only on a SUCCESSFUL login of that same key — which an attacker never performs.
+  const id = new IdentidadeSenha(store(), { seguro: false });
+  await id.primeiroAcesso('someone@example.org', 'Someone');
+  // The real ceiling is 10.000, and proving it at that size costs ten minutes of scrypt. The
+  // ceiling is the same code either way, so the test lowers it and runs in a second.
+  id.maxTracked = 50;
+
+  for (let i = 0; i < 200; i++) await id.entrar(`invented-${i}@example.org`, 'wrong');
+  assert.ok(id.tracked() <= 50, `stopped growing at 50, got ${id.tracked()}`);
+});

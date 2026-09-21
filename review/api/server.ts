@@ -403,7 +403,7 @@ async function estatico(url: URL, res: ServerResponse) {
     if (info.isDirectory()) return estatico(new URL(url.href.replace(/\/?$/, '/index.html')), res);
     return servirArquivo(alvo, res, caminho);
   } catch {
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS });
     res.end('não encontrado');
   }
 }
