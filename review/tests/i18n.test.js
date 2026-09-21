@@ -189,7 +189,11 @@ test('the language selector offers every language, in its own name, with no flag
   const page = renderLoginPage(i18n, 'es', '/entrar?destino=/D01.html');
   // The selector alone, not the whole page: the page also has a `button:disabled` rule in its
   // stylesheet, and asserting against all of it would be asserting against the wrong thing.
-  const selector = page.match(/<form class="languages"[\s\S]*?<\/form>/)?.[0];
+  // `class="[^"]*"` rather than the literal `class="languages"`: the selector now composes the
+  // engine's own `df-langbar` with the `languages` hook this test looks for. What is being asserted
+  // is that the hook survives and that the form is still a plain GET — not the order of two class
+  // names.
+  const selector = page.match(/<form class="[^"]*\blanguages\b[^"]*"[\s\S]*?<\/form>/)?.[0];
   assert.ok(selector, 'the selector has to be on the page at all');
 
   // All three, always, whichever language the page is being served in: someone stuck in a language
@@ -205,7 +209,7 @@ test('the language selector offers every language, in its own name, with no flag
   assert.match(selector, /aria-label="Idioma"/, 'the selector is labelled, in the page language');
 
   // It has to work with JavaScript off: a GET form, which the browser submits on its own.
-  assert.match(selector, /^<form class="languages" method="get" action="\/language"/);
+  assert.match(selector, /^<form class="[^"]*\blanguages\b[^"]*" method="get" action="\/language"/);
   assert.match(selector, /<input type="hidden" name="next" value="\/entrar\?destino=\/D01\.html">/);
 
   // ⚠️ No flags. A flag is a country, not a language — Spain or Mexico? the United Kingdom or the

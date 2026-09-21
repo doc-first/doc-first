@@ -28,9 +28,12 @@ export function readConfig(root, io, env = {}) {
   const cloud = file.nuvem ?? {};
   const dev = file.desenvolvimento ?? {};
   const content = file.conteudo ?? {};
+  const theme = file.tema ?? {};
+
+  const name = env.DOC_FIRST_NOME ?? file.nome ?? 'Documentation';
 
   return {
-    name: env.DOC_FIRST_NOME ?? file.nome ?? 'Documentation',
+    name,
     owner: env.REVISAO_OWNER ?? file.owner ?? null,
     admins: env.REVISAO_ADMINS ?? (file.admins ?? []).join(','),
     project: env.REVISAO_PROJETO ?? cloud.projeto ?? null,
@@ -63,5 +66,25 @@ export function readConfig(root, io, env = {}) {
      * `doc-first.json` — one line, and it is the project's statement, not the engine's assumption.
      */
     idioma: file.idioma ?? env.REVISAO_IDIOMA ?? 'en',
+
+    /**
+     * HOW THE PROJECT DRESSES THE ENGINE. The Keycloak arrangement: the engine ships a complete,
+     * neutral look and the deployment overrides the parts it cares about.
+     *
+     *     "tema": { "marca": "#0B5FA5", "logo": "tema/logo.svg", "nome": "Product · Handbook" }
+     *
+     * All three are optional, and this function does NOT check them — it only reads. Validation
+     * lives in review/api/theme.ts, next to the code that writes the values into CSS and HTML,
+     * because a check that is far from the use is a check the next caller forgets to run.
+     *
+     * `name` falls back to the project's own `nome`, which every project already has: the screen
+     * should never have nothing to show, and asking for the same name twice would be asking a
+     * project to repeat itself.
+     */
+    theme: {
+      brand: env.DOC_FIRST_TEMA_MARCA ?? theme.marca ?? null,
+      logo: theme.logo ?? null,
+      name: theme.nome ?? name,
+    },
   };
 }

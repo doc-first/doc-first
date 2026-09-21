@@ -17,6 +17,21 @@
   "admins": [],
   "_admins": "Podem tudo o que o owner faz, menos ser owner. Vazio é o caso normal.",
 
+  "_tema": [
+    "COMO O SEU PROJETO VESTE O MOTOR — opcional, no modelo do Keycloak. Sem ele, o motor usa o",
+    "próprio visual neutro, que não é a marca de ninguém. Exemplo:",
+    "",
+    "  \"tema\": { \"marca\": \"#0B5FA5\", \"logo\": \"tema/logo.svg\", \"nome\": \"Produto · Manual\" }",
+    "",
+    "marca: só hexadecimal, de três ou seis dígitos. Qualquer outra coisa é recusada e registrada",
+    "       no log — o valor entra dentro de uma folha de estilo.",
+    "logo:  caminho dentro do projeto (svg, png, webp, jpg, gif, até 64 KiB). O servidor lê o",
+    "       arquivo e o embute; sem logo, aparece o nome.",
+    "nome:  como a tela de entrada chama o produto. Por padrão, o `nome` acima.",
+    "",
+    "Este repositório não define tema de propósito: o motor tem de continuar parecendo o motor."
+  ],
+
   "conteudo": {
     "pastas": ["examples/ola-mundo/paginas"],
     "registro": "examples/ola-mundo/aprovacoes.json",

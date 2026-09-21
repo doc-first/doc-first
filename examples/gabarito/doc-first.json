@@ -11,6 +11,20 @@
   ],
   "nome": "Template",
   "owner": "you@example.org",
+
+  "tema": {
+    "marca": "#2E6E5B",
+    "nome": "Template · Handbook"
+  },
+  "_tema": [
+    "HOW YOUR PROJECT DRESSES THE ENGINE. All three keys are optional; with no tema at all the",
+    "engine wears its own neutral look, which is nobody's brand.",
+    "marca: the brand colour. Hex only, three or six digits — anything else is refused and logged.",
+    "logo: a path inside this folder (svg, png, webp, jpg, gif, up to 64 KiB). The server reads it",
+    "      and inlines it; without a logo, the name is shown. Not set here because the template",
+    "      ships no image, and a broken logo is worse than none.",
+    "nome:  what the sign-in screen calls the product. Defaults to `nome` above."
+  ],
   "conteudo": {
     "pastas": [
       "00-tipos",

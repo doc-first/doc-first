@@ -178,6 +178,15 @@ expect "the login screen opens → 200"  200 "$(curl -s -o /dev/null -w '%{http_
 expect "and it refuses to be framed"     1 "$(curl -s -D- -o /dev/null $B/entrar | grep -ci "frame-ancestors 'none'")"
 expect "and it says nosniff"             1 "$(curl -s -D- -o /dev/null $B/entrar | grep -ci 'x-content-type-options: nosniff')"
 expect "and it doesn't ask for anything external" 1 "$(curl -s $B/entrar | grep -qE '<link|src=\"/front'; echo $?)"
+# The design system arrives INLINE, for the same reason: /review/web/ is behind the guard, so a
+# linked stylesheet on the one page served without a session would be answered with a redirect to
+# that same page, and the login screen would arrive unstyled.
+expect "and the design system came with it"    0 "$(curl -s $B/entrar | grep -qF -- '--df-space-1'; echo $?)"
+# ⚠️ ola-mundo sets no `tema`, so what is served here is the ENGINE's default — and the engine's
+# default must not be anybody's brand. Asserted as the exact line, because the point is that
+# nothing else got interpolated into it: the theme is the one value on this page that comes from a
+# file the engine did not write.
+expect "wearing the engine's neutral brand"    0 "$(curl -s $B/entrar | grep -qF -- '<style>:root { --df-brand: #3F4B57; --df-brand-ink: #FFFFFF; }</style>'; echo $?)"
 expect "X-Dev-Email doesn't count here → 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eu)"
 expect "wrong password → 401"          401 "$(login 'not-the-password')"
 expect "correct password → 200"        200 "$(login "$PASSWORD")"

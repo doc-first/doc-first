@@ -16,6 +16,7 @@ import {
 } from './users.ts';
 import { log } from './log.ts';
 import { renderLoginPage } from './login-page.ts';
+import { loadTheme } from './theme.ts';
 import { LANGUAGE_ROUTE, chosenLanguage, languageSwitch } from './language.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
@@ -53,6 +54,22 @@ const idioma = (req: IncomingMessage) =>
     person: chosenLanguage(req.headers.cookie),
     acceptLanguage: req.headers['accept-language'] as string, project: doProjeto.idioma,
   });
+
+/**
+ * How the project dresses the engine. Read ONCE, at boot, for two reasons: the logo is a file on
+ * disk and re-reading it on every sign-in would put an I/O call on the one request that is always
+ * a cold start; and a theme that changes without a restart is a theme nobody can reason about when
+ * two instances disagree.
+ *
+ * ⚠️ Whatever was refused is logged, and logged LOUDLY. A theme that quietly does not apply is an
+ * afternoon of someone reloading the page wondering where their colour went — and if the reason it
+ * was refused is that the value looked like an injection attempt, that is the line an operator
+ * needs to find.
+ */
+const { theme: temaDoProjeto, warnings: avisosDoTema } = loadTheme(
+  raizDoProjeto, doProjeto.theme, { readBinary: (p: string) => readFileSync(p) },
+);
+for (const aviso of avisosDoTema) log('WARNING', 'theme_rejected', { reason: aviso });
 
 const cfg = {
   porta: Number(process.env.PORT ?? 8080),
@@ -736,7 +753,7 @@ const servidor = createServer(async (req, res) => {
         });
         // The text goes in before the bytes leave: no untranslated flash, no second request, and
         // the labels are there with JavaScript off. See review/api/login-page.ts.
-        return res.end(renderLoginPage(i18n, idioma(req), url.pathname + url.search));
+        return res.end(renderLoginPage(i18n, idioma(req), url.pathname + url.search, temaDoProjeto));
       }
       const destino = encodeURIComponent(url.pathname + url.search);
       return (res.writeHead(302, { location: `${TELA_DE_ENTRADA}?destino=${destino}` }), res.end());

@@ -181,14 +181,40 @@ reads go through `review/core/i18n.js`, so adding a fourth is copying one file �
 `examples/locales/README.md`.
 
 The **login screen** is in there too. The server renders its text before sending the page, so there
-is no untranslated flash and the labels are there with JavaScript off. A globe in the corner of
-that screen switches language, and it works with JavaScript off as well: it is a form that submits
-a `GET /language`. The choice is kept in a cookie and **beats the browser's `Accept-Language`** —
+is no untranslated flash and the labels are there with JavaScript off. The language control sits
+beside the product name on that screen, and it works with JavaScript off as well: it is a form that
+submits a `GET /language`. The choice is kept in a cookie and **beats the browser's `Accept-Language`** —
 it is the only one the person made on purpose. With neither, the project's default: set `idioma` in
 `doc-first.json` (or `REVISAO_IDIOMA`); with none of the three, English.
 
 Logs stay English always: a log is evidence, and evidence that changes wording by locale cannot be
 grepped.
+
+## Theme
+
+The engine ships a complete look and the **project** dresses it, the way a Keycloak theme dresses
+Keycloak. One optional block in `doc-first.json`, all three keys optional:
+
+```json
+"tema": { "marca": "#0B5FA5", "logo": "tema/logo.svg", "nome": "Handbook · Product" }
+```
+
+- `marca` — the brand colour. **Hex only**, three or six digits. Anything else is refused, the
+  engine default is used instead, and the refusal is logged: a value from a config file ends up
+  inside a stylesheet, and `red; } body { display: none } /*` is what happens to whoever
+  interpolates it raw.
+- `logo` — a path inside the project (`svg`, `png`, `webp`, `jpg`, `gif`, up to 64 KiB). The server
+  **reads the file and inlines it**; the browser never fetches the path. The login screen is the
+  one page served without a session, so a linked image there would be redirected to the login
+  screen. Without a logo, the name is shown.
+- `nome` — what to call the product on the sign-in screen. Defaults to the project's own `nome`.
+
+**The engine's default is nobody's brand**: a slate lifted from its own neutral ramp, which says
+"no brand has been set" rather than asserting one that is not yours. The tokens live in
+`review/web/base.css` — colour, type scale, reading width, spacing, radius, shadow, focus ring and
+two breakpoints — and every engine screen composes them. What goes *on* the brand colour is
+measured, not assumed: a light brand gets dark text instead of the white that would have made the
+button unreadable.
 
 ## What does not work yet
 
