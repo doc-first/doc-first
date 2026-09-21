@@ -35,6 +35,8 @@ doc-first — the agent's tool for the Doc First method
     index                       rebuilds the index: kinds, dependencies, what is missing
     kinds                       the catalogue of content kinds
     lights                      the state of the whole documentation: 🟢 🟡 🔴 ⚪
+    restamp                     writes into the HTML what the registry already knows, so the
+                                  browser can paint 🟡 — for approvals older than the attributes
     if-i-touch <id>             what else needs checking if I edit this
 
   Options
@@ -57,8 +59,8 @@ doc-first — the agent's tool for the Doc First method
  *
  * Why a table and not a rename: these names are a PUBLISHED interface. They have been the only way
  * to call the tool for its whole life so far, they are typed by hand every day, and they are baked
- * into shell scripts and pre-commit hooks in the repositories that consume this engine — the
- * Arautos hook runs `./doc-first conferir` on every commit. A plain rename would break those hooks
+ * into shell scripts and pre-commit hooks in the repositories that consume this engine — a
+ * downstream project's hook runs `./doc-first conferir` on every commit. A plain rename would break those hooks
  * on the next pull, with an error that reads like the user's repository is broken rather than like
  * this tool changed. That is how a tool gets uninstalled instead of reported.
  *
@@ -165,6 +167,7 @@ async function main() {
     case 'index':      await validacao.indexar(root, values.db); return 0;
     case 'kinds':      await validacao.tipos(); return 0;
     case 'lights':     await validacao.mostrarSemaforo(root, { so: values.only }); return 0;
+    case 'restamp':    await validacao.restamp(root); return 0;
     case 'if-i-touch': return validacao.seEuMexer(root, requireArg(arg, 'if-i-touch <id>'));
     default:
       console.error(`unknown command: ${given}\n`);

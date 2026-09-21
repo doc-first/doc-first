@@ -263,6 +263,71 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
   return tally;
 }
 
+/**
+ * Writes into the HTML what the approvals registry already knows.
+ *
+ * Why this has to exist: the registry (`digital_texto`) is the truth, but the BROWSER cannot read
+ * it — the page is static and the panel has no server to ask. It paints the traffic light from
+ * three attributes that travel with the page, and `marcar()` only writes them at the moment an
+ * approval arrives. Any approval recorded before those attributes existed has `data-validado` and
+ * nothing else.
+ *
+ * ⚠️ What that costs is exactly the thing this project is about: `review/web/src/estado.js` says it
+ * in one line — without `data-digital-validada`, a rewritten block STAYS GREEN in the browser. The
+ * seal shows, and the page never warns that the text drifted. Documentation that lies about being
+ * checked is worse than documentation nobody checked.
+ *
+ * ⚠️ It writes the fingerprint FROM THE REGISTRY, never the one computed from the text on disk now.
+ * Recomputing would be a silent re-approval: a block whose text changed after the ✓ would be
+ * stamped with its new text and turn green, and the drift this exists to reveal would be erased by
+ * the very command meant to reveal it. So a block that drifted gets stamped with the OLD
+ * fingerprint and correctly shows 🟡.
+ */
+export async function restamp(raiz: string) {
+  const reg = carregar(raiz);
+  const trechos = await lerTrechos(raiz);
+  let escritos = 0, jaTinham = 0, semTrecho = 0;
+  const vaoFicarAmarelos: string[] = [];
+
+  for (const [id, r] of Object.entries(reg)) {
+    const gravada = (r as { digital_texto?: string }).digital_texto;
+    if (!gravada) continue;
+    const achado = acharArquivoDoTrecho(raiz, id);
+    if (!achado) { semTrecho++; continue; }
+
+    const atual = trechos.get(id)?.digital;
+    if (atual && atual !== gravada) vaoFicarAmarelos.push(id);
+
+    const escapado = id.replace(/\./g, '\\.');
+    if (new RegExp(`data-id="${escapado}"[^>]*data-digital-validada`).test(achado.html)) {
+      jaTinham++; continue;
+    }
+
+    const atributos: Record<string, string> = { 'data-digital-validada': gravada };
+    const dependia = (r as { depende?: Record<string, string> }).depende;
+    if (dependia && Object.keys(dependia).length) {
+      atributos['data-dependia-de'] = JSON.stringify(dependia).replace(/"/g, '&quot;');
+    }
+
+    let html = readFileSync(achado.caminho, 'utf8');
+    for (const [attr, valor] of Object.entries(atributos)) {
+      html = html.replace(new RegExp(`(data-id="${escapado}")((?:(?!${attr})[^>])*?)>`),
+                          `$1$2 ${attr}="${valor}">`);
+    }
+    writeFileSync(achado.caminho, html, 'utf8');
+    escritos++;
+  }
+
+  console.log(`\n${escritos} trecho(s) receberam a marca que faltava · ${jaTinham} já tinham`);
+  if (semTrecho) console.log(`⚠ ${semTrecho} do registro não existem mais nas folhas`);
+  if (vaoFicarAmarelos.length) {
+    console.log(`\n🟡 ${vaoFicarAmarelos.length} vão aparecer AMARELOS no site, e é o certo —`);
+    console.log(`   o texto mudou depois do ✓:\n   ${vaoFicarAmarelos.join('  ')}`);
+  }
+  console.log('');
+  return escritos;
+}
+
 /** What else do I have to look at if I touch this? The question to ask BEFORE editing. */
 export async function seEuMexer(raiz: string, id: string) {
   const trechos = await lerTrechos(raiz);
