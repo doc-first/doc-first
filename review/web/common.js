@@ -46,10 +46,16 @@
     return String(a.quando || '').localeCompare(String(b.quando || ''));
   };
 
-  /** Labels of the request cycle, in the interface. ⚠️ While the cycle lives in five
-      implementations (C#, pedidos.py, revisao.js, shell.js, triagem.html), these labels are the only
-      part already unified — Python said "To triage" where JS said "Awaiting triage". See
-      docs/DIVIDA-TECNICA.md, section "A raiz". */
+  /** Labels of the request cycle, in the interface.
+
+      These labels were the first thing here to be unified, and the reason is worth keeping: the
+      cycle used to exist in five implementations — C#, pedidos.py, revisao.js, shell.js and
+      triagem.html — and the five were not equal, they were similar. Python said "To triage" where
+      JS said "Awaiting triage", and the same request showed a different state depending on which
+      screen you opened it in.
+
+      The cycle itself now lives in review/cycle.json and is read by server, CLI and browser alike.
+      What is left here is only the wording. */
   A.ESTADOS_PEDIDO = {
     aberto: 'Awaiting triage', aprovado: 'Approved', recusado: 'Declined',
     pergunta: 'Question for the requester', analise: 'Being applied',

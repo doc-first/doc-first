@@ -21,7 +21,7 @@ export class RegistroEmMemoria implements Registro {
 /**
  * Firestore, `eventos` collection. INSERT ONLY: `create` fails if the document already exists, so
  * no code path overwrites a fact. Here the "nothing is erased" guarantee comes from the code — the
- * project IAM still allows delete, and that is logged as debt in docs/DIVIDA-TECNICA.md.
+ * project IAM still allows delete. Logged as a known gap in docs/METHOD.md, "Not built yet".
  */
 export class RegistroFirestore implements Registro {
   #db: Firestore;
