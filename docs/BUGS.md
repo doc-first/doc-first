@@ -119,9 +119,17 @@ the same attribute mean two things depending on where you stand.
 |---|---|
 | event against a block, with snapshot and author | ✅ exists |
 | triage with states and legal transitions (`review/cycle.json`) | ✅ exists |
-| a `bug` request category beside `text`, `term`, `remove`, `doubt` | ⬜ one line |
+| a `bug` request category beside `text`, `term`, `remove`, `doubt` | ✅ in `review/cycle.json`, labelled in both dictionaries (`cycle.category.bug`) and offered by both front ends |
 | the three outcomes as triage results, instead of approve/reject | ⬜ |
 | `rule` as a fifteenth kind | ✅ exists |
 | `entails` on the kind | ✅ exists |
 | `data-prova`, and the check that the proof moved too | 🟨 half: the kind demands it and `check` accuses a path that is gone; nobody checks the proof **moved** — that needs the git-diff layer |
 | a report that lands on **no** block — the hole case | ⬜ the hard one: it needs a subject before it has a home |
+
+⚠️ The category alone does **not** make the design above real. A request filed as `bug` today
+travels the ordinary cycle — open, approved or rejected, applied — and triage still answers
+approve/reject. The three outcomes are the next item, and they change the state machine: "the
+system is wrong" has to leave the block 🟢 and produce a fix, which is not any of the
+transitions in `review/cycle.json`. Until that exists, `bug` is a label on the request, not a
+different path through it.
+

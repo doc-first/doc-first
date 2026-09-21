@@ -62,8 +62,15 @@
     aguardando: 'Being applied · question', aplicado: 'Applied'
   };
 
+  /** The categories of a request, as `[value sent to the API, label on screen]`.
+
+      The list has to match `request_categories` in review/cycle.json — that table is the source,
+      this is the wording. The four older values travel in Portuguese because that is how they were
+      recorded before 2026-09-19, and review/core/legacy.js renames them on read; `bug` was born
+      after the rename, so it travels as `bug` and needs no pair in that map. Do NOT "fix" it to
+      `erro` for symmetry: that would add history that never happened. */
   A.CATEGORIAS = [['texto', 'Adjust the text'], ['termo', 'Change a term'],
-                  ['remover', 'Remove'], ['duvida', 'Question']];
+                  ['remover', 'Remove'], ['duvida', 'Question'], ['bug', 'Report a bug']];
 
   A.rotuloEstado = function (e) { return A.ESTADOS_PEDIDO[e] || e || 'Awaiting triage'; };
 

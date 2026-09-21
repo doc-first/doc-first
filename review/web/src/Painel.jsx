@@ -192,6 +192,10 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
 
       {aba === 'pedido' ? (
         <div className="rv-form">
+          {/* The same list as A.CATEGORIAS in review/web/common.js, and the same keys as
+              `request_categories` in review/cycle.json. Written out instead of read from the shared
+              array because this bundle does not load common.js — so adding a category means
+              touching both, and a test says so when only one of them was touched. */}
           <label>
             What it is
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
@@ -199,6 +203,7 @@ export default function Painel({ trecho, eu, podeAprovar, eventos, aoRegistrar, 
               <option value="termo">Change a term</option>
               <option value="remover">Remove</option>
               <option value="duvida">Question</option>
+              <option value="bug">Report a bug</option>
             </select>
           </label>
           <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={4}

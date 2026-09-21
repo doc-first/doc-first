@@ -52,11 +52,21 @@
     "text": "Ajustar texto",
     "term": "Trocar um termo",
     "remove": "Remover",
-    "doubt": "Dúvida"
+    "doubt": "Dúvida",
+    "bug": "Relatar um bug"
   },
   "_request_categories": [
     "`doubt`, e não `question`, de propósito: `question` já é um ESTADO do ciclo (o dono pergunta a",
     "quem pediu). São conceitos diferentes, e os dois viajam como texto solto — o mesmo nome nos dois",
-    "faria um grep mentir e um bug passar despercebido."
+    "faria um grep mentir e um bug passar despercebido.",
+    "",
+    "`bug` é CATEGORIA, e não um sistema à parte (docs/BUGS.md): um bug é a documentação e o",
+    "comportamento discordando, e isso já é um pedido contra um trecho, com foto, autor e ciclo. As",
+    "três saídas da triagem — o sistema está errado, a doc está errada, a doc tem um buraco — ainda",
+    "NÃO existem: hoje o pedido de bug percorre o mesmo ciclo de todos os outros.",
+    "",
+    "A chave é `bug` em inglês, como as outras chaves desta tabela. O front ainda manda `texto` e",
+    "`duvida` porque é história (review/core/legacy.js traduz na leitura), e código novo não nasce",
+    "em português só para combinar com o que está sendo aposentado."
   ]
 }

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createCycle } from '../core/cycle.js';
-import { doHistorico, estadoAtual } from '../core/legacy.js';
+import { categoriaAtual, doHistorico, estadoAtual } from '../core/legacy.js';
 import { fingerprintOfText, normalize, SIZE } from '../core/fingerprint.js';
 import { overLimit, validCommit } from '../core/limits.js';
 
@@ -81,6 +81,56 @@ test('an unknown state goes nowhere', () => {
 test('approved offers no triage; open offers the three the owner has', () => {
   assert.deepEqual(ciclo.status('approved').triage, []);
   assert.deepEqual(ciclo.status('open').triage, ['approved', 'rejected', 'question']);
+});
+
+/**
+ * A bug report is not a ticket here: it is a request against a block, like every other request, and
+ * the category is the only thing that says which kind of disagreement it is (docs/BUGS.md). That
+ * makes it four files that have to agree, and nothing but this test looks at all four at once: the
+ * table, the two dictionaries, and the two front ends that draw the dropdown.
+ */
+test('the bug category is in the cycle, in every language, and rides an event', () => {
+  assert.ok(tabela.request_categories.bug,
+    'cycle.json is the source of the categories, and bug has to be one of them');
+
+  // The label, in both dictionaries. The parity check in i18n.test.js would catch a key present in
+  // one and missing in the other; it would NOT catch the key missing from both, which is exactly
+  // how a new category ships untranslated.
+  for (const [language, file] of [['en', '../locales/en.json'],
+                                  ['pt-BR', '../../examples/locales/pt-BR.json']]) {
+    const dictionary = JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'));
+    assert.ok(dictionary['cycle.category.bug'], `${language} has no label for the bug category`);
+  }
+
+  // The edge still speaks pt-BR and legacy.js renames what it recognises. `bug` was born after the
+  // rename, so it has to cross UNTOUCHED — and it has to fit the limits the API applies before
+  // recording, or the request is refused with 400 and nobody knows why.
+  const event = doHistorico({ tipo: 'pedido', pagina: 'D01', caixa: 'D01.1.1',
+    texto: 'the screen does not do what this block says', dados: { categoria: 'bug' } });
+  assert.equal(event.data.category, 'bug');
+  assert.equal(overLimit(event), null, 'a request carrying the bug category is within the limits');
+});
+
+/**
+ * The dropdown is drawn twice — once in the plain-script pages (common.js) and once in the React
+ * panel — and a category added to only one of them is invisible to half the reviewers, with no
+ * error anywhere. Written out in both on purpose (the React bundle does not load common.js), so
+ * this is what keeps them the same list.
+ */
+test('both front ends offer exactly the categories the cycle declares', async () => {
+  Object.assign(globalThis, { window: {} });
+  await import('../web/common.js');
+  const fromCommon = globalThis.window.DOC_FIRST.CATEGORIAS.map(([value]) => value);
+
+  const painel = readFileSync(new URL('web/src/Painel.jsx', raiz), 'utf8');
+  const fromReact = [...painel.matchAll(/<option value="([^"]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(fromReact, fromCommon, 'the two dropdowns do not offer the same list');
+
+  // The values the front sends are the OLD names for four of them; legacy.js is what turns them
+  // into the keys of the table. Comparing after that translation is comparing the right things.
+  assert.deepEqual([...fromCommon.map(categoriaAtual)].sort(),
+    Object.keys(tabela.request_categories).sort(),
+    'the dropdown and cycle.json disagree about which categories exist');
 });
 
 test('an invalid table does not slip through', () => {

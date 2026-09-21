@@ -13,6 +13,7 @@
   "cycle.applying": "Em aplicação",
   "cycle.waiting": "Em aplicação · dúvida",
   "cycle.applied": "Aplicado",
+  "cycle.category.bug": "Relatar um bug",
   "limits.page.invalid": "página inválida: esperado um código curto como {examples}, veio \"{got}\"",
   "limits.text.tooLong": "o texto passa de {max} caracteres",
   "limits.snapshot.tooLong": "a foto do trecho passa de {max} caracteres",

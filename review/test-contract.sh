@@ -67,6 +67,10 @@ expect "rejected → approved → 201"     201 "$(state $OWNER $P aprovado 'revi
 expect "approved doesn't go back → 409" 409 "$(state $OWNER $P recusado 'changed my mind')"
 expect "applied without a commit → 400" 400 "$(state agent@test $P aplicado 'done')"
 expect "applied with a commit → 201"   201 "$(state agent@test $P aplicado 'done' ',"commit":"abc1234"')"
+# A bug report enters as a request like any other — the category is the only difference (docs/BUGS.md).
+# The check is here and not only in the unit tests because the category crosses the whole edge: JSON
+# body, the pt-BR field name `categoria`, the rename in legacy.js and the size limits on `dados`.
+expect "a request categorised as bug → 201" 201 "$(post $REVIEWER '{"tipo":"pedido","pagina":"D02","caixa":"D02.1.3","digital":"x","texto":"the screen does not do what this block says","foto":"the earlier text","dados":{"categoria":"bug"}}')"
 
 echo "a request from someone who can approve is born approved:"
 P2=$(new_request $OWNER '{"tipo":"pedido","pagina":"D02","caixa":"D02.2.1","digital":"x","texto":"my request"}')

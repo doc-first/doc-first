@@ -32,7 +32,7 @@
 /** @typedef {{ initial: string, initial_for_admin: string, states: Record<string,StateDef>,
  *              transitions: Record<string,string[]>, accepts_supplement: string[],
  *              requires_reason: string[], requires_commit: string[], agent_queue: string[],
- *              request_categories?: string[] }} CycleTable */
+ *              request_categories?: Record<string,string> }} CycleTable */
 
 /**
  * @param {CycleTable} table

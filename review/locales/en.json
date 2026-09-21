@@ -20,6 +20,7 @@
   "cycle.applying": "Being applied",
   "cycle.waiting": "Being applied · query",
   "cycle.applied": "Applied",
+  "cycle.category.bug": "Report a bug",
   "limits.page.invalid": "invalid page: expected a short code like {examples}, got \"{got}\"",
   "limits.text.tooLong": "the text is longer than {max} characters",
   "limits.snapshot.tooLong": "the block snapshot is longer than {max} characters",
