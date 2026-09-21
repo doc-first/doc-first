@@ -42,8 +42,9 @@ Everything in the code is English: identifiers, comments, file names, table name
 Messages a reviewer reads go through `review/core/i18n.js` and live in `review/locales/`. Logs stay
 English always — a log is evidence, and evidence that changes wording by locale cannot be grepped.
 
-Some command names and configuration keys are still Portuguese (`sincronizar`, `conteudo`), left
-over from where this grew. They are being renamed, and the old names will keep working.
+Some configuration keys are still Portuguese (`conteudo`, `REVISAO_*`), left over from where this
+grew. They are being renamed. The CLI commands have already moved (`sincronizar` → `sync`), and the
+old names stay accepted as aliases — see the table at the top of `review/cli/doc-first.ts`.
 
 ## Commit messages
 

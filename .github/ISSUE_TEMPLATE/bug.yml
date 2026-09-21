@@ -14,7 +14,7 @@ body:
     attributes:
       label: What happened, and what you expected instead
       placeholder: |
-        I ran `doc-first conferir` and it reported a block as changed.
+        I ran `doc-first check` and it reported a block as changed.
         The file has not been edited since the approval.
     validations: { required: true }
 

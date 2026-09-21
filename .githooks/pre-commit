@@ -72,7 +72,7 @@ fi
 # Só quando uma folha muda. É o coração do método: trecho aprovado não muda sem permissão, e não
 # existe marca de aprovação sem rastro.
 if [ -n "$folhas" ]; then
-  node review/cli/doc-first.ts conferir >/tmp/pre-commit-trava.log 2>&1 \
+  node review/cli/doc-first.ts check >/tmp/pre-commit-trava.log 2>&1 \
     || { grep '✗' /tmp/pre-commit-trava.log | sed 's/^/      /' | head -5; \
          falha "a trava de validação acusou (se foi de propósito, o dono precisa autorizar)"; }
 fi

@@ -117,20 +117,24 @@ has diffs, history and authorship.
 
 ```bash
 docker run --rm -v "$PWD:/work" -w /work --user "$(id -u):$(id -g)" \
-  ghcr.io/doc-first/doc-first node /app/review/cli/doc-first.ts listar
+  ghcr.io/doc-first/doc-first node /app/review/cli/doc-first.ts list
 ```
 
 | Command | What it does |
 |---|---|
-| `semaforo` | the state of the whole documentation: 🟢 🟡 🔴 ⚪ |
-| `se-eu-mexer <id>` | what will need checking if you edit this |
-| `indexar` | rebuilds the index: kinds, dependencies, what is missing |
-| `sincronizar` | pulls in the ✓ given on the site |
-| `listar` | approved requests, waiting to be applied |
-| `ver <id>` | the request, the text then, and the text now |
-| `impacto <id>` | where else the subject shows up, and what is validated |
-| `conferir` | a validated block that changed, and an approval with no trail |
-| `tipos` | the catalogue of content kinds |
+| `lights` | the state of the whole documentation: 🟢 🟡 🔴 ⚪ |
+| `if-i-touch <id>` | what will need checking if you edit this |
+| `index` | rebuilds the index: kinds, dependencies, what is missing |
+| `sync` | pulls in the ✓ given on the site |
+| `list` | approved requests, waiting to be applied |
+| `show <id>` | the request, the text then, and the text now |
+| `impact <id>` | where else the subject shows up, and what is validated |
+| `check` | a validated block that changed, and an approval with no trail |
+| `kinds` | the catalogue of content kinds |
+
+The commands used to be Portuguese (`listar`, `ver`, `conferir`, …), and those names still work —
+silently, and doing exactly the same thing. They are a published interface: dropping them would
+break scripts and pre-commit hooks that already exist, so it will only happen in a major version.
 
 The separation of powers is tested: **the agent applies, but refuses to approve.** Triage belongs to
 whoever owns the documentation.
@@ -158,8 +162,8 @@ Honest, as of `2026-09-20`:
   holds the place.
 - **Identity beyond password and an identity proxy.** OIDC, Google and LDAP are missing; the
   interface is there, the piece is not.
-- **Command names and some configuration keys are still Portuguese** (`sincronizar`, `conteudo`).
-  They are being renamed; the old names will keep working.
+- **Some configuration keys are still Portuguese** (`conteudo`, `REVISAO_*`). The commands have
+  been renamed already, and their old names still work.
 
 ## Licence
 

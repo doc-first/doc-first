@@ -43,7 +43,7 @@
   "_accepts_supplement": "Complemento em recusado ou pergunta devolve o pedido para 'open'.",
 
   "agent_queue": ["approved", "applying", "waiting"],
-  "_agent_queue": "O que `doc-first listar` mostra como 'a aplicar'.",
+  "_agent_queue": "O que `doc-first list` mostra como 'a aplicar'.",
 
   "requires_reason": ["rejected", "question"],
   "requires_commit": ["applied"],

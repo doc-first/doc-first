@@ -66,7 +66,7 @@ became suspect. Treat it as an error and people switch the check off at the firs
 and then the whole lock is worth nothing.
 
 Code: `review/core/validity.js` (`stateOf`, `trafficLight`, `dependentsOf`).
-Commands: `doc-first semaforo`, `doc-first se-eu-mexer <id>`.
+Commands: `doc-first lights`, `doc-first if-i-touch <id>`.
 
 ## Kinds of content
 
@@ -129,7 +129,7 @@ The owner validates **in the browser, not in the terminal**. The site does not w
 repository; the agent closes the loop.
 
 ```
-owner clicks ✓ ──► event in the store ──► doc-first sincronizar
+owner clicks ✓ ──► event in the store ──► doc-first sync
                                      ──► the approvals file + three attributes in the HTML
 ```
 
@@ -157,23 +157,23 @@ where it goes. Writing it inside the engine was a decision of the first project,
 node review/cli/doc-first.ts <command>     # --local to talk to the local server
 ```
 
-1. **See** — `listar` (only the ones the owner approved) and `ver <id>`: what was asked, by whom, the
+1. **See** — `list` (only the ones the owner approved) and `show <id>`: what was asked, by whom, the
    text then and now, and whether the block is validated.
-2. **Mark it under analysis** — `estado <id> analise "…"`. Whoever asked sees it in the panel.
-3. **Measure the impact** — `impacto <id> --termo "…"` for each subject in the request, and
-   `se-eu-mexer <id>` for what the block holds up. Dependency of meaning counts: remove a use case,
+2. **Mark it under analysis** — `state <id> analise "…"`. Whoever asked sees it in the panel.
+3. **Measure the impact** — `impact <id> --term "…"` for each subject in the request, and
+   `if-i-touch <id>` for what the block holds up. Dependency of meaning counts: remove a use case,
    and whatever cited that use case is now suspect.
 4. **Ask the owner** about anything ambiguous, and about anything touching a validated block — "only
    in this block, or in the other N as well?". If the answer belongs to whoever asked,
-   `estado <id> aguardando "question"`.
-5. **Apply** it, then run `conferir` (a validated block changes only with the owner's ok) and
-   `indexar`.
+   `state <id> aguardando "question"`.
+5. **Apply** it, then run `check` (a validated block changes only with the owner's ok) and
+   `index`.
 6. **Commit** with trailers:
    ```
    Pedido: <full id>
    Solicitado-por: <e-mail of whoever asked>
    ```
-7. **Close** — `estado <id> aplicado "what changed" --commit <sha> --trechos A01.2.1,A01.2.2`, or
+7. **Close** — `state <id> aplicado "what changed" --commit <sha> --blocks A01.2.1,A01.2.2`, or
    `recusado "reason"`.
 
 **The separation of powers is tested:** the agent applies, and refuses to approve. Triage belongs to
@@ -191,7 +191,7 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 | Language | `review/core/i18n.js` + `review/locales/` | the reviewer's messages; logs stay English |
 | Server | `review/api/server.ts` | Node 24 running TypeScript directly — no build step |
 | Event store | `review/api/store-sqlite.ts` | SQLite on `/data`; the interface takes other stores |
-| Index | `review/api/index-store.ts` | derived, disposable, rebuilt by `indexar` |
+| Index | `review/api/index-store.ts` | derived, disposable, rebuilt by `index` |
 | Identity | `review/api/identity-password.ts`, `identity-iap.ts` | password, or a signed header from an identity proxy |
 | Review panel | `review/web/` | React, bundled into `painel-react.js` |
 | The agent's tool | `review/cli/doc-first.ts` | the commands above |
@@ -214,7 +214,7 @@ Two databases, and only one of them is truth.
 
 - **`events`** is fact. Triggers refuse `UPDATE` and `DELETE` — through the database, not through
   discipline. Nothing is ever erased; a correction is a new event.
-- **`blocks`, `dependencies`, `issues`** are derived. `indexar` wipes and rewrites them inside a
+- **`blocks`, `dependencies`, `issues`** are derived. `index` wipes and rewrites them inside a
   transaction. Delete the file and you lose nothing.
 
 They are separate because files answer some questions badly — "every suspect diagram in the
@@ -253,8 +253,8 @@ Honest, `2026-09-20`:
 - **AI assistance.** Designed, not built. Each project brings its own key.
 - **Identity beyond password and identity proxy.** OIDC, Google, LDAP: the interface is there, the
   piece is not.
-- **Command names and some configuration keys are still Portuguese** (`sincronizar`, `REVISAO_*`).
-  They are being renamed; the old names will keep working.
+- **Some configuration keys are still Portuguese** (`conteudo`, `REVISAO_*`). The commands have
+  been renamed already, and their old Portuguese names still work as aliases.
 
 ## What is not in here, and why
 

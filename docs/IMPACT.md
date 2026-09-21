@@ -63,7 +63,7 @@ an invented number with a decimal point. Words you can argue about in a pull req
 | **substantive** | silent | agent | person |
 | **binding** | agent | person | person |
 
-*Silent is still recorded.* It shows up in `doc-first impacto` and in the ledger; it just does not
+*Silent is still recorded.* It shows up in `doc-first impact` and in the ledger; it just does not
 raise a flag. The difference is between being written down and being put in your way.
 
 ## Stage 3b — what the edit itself says
@@ -107,7 +107,7 @@ That is not a detail, it is the difference between a feature people adopt and on
 forever. If the link were `[[subject]]` written into the prose, inserting it would change the text,
 drop the approval, and turn every act of linking into an act of re-approving.
 
-⚠️ The HTML fingerprint (`digital`) *does* change, and it is what `conferir` uses to catch a change
+⚠️ The HTML fingerprint (`digital`) *does* change, and it is what `check` uses to catch a change
 of formatting in an approved block. Linking a whole project would set off all of it at once. That
 needs a stated exception, or the first day of linking buries the signal it was built to protect.
 

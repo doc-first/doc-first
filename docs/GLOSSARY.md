@@ -158,11 +158,15 @@ the defect is in the new code — fix it there.
 
 | What | Where | Why it has not moved |
 |---|---|---|
-| CLI commands: `sincronizar`, `listar`, `ver`, `impacto`, `estado`, `resumo`, `conferir`, `indexar`, `tipos`, `semaforo`, `se-eu-mexer` | `review/cli/doc-first.ts` | typed by people and written into scripts; renaming means keeping both for a while |
 | `doc-first.json` keys: `nome`, `conteudo.pastas`, `conteudo.registro`, `desenvolvimento` | the root of each project | that file is edited by whoever **adopts** the method. Renaming what already sits on somebody else's disk is a migration, not a translation |
 | HTML attributes: `data-id`, `data-cod`, `data-validado`, `data-revisao-ui`, `data-depende`, `data-tipo`, `data-dono`, `data-prazo` | the sheets | they are in ~490 blocks of content, and `data-validado` is read by the validation lock. Changing them is a job of its own, with the lock checked before and after |
 | `REVISAO_OWNER`, `REVISAO_ADMINS`, `REVISAO_SITE` | Cloud Run, `publicar.sh`, CI | renaming requires publishing at the same time, so it becomes its own step |
 | The reviewer's labels: "Aguardando triagem", "Aprovado" | `review/cycle.json` | they leave once the language choice arrives. Until then, translating them would leave a reviewer who works in Portuguese without Portuguese |
+
+The CLI commands used to be on this list. They moved — `sincronizar` → `sync`, `listar` → `list`,
+and so on — and the Portuguese names stay accepted as aliases, because scripts and pre-commit
+hooks out there already call them. The table that maps them is at the top of
+`review/cli/doc-first.ts`; removing it is a major version.
 
 ## Event fields
 

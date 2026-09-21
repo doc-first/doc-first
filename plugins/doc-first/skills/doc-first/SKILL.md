@@ -20,9 +20,9 @@ source of the content; the site never edits it.
 ## When resuming work — do it in this order
 
 ```bash
-node review/cli/doc-first.ts sincronizar   # brings in the ✓ the owner gave on the site
-node review/cli/doc-first.ts listar        # approved requests, ready to apply
-node review/cli/doc-first.ts conferir      # did anything validated change without permission?
+node review/cli/doc-first.ts sync    # brings in the ✓ the owner gave on the site
+node review/cli/doc-first.ts list    # approved requests, ready to apply
+node review/cli/doc-first.ts check   # did anything validated change without permission?
 ```
 
 Tell the owner, in a few lines: how many new blocks were validated, how many requests are ready to
@@ -31,14 +31,14 @@ the site.
 
 ## When applying a request
 
-1. `doc-first ver <id>` — what was asked, the text then and now, and the conversation.
-2. `doc-first estado <id> analise "Received…"` — the reviewer sees the progress in the panel.
-3. `doc-first impacto <id> --termo "…"` — **everywhere else the subject shows up**. Never change
+1. `doc-first show <id>` — what was asked, the text then and now, and the conversation.
+2. `doc-first state <id> analise "Received…"` — the reviewer sees the progress in the panel.
+3. `doc-first impact <id> --term "…"` — **everywhere else the subject shows up**. Never change
    anything without this: the command marks which blocks are **validated**, and those need the
    owner's permission to change.
 4. Ask about anything ambiguous. A misunderstood request turns into two requests.
 5. Apply it, with a commit that carries the trailers `Pedido: <id>` and `Solicitado-por: <e-mail>`.
-6. `doc-first estado <id> aplicado "Done" --commit <sha> --trechos D01.1.4,D02.3.1`
+6. `doc-first state <id> aplicado "Done" --commit <sha> --blocks D01.1.4,D02.3.1`
 7. Add the lesson to the Traps section below, if the fix teaches a rule that is not written yet.
 
 ## The rules that are not up for negotiation
@@ -75,4 +75,4 @@ the site.
 - **A test that passes for the wrong reason.** An assertion that ran `grep` on the output reported
   failure while everything passed. Prefer an exit code to text.
 - **A forged approval.** A hand-written `data-validado` created an approval out of nothing; today
-  `conferir` catches it, but the lesson stays: the lock has to look at both sides.
+  `check` catches it, but the lesson stays: the lock has to look at both sides.
