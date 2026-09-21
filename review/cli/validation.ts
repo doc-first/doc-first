@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
 import { fingerprintOfText } from '../core/fingerprint.js';
-import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto } from './pages.ts';
+import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
 import { readConfig } from '../core/config.js';
 import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
 import { Fonte } from './remote.ts';
@@ -203,10 +203,32 @@ export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: s
  * This is the command that answers "can I trust this documentation today?". `conferir` answers a
  * smaller and older question — whether someone tampered with a mark. This one answers today's question.
  */
+/**
+ * A `Trecho` as the traffic light sees it.
+ *
+ * ⚠️ This function exists because of a bug that hid for days behind `as never`. `review/core/`
+ * speaks English — `fingerprint`, `dependsOn` — and the CLI's own type speaks Portuguese —
+ * `digital`, `depende`. Passing one where the other was expected type-checks ONLY because the cast
+ * erases the mismatch, and then `block.fingerprint` is `undefined` at run time.
+ *
+ * What it cost: `semaforo` reported EVERY validated block as 🟡 forever, because `undefined` never
+ * equals a recorded fingerprint — while `conferir`, which reads the right field, said "17 ·
+ * everything intact" on the same repository. Two commands of the same tool, one lock, opposite
+ * answers. And `se-eu-mexer` always replied "nothing depends on this", which is worse: it is the
+ * answer you get right before you break something.
+ *
+ * The lesson is not "be careful with casts". It is that the translation between the two vocabularies
+ * has to live in ONE named place that a test can point at — which is this one.
+ */
+export function comoONucleoVe(trechos: Map<string, Trecho>) {
+  return new Map([...trechos].map(([id, t]) =>
+    [id, { id, fingerprint: t.digital, dependsOn: t.depende }]));
+}
+
 export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}) {
   const trechos = await lerTrechos(raiz);
   const reg = carregar(raiz);
-  const { byBlock, tally } = trafficLight(trechos as never, reg as never);
+  const { byBlock, tally } = trafficLight(comoONucleoVe(trechos), reg as never);
 
   const total = trechos.size;
   const linha = (e: 'valid' | 'stale' | 'broken' | 'none', nome: string) =>
@@ -246,7 +268,7 @@ export async function seEuMexer(raiz: string, id: string) {
   const trechos = await lerTrechos(raiz);
   if (!trechos.has(id)) { console.log(`✗ não achei o trecho ${id}`); return 1; }
 
-  const dependentes = dependentsOf(id, trechos as never);
+  const dependentes = dependentsOf(id, comoONucleoVe(trechos));
   const reg = carregar(raiz);
 
   console.log(`\nSe você mexer em ${id}:\n`);
