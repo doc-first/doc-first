@@ -1,4 +1,4 @@
-import { Firestore } from '@google-cloud/firestore';
+import { Firestore, type DocumentData } from '@google-cloud/firestore';
 import { UserStoreBase, type StoredSession, type StoredUser } from './users.ts';
 
 /**
@@ -16,9 +16,13 @@ import { UserStoreBase, type StoredSession, type StoredUser } from './users.ts';
  * Unlike the event store next door, this collection is NOT insert-only: a password change is an
  * update, and a logout is a delete. People are state, not facts.
  *
- * ⚠️ Proved by code review only. There is no Firestore emulator on this machine, so the
- * conformance test skips this implementation with a message instead of pretending. Do not read a
- * green suite as evidence that this file works.
+ * ⚠️ Proved by the conformance suite ONLY when the emulator is running. `npm test` on its own
+ * skips this implementation with a message instead of pretending. To prove it:
+ *
+ *   firebase emulators:start --only firestore --project doc-first-conformance
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8433 npm test
+ *
+ * Without that variable, do not read a green suite as evidence that this file works.
  */
 export class UsersFirestore extends UserStoreBase {
   #db: Firestore;
@@ -32,24 +36,34 @@ export class UsersFirestore extends UserStoreBase {
     await this.#db.collection('users').doc(row.email).create({
       email: row.email, name: row.name, salt: row.salt, hash: row.hash,
       must_change: row.mustChangePassword, created_at: row.createdAt,
+      enabled: row.enabled,
     });
   }
 
   protected async readUser(email: string): Promise<StoredUser | null> {
     const doc = await this.#db.collection('users').doc(email).get();
     const d = doc.data();
-    if (!d) return null;
-    return {
-      email: d.email, name: d.name,
-      // Firestore hands bytes back as a Buffer already; the copy costs nothing and means the
-      // constant-time comparison never receives something that is merely Buffer-like.
-      salt: Buffer.from(d.salt), hash: Buffer.from(d.hash),
-      mustChangePassword: !!d.must_change, createdAt: d.created_at,
-    };
+    return d ? docToUser(d) : null;
   }
 
-  protected async writeCredential(email: string, salt: Buffer, hash: Buffer): Promise<void> {
-    await this.#db.collection('users').doc(email).update({ salt, hash, must_change: false });
+  protected async readAllUsers(): Promise<StoredUser[]> {
+    // Ordered by document id, which IS the normalised e-mail — the same ordering the other two
+    // stores produce, and it needs no extra index because Firestore always has this one.
+    const all = await this.#db.collection('users').orderBy('__name__').get();
+    return all.docs.map((doc) => docToUser(doc.data()));
+  }
+
+  protected async writeEnabled(email: string, enabled: boolean): Promise<void> {
+    await this.#db.collection('users').doc(email).update({ enabled });
+  }
+
+  protected async writeName(email: string, name: string): Promise<void> {
+    await this.#db.collection('users').doc(email).update({ name });
+  }
+
+  protected async writeCredential(
+    email: string, salt: Buffer, hash: Buffer, mustChange: boolean): Promise<void> {
+    await this.#db.collection('users').doc(email).update({ salt, hash, must_change: mustChange });
   }
 
   protected async countUsers(): Promise<number> {
@@ -89,4 +103,27 @@ export class UsersFirestore extends UserStoreBase {
   async close(): Promise<void> {
     await this.#db.terminate();
   }
+}
+
+/**
+ * One document of `users`, as the rest of the code expects it. Shared by the single read and the
+ * listing so the two can never drift — a listing that decoded `enabled` differently from the login
+ * path is a screen that shows someone as able to get in while the door says otherwise.
+ *
+ * ⚠️ `enabled` is read as `!== false`, not as `!!`, and the difference is a whole team locked out.
+ * A document written before this field existed has no `enabled` at all, and `undefined` is falsy —
+ * so `!!` would refuse everyone who already had an account, with the right password in their hands
+ * and nothing in the log to explain it. There is no `ALTER TABLE` in Firestore to fix that after
+ * the fact, so the default has to live at the read. Absent means "written before we asked", which
+ * means allowed in.
+ */
+function docToUser(d: DocumentData): StoredUser {
+  return {
+    email: d.email, name: d.name,
+    // Firestore hands bytes back as a Buffer already; the copy costs nothing and means the
+    // constant-time comparison never receives something that is merely Buffer-like.
+    salt: Buffer.from(d.salt), hash: Buffer.from(d.hash),
+    mustChangePassword: !!d.must_change, createdAt: d.created_at,
+    enabled: d.enabled !== false,
+  };
 }

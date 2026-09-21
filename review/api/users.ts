@@ -56,6 +56,12 @@ const SALT_LENGTH = 16;
 export const MIN_PASSWORD_LENGTH = 12;
 
 /**
+ * A ceiling on the display name. Generous enough for any real name with its titles, small enough
+ * that a name is never a way to push a page of text into every screen that lists people.
+ */
+export const MAX_NAME_LENGTH = 120;
+
+/**
  * A rule the PERSON broke — not the program. It carries the i18n key so the edge can say it in
  * their language (see review/core/i18n.js for who reads what).
  *
@@ -87,6 +93,21 @@ export interface User {
   name: string;
   mustChangePassword: boolean;
   createdAt: string;
+  /**
+   * Whether this person may still get in. There is no way to DELETE a person, on purpose.
+   *
+   * ⚠️ This is the central decision of the whole method, not a convenience. Nothing here is
+   * erased: the event store refuses `UPDATE` and `DELETE` by trigger, precisely so that a review
+   * history can be trusted years later. An approval is signed by an e-mail, and that signature is
+   * what turns a ✓ into evidence. Delete the person and every ✓ they ever gave becomes a tick
+   * with no owner — the history still says "approved", and nobody can say by whom, or whether
+   * that person had the standing to approve. The trail is half the value of the method; losing
+   * it costs more than any row ever saved.
+   *
+   * So: disabling takes the access away and KEEPS the history. Deleting would destroy the history
+   * to save one row. Only the first one exists here.
+   */
+  enabled: boolean;
 }
 
 /**
@@ -98,10 +119,33 @@ export interface User {
 export interface UserStore {
   /** Creates the person. Returns the password — the generated one when none is given. */
   create(email: string, name: string, password?: string, mustChange?: boolean): Promise<string>;
-  /** Checks the password. Returns the person, or null — without saying whether the e-mail exists. */
+  /**
+   * Checks the password. Returns the person, or null — without saying whether the e-mail exists,
+   * and without saying whether they are disabled.
+   */
   check(email: string, password: string): Promise<User | null>;
   changePassword(email: string, next: string): Promise<void>;
+  /**
+   * Generates a new password, stores it and returns it to be shown ONCE. Demands a change, because
+   * somebody other than its owner has seen it.
+   */
+  resetPassword(email: string): Promise<string>;
   find(email: string): Promise<User | null>;
+  /**
+   * Everyone, ordered by e-mail, disabled people included.
+   *
+   * Ordered in the STORE and not in the caller: three databases with three natural orders would
+   * hand the same team three different lists, and "the third row" would mean something different
+   * depending on where the service was deployed.
+   *
+   * ⚠️ These are `User` objects, so no salt and no hash ever leave here — this list goes straight
+   * to an HTTP response.
+   */
+  list(): Promise<User[]>;
+  /** Takes the access away, or gives it back. Never deletes: see the note on `User.enabled`. */
+  setEnabled(email: string, enabled: boolean): Promise<void>;
+  /** Changes the display name. The e-mail is the identity and does not change. */
+  rename(email: string, name: string): Promise<void>;
   /** True when nobody has been created yet: the first-access condition. */
   isEmpty(): Promise<boolean>;
   openSession(email: string, hours?: number): Promise<string>;
@@ -128,11 +172,35 @@ export function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
+/** The longest address RFC 5321 allows. Anything past it is not a typo, it is a payload. */
+export const MAX_EMAIL_LENGTH = 320;
+
+/**
+ * Is this something that can be an address here?
+ *
+ * ⚠️ Deliberately NOT an RFC 5322 parse, and the restraint is the point. The exhaustive regular
+ * expressions for that are famous for rejecting addresses that work, and the only thing this check
+ * is here to catch is the empty field and the obvious typo — somebody typing a NAME into the
+ * e-mail box, which would otherwise create an access nobody can ever sign in to, and which cannot
+ * be deleted afterwards because nothing here is deleted.
+ *
+ * No dot is demanded in the domain: `root@localhost` and internal single-label hosts are real, and
+ * refusing them would be this checker deciding what someone else's network looks like.
+ */
+export function isEmailAddress(value: string): boolean {
+  const email = value.trim();
+  if (email.length === 0 || email.length > MAX_EMAIL_LENGTH) return false;
+  if (/\s/.test(email)) return false;
+  const at = email.indexOf('@');
+  // Exactly one `@`, with something on both sides of it.
+  return at > 0 && at === email.lastIndexOf('@') && at < email.length - 1;
+}
+
 /**
  * Everything that must not differ between databases: the hashing, the constant-time comparison,
  * the session lifetime, the minimum password length.
  *
- * An implementation fills in the seven row operations below and gets the rest for free. That is
+ * An implementation fills in the eleven row operations below and gets the rest for free. That is
  * the point — there is no way for one store to hash differently from another, because none of
  * them hashes at all.
  */
@@ -140,8 +208,19 @@ export abstract class UserStoreBase implements UserStore {
   // ------------------------------------------------------------- rows: one per database
   protected abstract insertUser(row: StoredUser): Promise<void>;
   protected abstract readUser(email: string): Promise<StoredUser | null>;
-  protected abstract writeCredential(email: string, salt: Buffer, hash: Buffer): Promise<void>;
+  /**
+   * ⚠️ `mustChange` is a PARAMETER and not a constant, and it used to be hard-coded to "no". The
+   * decision belongs to the caller above: somebody who chose their own password owes nothing,
+   * somebody handed a generated one has to replace it. Hard-coded here, a password reset would
+   * silently leave the person free to keep using a secret an admin had seen.
+   */
+  protected abstract writeCredential(
+    email: string, salt: Buffer, hash: Buffer, mustChange: boolean): Promise<void>;
   protected abstract countUsers(): Promise<number>;
+  /** Every row, already ordered by e-mail. The secrets are dropped above, in `list()`. */
+  protected abstract readAllUsers(): Promise<StoredUser[]>;
+  protected abstract writeEnabled(email: string, enabled: boolean): Promise<void>;
+  protected abstract writeName(email: string, name: string): Promise<void>;
   protected abstract insertSession(id: string, email: string, createdAt: string, expiresAt: string): Promise<void>;
   protected abstract readSession(id: string): Promise<StoredSession | null>;
   protected abstract deleteSession(id: string): Promise<void>;
@@ -156,13 +235,27 @@ export abstract class UserStoreBase implements UserStore {
     return derive(password.normalize('NFKC'), salt, KEY_LENGTH);
   }
 
+  /**
+   * A password nobody chose, for a first access and for a reset.
+   *
+   * One place, so the two paths cannot drift: a reset that produced something weaker than the
+   * first-access password would be a quiet downgrade, visible to nobody, on the very operation
+   * people reach for when they suspect a credential has leaked.
+   */
+  #generatePassword(): string {
+    return randomBytes(12).toString('base64url');
+  }
+
   async create(email: string, name: string, password?: string, mustChange = true): Promise<string> {
-    const chosen = password ?? randomBytes(12).toString('base64url');
+    const chosen = password ?? this.#generatePassword();
     const salt = randomBytes(SALT_LENGTH);
     const hash = await this.#hash(chosen, salt);
     await this.insertUser({
       email: normalizeEmail(email), name, salt, hash,
       mustChangePassword: mustChange, createdAt: new Date().toISOString(),
+      // Somebody just created on purpose is somebody who is meant to get in. Being disabled is
+      // always an explicit act, never a starting state.
+      enabled: true,
     });
     return chosen;
   }
@@ -177,6 +270,12 @@ export abstract class UserStoreBase implements UserStore {
     if (!row) return null;
 
     if (computed.length !== row.hash.length || !timingSafeEqual(computed, row.hash)) return null;
+    // ⚠️ Checked AFTER the hash, and refused exactly the way a wrong password is refused: the same
+    // `null`, at the same cost, with the same message at the edge. Answering "this account is
+    // disabled" would confirm to anyone who asked that the address has an account here, and would
+    // do it without a valid password — the very thing the constant-time comparison above exists to
+    // prevent. Whoever was disabled already knows why; whoever is guessing learns nothing.
+    if (!row.enabled) return null;
     return profileOf(row);
   }
 
@@ -188,12 +287,64 @@ export abstract class UserStoreBase implements UserStore {
     }
     const salt = randomBytes(SALT_LENGTH);
     const hash = await this.#hash(next, salt);
-    await this.writeCredential(normalizeEmail(email), salt, hash);
+    // `false`: the person just chose this one themselves, so there is nothing left to demand.
+    await this.writeCredential(normalizeEmail(email), salt, hash, false);
   }
 
+  /**
+   * A brand-new generated password for somebody who lost theirs. Returned to be shown ONCE.
+   *
+   * It lives here, and not in the route that calls it, for the reason the whole class exists: the
+   * generating and the hashing are the parts that must not differ between databases, and a route
+   * that generated its own password would be a second place able to get scrypt wrong.
+   *
+   * ⚠️ It demands a change, unlike `changePassword`. The difference is who picked the password: a
+   * reset hands somebody a secret that a THIRD PERSON has seen — whoever ran the reset, plus
+   * whatever channel carried it to them. Leaving it in place would mean an admin permanently knows
+   * the credential of a person whose ✓ is evidence in the record. Forcing the change makes that
+   * window as short as one login.
+   */
+  async resetPassword(email: string): Promise<string> {
+    const chosen = this.#generatePassword();
+    const salt = randomBytes(SALT_LENGTH);
+    const hash = await this.#hash(chosen, salt);
+    await this.writeCredential(normalizeEmail(email), salt, hash, true);
+    return chosen;
+  }
+
+  /**
+   * ⚠️ Finds disabled people too, on purpose. Management has to be able to SEE whoever it took the
+   * access away from — otherwise disabling someone would make them vanish from the screen, which
+   * is indistinguishable from deleting them and would quietly recreate the thing `User.enabled`
+   * exists to avoid. Whether they may get in is decided in `check` and in `fromSession`.
+   */
   async find(email: string): Promise<User | null> {
     const row = await this.readUser(normalizeEmail(email));
     return row ? profileOf(row) : null;
+  }
+
+  async list(): Promise<User[]> {
+    return (await this.readAllUsers()).map(profileOf);
+  }
+
+  async setEnabled(email: string, enabled: boolean): Promise<void> {
+    await this.writeEnabled(normalizeEmail(email), enabled);
+  }
+
+  async rename(email: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    // An empty name is not a name, and it is the one that does real damage: the history would show
+    // an approval signed by a blank, and "who said this?" would have no answer on the screen even
+    // though the e-mail is still in the row.
+    if (!trimmed) {
+      throw new UserInputError('a name cannot be empty', 'api.name.empty');
+    }
+    if (trimmed.length > MAX_NAME_LENGTH) {
+      throw new UserInputError(
+        `a name is at most ${MAX_NAME_LENGTH} characters`,
+        'api.name.tooLong', { max: MAX_NAME_LENGTH });
+    }
+    await this.writeName(normalizeEmail(email), trimmed);
   }
 
   async isEmpty(): Promise<boolean> {
@@ -216,7 +367,16 @@ export abstract class UserStoreBase implements UserStore {
     // Expiry is decided here, against the service's clock, and not by each database's own idea of
     // "now". A session that is dead in SQLite and alive in Postgres is not one product.
     if (!session || session.expiresAt < new Date().toISOString()) return null;
-    return this.find(session.email);
+    const person = await this.find(session.email);
+    // ⚠️ Checked on EVERY request, not only at login. Without this, disabling someone would take
+    // effect whenever their cookie happened to expire — up to twelve hours of a person who has
+    // just been removed still reading, still commenting, still approving. "Their access was
+    // revoked" has to mean the next request, or it does not mean anything.
+    //
+    // The session row is deliberately left where it is: it expires on its own, and deleting it
+    // here would turn a read into a write on the hot path of every page load.
+    if (!person?.enabled) return null;
+    return person;
   }
 
   async closeSession(id: string | undefined): Promise<void> {
@@ -233,6 +393,7 @@ function profileOf(row: StoredUser): User {
   return {
     email: row.email, name: row.name,
     mustChangePassword: row.mustChangePassword, createdAt: row.createdAt,
+    enabled: row.enabled,
   };
 }
 

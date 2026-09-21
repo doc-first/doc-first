@@ -92,6 +92,10 @@ expect "root redirects"                302 "$(curl -s -o /dev/null -w '%{http_co
 # ENCODED `..`, which survives parsing and only becomes `..` at decodeURIComponent.
 expect "encoded traversal → 403"       403 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is "$B/%2e%2e%2f%2e%2e%2fetc/passwd")"
 expect "raw traversal doesn't leak"    404 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/front/../../../etc/passwd)"
+# ⚠️ Behind an identity proxy there is no user store at all — who exists is the proxy's directory.
+# Answering here would invent a second, empty source of truth for who works at the company, and an
+# empty list of people is the kind of screen somebody believes.
+expect "no user store, no management → 405" 405 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/users)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
 echo "local mode does NOT turn on outside development:"
@@ -149,6 +153,101 @@ expect "now the docs open → 200"       200 "$(curl -s -b $COOKIES -o /dev/null
 # changed on disk.
 expect "HTML is not cached"            0 "$(curl -s -b $COOKIES -D- -o /dev/null $B/paginas/A01.html | grep -qi 'cache-control: no-cache'; echo $?)"
 expect "and /entrar no longer has anything to do" 302 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/entrar)"
+
+# ----------------------------------------------------------------------------- managing people
+# Nothing here deletes anybody. An approval signed by somebody who was removed would be a ✓ with no
+# owner, and the trail is half of what this tool is for — so the access goes away and the person
+# stays. Everything below is about that one decision holding at the edge.
+echo "managing people:"
+MEMBER=member@example.org
+MCOOKIES=/tmp/cookies-member.txt; rm -f $MCOOKIES
+jfield() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const v=process.argv[1].split('.').reduce((o,k)=>(o===undefined||o===null)?o:o[k],JSON.parse(s));console.log(v===undefined||v===null?'':v)})" "$1"; }
+as_owner()  { curl -s -b $COOKIES  -H 'Content-Type: application/json' "$@"; }
+as_member() { curl -s -b $MCOOKIES -H 'Content-Type: application/json' "$@"; }
+code_owner()  { as_owner  -o /dev/null -w '%{http_code}' "$@"; }
+code_member() { as_member -o /dev/null -w '%{http_code}' "$@"; }
+emails() { as_owner $B/api/users | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).users.map(u=>u.email).join(' ')))"; }
+mlogin() { curl -s -c $MCOOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$MEMBER\",\"senha\":\"$1\"}" $B/api/entrar; }
+
+expect "the owner sees the list → 200"  200 "$(code_owner $B/api/users)"
+expect "and is in it"                   "$OWNER" "$(as_owner $B/api/users | jfield users.0.email)"
+expect "and is able to get in"          true "$(as_owner $B/api/users | jfield users.0.enabled)"
+
+CREATED=$(as_owner -w '\n%{http_code}' -d "{\"email\":\"$MEMBER\",\"name\":\"A Member\"}" $B/api/users)
+CREATE_CODE=$(echo "$CREATED" | tail -1); CREATED=$(echo "$CREATED" | head -n -1)
+MEMBER_PASSWORD=$(echo "$CREATED" | jfield password)
+expect "creating an access → 201"       201 "$CREATE_CODE"
+expect "and the password comes back once" 0 "$([ -n "$MEMBER_PASSWORD" ] && echo 0 || echo 1)"
+expect "and the new person is enabled"  true "$(echo "$CREATED" | jfield user.enabled)"
+expect "and has to change that password" true "$(echo "$CREATED" | jfield user.mustChangePassword)"
+# The whole point of "once". A password readable from a listing is a password anyone who can read
+# the panel can collect, and one in a log is readable by everybody with access to the collector —
+# a far wider audience than the account it opens.
+expect "the password is NOT in the listing" 0 "$(as_owner $B/api/users | grep -Fc -e "$MEMBER_PASSWORD")"
+expect "nor anywhere in the log"        0 "$(grep -Fc -e "$MEMBER_PASSWORD" /tmp/node-password.log)"
+# Ordered in the store, not by the database's own idea of order: three databases with three natural
+# orders would hand the same team three different lists.
+expect "the list is ordered by e-mail"  "$MEMBER $OWNER" "$(emails)"
+
+expect "the new person signs in → 200"  200 "$(mlogin "$MEMBER_PASSWORD")"
+expect "and is nobody special"          outro "$(as_member $B/api/eu | jfield papel)"
+
+# Every management route, against somebody who is neither owner nor admin.
+expect "not an admin: the list → 403"   403 "$(code_member $B/api/users)"
+expect "not an admin: creating → 403"   403 "$(code_member -d '{"email":"x@example.org","name":"X"}' $B/api/users)"
+expect "not an admin: disabling → 403"  403 "$(code_member -d '{"enabled":false}' $B/api/users/$OWNER/enabled)"
+expect "not an admin: a new password → 403" 403 "$(code_member -X POST $B/api/users/$OWNER/password)"
+# The one route that is about the caller's own row. Fixing the spelling of your own name is not a
+# privilege, and making it one would send people to an admin over a typo.
+expect "but anybody renames themselves → 200" 200 "$(code_member -d '{"name":"Renamed Themselves"}' $B/api/users/me/name)"
+expect "and the listing shows the new name" "Renamed Themselves" "$(as_owner $B/api/users | jfield users.0.name)"
+expect "an empty name → 400"            400 "$(code_member -d '{"name":"   "}' $B/api/users/me/name)"
+
+expect "an e-mail that is not one → 400" 400 "$(code_owner -d '{"email":"not an address","name":"X"}' $B/api/users)"
+# The bad value goes back in the message: "invalid e-mail" next to a form makes the person guess
+# which field, and guess what is wrong with it.
+expect "and the message quotes what was typed" 0 "$(as_owner -d '{"email":"not an address","name":"X"}' $B/api/users | grep -q 'not an address'; echo $?)"
+expect "a name nobody wrote → 400"      400 "$(code_owner -d '{"email":"other@example.org","name":"  "}' $B/api/users)"
+expect "an e-mail already here → 400"   400 "$(code_owner -d "{\"email\":\"$MEMBER\",\"name\":\"Twice\"}" $B/api/users)"
+expect "and the message names it"       0 "$(as_owner -d "{\"email\":\"$MEMBER\",\"name\":\"Twice\"}" $B/api/users | grep -q "$MEMBER"; echo $?)"
+expect "a new password for nobody → 404" 404 "$(code_owner -X POST $B/api/users/nobody@example.org/password)"
+# A half-written escape makes decodeURIComponent throw. Uncaught, that is a 500 with an incident
+# id — an answer that says "the service is broken" about a request that was merely malformed.
+expect "an address nobody can decode → 404" 404 "$(code_owner -X POST --path-as-is "$B/api/users/%zz/password")"
+
+# ⚠️ Not even the owner may disable the owner. The service refuses to start without exactly one,
+# so an owner who cannot sign in is a service where nobody can approve and nobody can hand the role
+# over — and the only fix is a restart with a different variable, which is not something the person
+# locked out can do from the screen they are looking at.
+expect "the owner cannot be disabled → 409" 409 "$(code_owner -d '{"enabled":false}' $B/api/users/$OWNER/enabled)"
+expect "and the message says how to hand it over" 0 "$(as_owner -d '{"enabled":false}' $B/api/users/$OWNER/enabled | grep -q 'REVISAO_OWNER'; echo $?)"
+expect "and the owner is still in"      200 "$(code_owner $B/api/eu)"
+
+expect "disabling somebody → 200"       200 "$(code_owner -d '{"enabled":false}' $B/api/users/$MEMBER/enabled)"
+# Without this the revocation would land whenever the cookie happened to expire: up to twelve hours
+# of somebody just removed still reading, still commenting, still approving.
+expect "their open session dies at once → 401" 401 "$(code_member $B/api/eu)"
+expect "and the right password no longer gets in → 401" 401 "$(mlogin "$MEMBER_PASSWORD")"
+expect "but they are still on the list"  false "$(as_owner $B/api/users | jfield users.0.enabled)"
+expect "disabling is not deleting"      "$MEMBER $OWNER" "$(emails)"
+# A missing field is not "false": read as falsy, a typo in the key would silently revoke somebody.
+expect "a body with no enabled → 400"   400 "$(code_owner -d '{}' $B/api/users/$MEMBER/enabled)"
+
+expect "giving the access back → 200"   200 "$(code_owner -d '{"enabled":true}' $B/api/users/$MEMBER/enabled)"
+expect "and the same password works again → 200" 200 "$(mlogin "$MEMBER_PASSWORD")"
+
+RESET=$(as_owner -X POST $B/api/users/$MEMBER/password)
+NEW_PASSWORD=$(echo "$RESET" | jfield password)
+expect "a reset gives back a different password" 0 "$([ -n "$NEW_PASSWORD" ] && [ "$NEW_PASSWORD" != "$MEMBER_PASSWORD" ]; echo $?)"
+# Somebody OTHER than the owner of the account has seen this one — whoever ran the reset, and
+# whatever channel carried it over. The window has to be one login long.
+expect "and it demands a change"        true "$(echo "$RESET" | jfield user.mustChangePassword)"
+expect "the old password stops working → 401" 401 "$(mlogin "$MEMBER_PASSWORD")"
+expect "the new one gets in → 200"      200 "$(mlogin "$NEW_PASSWORD")"
+expect "and it is not in the listing"   0 "$(as_owner $B/api/users | grep -Fc -e "$NEW_PASSWORD")"
+expect "nor in the log"                 0 "$(grep -Fc -e "$NEW_PASSWORD" /tmp/node-password.log)"
+rm -f $MCOOKIES
+
 expect "logout → 200"                  200 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' -X POST $B/api/sair)"
 expect "and after logging out → 401"   401 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/api/eu)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null

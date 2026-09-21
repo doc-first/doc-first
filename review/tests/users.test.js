@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { rmSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { UsersSqlite } from '../api/users-sqlite.ts';
-import { ephemeralUserStoreWarning, looksEphemeral } from '../api/users.ts';
+import { ephemeralUserStoreWarning, looksEphemeral, isEmailAddress } from '../api/users.ts';
 import { IdentidadeSenha } from '../api/identity-password.ts';
 import { RegistroSqlite } from '../api/store-sqlite.ts';
 
@@ -173,6 +173,8 @@ test('a user database written in Portuguese still opens, and the password still 
     assert.ok(person, 'the password has to keep working: it cannot be reconstructed');
     assert.equal(person.name, 'Owner');
     assert.equal(person.mustChangePassword, true, 'the first-access flag travels too');
+    assert.equal(person.enabled, true,
+      'a table written before anybody could be disabled has nobody disabled in it');
     assert.ok(await after.openSession('owner@example.org'), 'sessions work again after the move');
     await after.close();
 
@@ -180,6 +182,53 @@ test('a user database written in Portuguese still opens, and the password still 
     const checking = new DatabaseSync(path);
     assert.equal(checking.prepare('SELECT COUNT(*) c FROM pessoas').get().c, 1);
     checking.close();
+  } finally {
+    for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
+  }
+});
+
+/**
+ * The upgrade that would have locked a whole team out of their own tool.
+ *
+ * `CREATE TABLE IF NOT EXISTS` does NOTHING to a table that is already there, so a file written
+ * before the `enabled` column existed would keep its six columns, every read would come back with
+ * `enabled` undefined — falsy — and everybody would be refused at the door on the first restart
+ * after the upgrade. They would see "e-mail or password do not match" holding the right password,
+ * with nothing in the log to explain it. `ALTER TABLE ... DEFAULT 1` is what prevents that, and
+ * this test is the only thing that says so out loud.
+ */
+test('a database written before anyone could be disabled keeps letting everyone in', async () => {
+  const path = `/tmp/teste-usuarios-enabled-${process.pid}.db`;
+  for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
+  try {
+    const before = new UsersSqlite(path);
+    await before.create('old@example.org', 'Was Here Already', 'a-long-enough-password');
+    await before.close();
+
+    // Put the file back in the shape the previous release wrote: the same row, no `enabled`
+    // column anywhere. The credential has to survive the rewrite or the test proves nothing.
+    const raw = new DatabaseSync(path);
+    raw.exec(`
+      CREATE TABLE old_users (
+        email TEXT PRIMARY KEY, name TEXT NOT NULL, salt BLOB NOT NULL, hash BLOB NOT NULL,
+        must_change INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+      INSERT INTO old_users SELECT email, name, salt, hash, must_change, created_at FROM users;
+      DROP TABLE users;
+      ALTER TABLE old_users RENAME TO users;
+    `);
+    assert.ok(
+      !raw.prepare('PRAGMA table_info(users)').all().some((c) => c.name === 'enabled'),
+      'the starting point has to be a file without the column, or this proves nothing');
+    raw.close();
+
+    const upgraded = new UsersSqlite(path);
+    const columns = new DatabaseSync(path).prepare('PRAGMA table_info(users)').all();
+    assert.ok(columns.some((c) => c.name === 'enabled'), 'the column has to be added, not assumed');
+
+    assert.ok(await upgraded.check('old@example.org', 'a-long-enough-password'),
+      'somebody who could sign in yesterday signs in today: an upgrade is not a revocation');
+    assert.equal((await upgraded.find('old@example.org')).enabled, true);
+    await upgraded.close();
   } finally {
     for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
   }
@@ -218,4 +267,30 @@ test('K_SERVICE is a signal, and an empty one is no signal at all', () => {
   assert.equal(looksEphemeral({}), false);
   assert.equal(looksEphemeral({ K_SERVICE: '' }), false, 'an empty variable is evidence of nothing');
   assert.equal(looksEphemeral({ K_SERVICE: 'doc-first' }), true);
+});
+
+/**
+ * The check on the way in is deliberately shallow, and these are the cases it has to get right.
+ *
+ * It exists for one failure: somebody types a NAME into the e-mail box, an access is created that
+ * nobody can ever sign in to, and it cannot be taken back afterwards because nothing here is
+ * deleted. What it must NOT do is turn into an RFC 5322 parser — those are famous for rejecting
+ * addresses that work, and a door that refuses a real person is worse than one that admits a typo.
+ */
+test('an address is told apart from a name, without pretending to parse RFC 5322', () => {
+  assert.equal(isEmailAddress('someone@example.org'), true);
+  assert.equal(isEmailAddress('  Someone@Example.ORG  '), true, 'it is checked after trimming');
+  assert.equal(isEmailAddress('root@localhost'), true,
+    'no dot is demanded: single-label hosts are real, and this is not the place to decide what '
+    + "somebody else's network looks like");
+  assert.equal(isEmailAddress('first+tag@example.co.uk'), true);
+
+  assert.equal(isEmailAddress(''), false, 'an empty field is the commonest way to get here');
+  assert.equal(isEmailAddress('   '), false);
+  assert.equal(isEmailAddress('A Member'), false, 'the name typed into the e-mail box');
+  assert.equal(isEmailAddress('@example.org'), false, 'nothing before the @');
+  assert.equal(isEmailAddress('someone@'), false, 'nothing after it');
+  assert.equal(isEmailAddress('a@b@c'), false, 'two of them is not an address');
+  assert.equal(isEmailAddress('a'.repeat(320) + '@example.org'), false,
+    'past the longest address RFC 5321 allows it is not a typo, it is a payload');
 });

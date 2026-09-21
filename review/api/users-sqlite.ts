@@ -34,7 +34,10 @@ export class UsersSqlite extends UserStoreBase {
         salt        BLOB NOT NULL,
         hash        BLOB NOT NULL,
         must_change INTEGER NOT NULL DEFAULT 0,
-        created_at  TEXT NOT NULL
+        created_at  TEXT NOT NULL,
+        -- 1, so that whoever already exists keeps getting in. See #addEnabledColumn below for why
+        -- the other default would have been a way to lock a team out of their own tool.
+        enabled     INTEGER NOT NULL DEFAULT 1
       );
       CREATE TABLE IF NOT EXISTS sessions (
         id         TEXT PRIMARY KEY,
@@ -44,7 +47,26 @@ export class UsersSqlite extends UserStoreBase {
       );
       CREATE INDEX IF NOT EXISTS sessions_by_expiry ON sessions (expires_at);
     `);
+    this.#addEnabledColumn();
     this.#migrateFromPortuguese();
+  }
+
+  /**
+   * Adds `enabled` to a `users` table written before the column existed.
+   *
+   * `CREATE TABLE IF NOT EXISTS` above does NOTHING when the table is already there, so a database
+   * created yesterday would keep the old six columns and every read would come back with
+   * `enabled` undefined — which is falsy, which means the whole team is refused at the door on the
+   * first restart after the upgrade. The symptom would be "e-mail or password do not match" for
+   * everyone, with the right passwords in their hands, and nothing in the log saying why.
+   *
+   * `DEFAULT 1` is the migration: whoever already exists was allowed in yesterday and stays
+   * allowed in today. Being disabled is an explicit act, and an upgrade is not one.
+   */
+  #addEnabledColumn() {
+    const columns = this.#db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
+    if (columns.some((c) => c.name === 'enabled')) return;
+    this.#db.exec('ALTER TABLE users ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1');
   }
 
   /**
@@ -79,24 +101,36 @@ export class UsersSqlite extends UserStoreBase {
 
   protected async insertUser(row: StoredUser): Promise<void> {
     this.#db.prepare(
-      'INSERT INTO users (email, name, salt, hash, must_change, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(row.email, row.name, row.salt, row.hash, row.mustChangePassword ? 1 : 0, row.createdAt);
+      'INSERT INTO users (email, name, salt, hash, must_change, created_at, enabled) '
+      + 'VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(row.email, row.name, row.salt, row.hash, row.mustChangePassword ? 1 : 0, row.createdAt,
+      row.enabled ? 1 : 0);
   }
 
   protected async readUser(email: string): Promise<StoredUser | null> {
     const r = this.#db.prepare('SELECT * FROM users WHERE email = ?').get(email) as
       Record<string, string | number | Uint8Array> | undefined;
-    if (!r) return null;
-    return {
-      email: r.email as string, name: r.name as string,
-      salt: Buffer.from(r.salt as Uint8Array), hash: Buffer.from(r.hash as Uint8Array),
-      mustChangePassword: !!r.must_change, createdAt: r.created_at as string,
-    };
+    return r ? rowToUser(r) : null;
   }
 
-  protected async writeCredential(email: string, salt: Buffer, hash: Buffer): Promise<void> {
-    this.#db.prepare('UPDATE users SET salt = ?, hash = ?, must_change = 0 WHERE email = ?')
-      .run(salt, hash, email);
+  protected async readAllUsers(): Promise<StoredUser[]> {
+    const rows = this.#db.prepare('SELECT * FROM users ORDER BY email').all() as
+      Record<string, string | number | Uint8Array>[];
+    return rows.map(rowToUser);
+  }
+
+  protected async writeEnabled(email: string, enabled: boolean): Promise<void> {
+    this.#db.prepare('UPDATE users SET enabled = ? WHERE email = ?').run(enabled ? 1 : 0, email);
+  }
+
+  protected async writeName(email: string, name: string): Promise<void> {
+    this.#db.prepare('UPDATE users SET name = ? WHERE email = ?').run(name, email);
+  }
+
+  protected async writeCredential(
+    email: string, salt: Buffer, hash: Buffer, mustChange: boolean): Promise<void> {
+    this.#db.prepare('UPDATE users SET salt = ?, hash = ?, must_change = ? WHERE email = ?')
+      .run(salt, hash, mustChange ? 1 : 0, email);
   }
 
   protected async countUsers(): Promise<number> {
@@ -125,4 +159,18 @@ export class UsersSqlite extends UserStoreBase {
   async close(): Promise<void> {
     this.#db.close();
   }
+}
+
+/**
+ * One row of `users`, as the rest of the code expects it. Shared by the single read and the listing
+ * so the two can never drift — a listing that decoded `enabled` differently from the login path is
+ * a screen that shows someone as able to get in while the door says otherwise.
+ */
+function rowToUser(r: Record<string, string | number | Uint8Array>): StoredUser {
+  return {
+    email: r.email as string, name: r.name as string,
+    salt: Buffer.from(r.salt as Uint8Array), hash: Buffer.from(r.hash as Uint8Array),
+    mustChangePassword: !!r.must_change, createdAt: r.created_at as string,
+    enabled: !!r.enabled,
+  };
 }

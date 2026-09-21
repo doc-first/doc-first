@@ -10,7 +10,10 @@ import { overLimit, validCommit } from '../core/limits.js';
 import { createI18n } from '../core/i18n.js';
 import { RegistroEmMemoria, RegistroFirestore } from './store.ts';
 import { RegistroSqlite } from './store-sqlite.ts';
-import { openUserStore, ephemeralUserStoreWarning, DEFAULT_SQLITE_PATH, UserInputError } from './users.ts';
+import {
+  openUserStore, ephemeralUserStoreWarning, DEFAULT_SQLITE_PATH, UserInputError,
+  normalizeEmail, isEmailAddress, MAX_NAME_LENGTH, type UserStore,
+} from './users.ts';
 import { renderLoginPage } from './login-page.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
@@ -273,6 +276,23 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
     });
   }
 
+  // ---------------------------------------------------------------- people, and who may get in
+  //
+  // ⚠️ These routes exist ONLY with password identity, and the guard is `porSenha`. Behind an
+  // identity proxy there is no user store at all — who exists is the proxy's directory — so
+  // answering here would be inventing a second, empty source of truth for who works at the
+  // company. Without a store they fall through to the 405 at the bottom.
+  //
+  // ⚠️ The names, the fields and the error key are ENGLISH, unlike every route above. Those are
+  // published contract and stay Portuguese for as long as somebody depends on them; nothing NEW is
+  // added in Portuguese. So the body here says `error`, not `erro`.
+  //
+  // ⚠️ Who may do this comes from `papeis`, which reads REVISAO_OWNER and REVISAO_ADMINS — NOT
+  // from the user store. The two are different questions: the store answers "does this person have
+  // a way in", the configuration answers "what may they do". Putting the role in the row would
+  // create a second truth, and on the day they disagree nobody can say which one is the service.
+  if (porSenha && (await userRoutes(req, res, rota, email, porSenha.users, idioma(req)))) return;
+
   if (req.method === 'GET' && rota === '/eventos') {
     const pagina = url.searchParams.get('pagina');
     // ALL events of a request live on its own page (triage and the agent write with the request's
@@ -374,6 +394,162 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   }
 
   return json(res, 405, { erro: 'método ou rota não existe', rota });
+}
+
+/**
+ * Managing the people who may sign in. Returns true when it answered the request.
+ *
+ * Split out of `api()` because it is a self-contained subject with five routes and one rule that
+ * has to hold across all of them, and because the next thing to arrive here is a screen — the
+ * guards below are the whole contract that screen may rely on.
+ *
+ * ## What never leaves this function
+ *
+ * A generated password is returned EXACTLY ONCE, in the body of the request that generated it. It
+ * is never readable again, never in a `GET`, and never in a log line. That is not tidiness: this
+ * service writes one structured JSON line per fact, and on a hosted runtime those lines go to a
+ * collector that many more people can read than can ever sign in here. A password in a log is a
+ * password with a much wider audience than the account it opens.
+ */
+async function userRoutes(
+  req: IncomingMessage, res: ServerResponse, rota: string, email: string,
+  users: UserStore, lang: string,
+): Promise<boolean> {
+  const say = (key: string, params?: Record<string, string | number>) => i18n.t(lang, key, params);
+  /** Owner and admin, and nobody else. `isAdmin` already counts the owner as one. */
+  const manages = () => papeis.isAdmin(email);
+  const forbidden = () => (json(res, 403, { error: say('api.users.adminOnly') }), true);
+
+  // ---------------------------------------------------------------- the list
+  if (rota === '/users' && req.method === 'GET') {
+    if (!manages()) return forbidden();
+    // `list()` hands back `User` objects: no salt, no hash, and no password — the plain one was
+    // never stored anywhere, so there is nothing here that could give one back.
+    json(res, 200, { users: await users.list() });
+    return true;
+  }
+
+  // ---------------------------------------------------------------- creating an access
+  if (rota === '/users' && req.method === 'POST') {
+    if (!manages()) return forbidden();
+    const body = (await corpoJson(req)) as { email?: string; name?: string };
+    const novo = normalizeEmail(String(body.email ?? ''));
+    if (!isEmailAddress(novo)) {
+      // The bad value goes back in the message. "Invalid e-mail" next to a form with three fields
+      // is a message that makes the person guess which one, and guess what is wrong with it.
+      json(res, 400, { error: say('api.users.emailInvalid', { email: String(body.email ?? '') }) });
+      return true;
+    }
+    const nome = String(body.name ?? '').trim();
+    if (!nome) { json(res, 400, { error: say('api.name.empty') }); return true; }
+    if (nome.length > MAX_NAME_LENGTH) {
+      json(res, 400, { error: say('api.name.tooLong', { max: MAX_NAME_LENGTH }) });
+      return true;
+    }
+    // ⚠️ Checked, AND caught below. The check is what produces a message worth reading; the catch
+    // is what covers two admins creating the same address at the same moment, where the check
+    // passes twice and the database is the only thing that can still say no.
+    if (await users.find(novo)) {
+      json(res, 400, { error: say('api.users.emailTaken', { email: novo }) });
+      return true;
+    }
+    let senha: string;
+    try {
+      senha = await users.create(novo, nome);
+    } catch {
+      json(res, 400, { error: say('api.users.emailTaken', { email: novo }) });
+      return true;
+    }
+    // The password is NOT in this line, and this is the line where it would be easiest to put it.
+    log('INFO', 'user_created', { email: novo, by: email });
+    json(res, 201, { user: await users.find(novo), password: senha });
+    return true;
+  }
+
+  // ⚠️ `/users/me/name` is matched before the patterns below and cannot collide with them: `me` is
+  // not an address, and `isEmailAddress` is what every other route puts in that position.
+  if (rota === '/users/me/name' && req.method === 'POST') {
+    // No role check, on purpose: this is the one route about the caller's OWN row. Anybody who got
+    // this far has a session, and correcting the spelling of your own name is not a privilege.
+    const body = (await corpoJson(req)) as { name?: string };
+    try {
+      await users.rename(email, String(body.name ?? ''));
+    } catch (erro) {
+      const falha = UserInputError.from(erro, 'api.name.invalid');
+      json(res, 400, { error: say(falha.key, falha.params) });
+      return true;
+    }
+    log('INFO', 'user_renamed', { email });
+    json(res, 200, { user: await users.find(email) });
+    return true;
+  }
+
+  // ---------------------------------------------------------------- a new password for somebody
+  const reset = rota.match(/^\/users\/([^/]+)\/password$/);
+  if (reset && req.method === 'POST') {
+    if (!manages()) return forbidden();
+    const alvo = await found(reset[1]);
+    if (!alvo) return true;
+    const senha = await users.resetPassword(alvo);
+    // Said once, here, and nowhere else. Not in the log line below, not in any later GET.
+    log('INFO', 'user_password_reset', { email: alvo, by: email });
+    json(res, 200, { user: await users.find(alvo), password: senha });
+    return true;
+  }
+
+  // ---------------------------------------------------------------- taking the access away
+  const enabled = rota.match(/^\/users\/([^/]+)\/enabled$/);
+  if (enabled && req.method === 'POST') {
+    if (!manages()) return forbidden();
+    const body = (await corpoJson(req)) as { enabled?: unknown };
+    // A missing field is not "false". Read as falsy, a body with a typo in the key would silently
+    // revoke somebody's access, which is the most expensive way to misread a request here.
+    if (typeof body.enabled !== 'boolean') {
+      json(res, 400, { error: say('api.users.enabledMissing') });
+      return true;
+    }
+    const alvo = await found(enabled[1]);
+    if (!alvo) return true;
+
+    // ⚠️ The owner cannot be disabled, not by an admin and not by themselves. `createRoles`
+    // refuses to start with anything other than exactly one owner, so a service whose owner cannot
+    // sign in is a service where nobody can approve and nobody can hand the role to anyone else —
+    // and the fix is a restart with a different environment variable, which is not something the
+    // person locked out can do from the screen they are looking at.
+    //
+    // 409 and not 403: 403 above means "you may not do this", and this is "this may not be done".
+    // Telling the two apart is the difference between asking an admin for help and understanding
+    // that the answer is in the configuration.
+    if (!body.enabled && papeis.isOwner(alvo)) {
+      json(res, 409, { error: say('api.users.ownerCannotBeDisabled', { email: alvo }) });
+      return true;
+    }
+    await users.setEnabled(alvo, body.enabled);
+    log('INFO', 'user_enabled_changed', { email: alvo, enabled: body.enabled, by: email });
+    json(res, 200, { user: await users.find(alvo) });
+    return true;
+  }
+
+  return false;
+
+  /** The address in the path, if somebody is there. Answers 404 itself and returns null if not. */
+  async function found(segment: string): Promise<string | null> {
+    // ⚠️ `decodeURIComponent` THROWS on a half-written escape like `%zz`, and an uncaught throw
+    // here becomes a 500 with an incident id — the shape of an answer that says "the service is
+    // broken" about a request that was simply malformed. A path nobody can decode names nobody.
+    let alvo: string;
+    try {
+      alvo = normalizeEmail(decodeURIComponent(segment));
+    } catch {
+      json(res, 404, { error: say('api.users.notFound', { email: segment }) });
+      return null;
+    }
+    // ⚠️ `find` returns disabled people too, and it has to: giving an access back is a request
+    // about somebody who is, by definition, already disabled.
+    if (await users.find(alvo)) return alvo;
+    json(res, 404, { error: say('api.users.notFound', { email: alvo }) });
+    return null;
+  }
 }
 
 /** The only page served without a session. Self-contained on purpose: see review/api/login.html. */

@@ -12,11 +12,16 @@
  *   - **Postgres** runs against a real server. If Docker is not up, the tests SKIP with a message
  *     saying so. They do not pass quietly. A green test that never ran is worse than no test,
  *     because it buys confidence with nothing behind it.
- *   - **Firestore** has no emulator on this machine. Its tests are written and they SKIP. That
- *     implementation is proved by reading the code, and by nothing else.
+ *   - **Firestore** needs the emulator. Without `FIRESTORE_EMULATOR_HOST` its tests SKIP, and the
+ *     implementation is proved by reading the code and by nothing else. With it, they run for
+ *     real, against the same suite as the other two.
  *
  * To run Postgres locally:
  *   docker run -d -e POSTGRES_PASSWORD=test -p 55432:5432 postgres:16-alpine
+ *
+ * To run Firestore locally:
+ *   firebase emulators:start --only firestore --project doc-first-conformance
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8433 npm test
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -94,9 +99,10 @@ if (process.env.FIRESTORE_EMULATOR_HOST) {
 } else {
   skipped.push({
     name: 'firestore',
-    why: 'FIRESTORE_EMULATOR_HOST is not set and there is no emulator on this machine. '
-      + 'This implementation is proved by code review only — do not read this suite as evidence '
-      + 'that it works.',
+    why: 'FIRESTORE_EMULATOR_HOST is not set, so nothing ran against Firestore. This '
+      + 'implementation is proved by code review only — do not read this suite as evidence that '
+      + 'it works. Start one with: firebase emulators:start --only firestore --project '
+      + 'doc-first-conformance, then re-run with FIRESTORE_EMULATOR_HOST=127.0.0.1:8433',
   });
 }
 
@@ -261,4 +267,116 @@ forEachStore('the e-mail does not depend on case or on spacing', async (s) => {
   await s.changePassword('Someone@EXAMPLE.org', 'another-long-password');
   assert.ok(await s.check('someone@example.org', 'another-long-password'),
     'a change under a different spelling must reach the same row, not a second one');
+});
+
+// ===================================================================== management of people
+//
+// Nothing below deletes anybody, and that is the point. The event store refuses UPDATE and DELETE
+// by trigger so a review history can be trusted years later; an approval signed by somebody who was
+// removed would be a ✓ with no owner. Disabling takes the access away and keeps the history.
+
+forEachStore('list gives everyone, ordered by e-mail, and carries no secret', async (s) => {
+  assert.deepEqual(await s.list(), [], 'an empty store lists nobody');
+
+  await s.create('zoe@example.org', 'Zoe', 'a-long-enough-password');
+  await s.create('Ana@Example.ORG', 'Ana', 'a-long-enough-password');
+  await s.create('mid@example.org', 'Mid', 'a-long-enough-password');
+
+  const all = await s.list();
+  assert.deepEqual(all.map((p) => p.email), ['ana@example.org', 'mid@example.org', 'zoe@example.org'],
+    'the order is the same in every store, or the same team sees three different lists');
+  assert.deepEqual(all.map((p) => p.name), ['Ana', 'Mid', 'Zoe']);
+  // This list goes straight into an HTTP response: a secret here is a secret on the wire.
+  for (const person of all) {
+    assert.equal(person.salt, undefined, 'a listing must never carry the salt');
+    assert.equal(person.hash, undefined, 'a listing must never carry the hash');
+  }
+});
+
+forEachStore('whoever is created is able to get in, and list says so', async (s) => {
+  await s.create('x@example.org', 'X', 'a-long-enough-password');
+  assert.equal((await s.find('x@example.org')).enabled, true,
+    'being disabled is an explicit act, never a starting state');
+  assert.equal((await s.list())[0].enabled, true);
+});
+
+forEachStore('a disabled person does not get in, and is refused like a wrong password', async (s) => {
+  await s.create('gone@example.org', 'Gone', 'a-long-enough-password');
+  assert.ok(await s.check('gone@example.org', 'a-long-enough-password'));
+
+  await s.setEnabled('gone@example.org', false);
+  assert.equal(await s.check('gone@example.org', 'a-long-enough-password'), null,
+    'the right password must stop working the moment the access is taken away');
+  // The same answer as a wrong password, for the same reason: saying WHICH of the two failed
+  // confirms that this address has an account here, to somebody holding no valid password.
+  assert.equal(await s.check('gone@example.org', 'the-wrong-password'), null);
+
+  // ⚠️ Still findable. Management has to SEE whoever it disabled; making them vanish from the
+  // screen is indistinguishable from deleting them, which is the thing this design refuses.
+  const still = await s.find('gone@example.org');
+  assert.equal(still.email, 'gone@example.org', 'disabling is not deleting');
+  assert.equal(still.enabled, false);
+  assert.equal((await s.list()).length, 1, 'and they are still in the list');
+});
+
+forEachStore('disabling closes the door on a session that is already open', async (s) => {
+  await s.create('x@example.org', 'X', 'a-long-enough-password');
+  const id = await s.openSession('x@example.org');
+  assert.equal((await s.fromSession(id)).email, 'x@example.org');
+
+  await s.setEnabled('x@example.org', false);
+  // Without this, revoking an access would take effect whenever the cookie happened to expire —
+  // up to twelve hours of somebody just removed still reading, still commenting, still approving.
+  assert.equal(await s.fromSession(id), null,
+    'a revoked access has to mean the next request, or it means nothing');
+});
+
+forEachStore('an access given back works again, with the same password', async (s) => {
+  await s.create('back@example.org', 'Back', 'a-long-enough-password');
+  await s.setEnabled('back@example.org', false);
+  assert.equal(await s.check('back@example.org', 'a-long-enough-password'), null);
+
+  await s.setEnabled('back@example.org', true);
+  assert.ok(await s.check('back@example.org', 'a-long-enough-password'),
+    'disabling is reversible — the credential was never touched');
+  assert.equal((await s.find('back@example.org')).enabled, true);
+});
+
+forEachStore('setEnabled reaches the same row whatever the spelling of the e-mail', async (s) => {
+  await s.create('x@example.org', 'X', 'a-long-enough-password');
+  await s.setEnabled('  X@Example.ORG  ', false);
+  assert.equal(await s.check('x@example.org', 'a-long-enough-password'), null,
+    'a second row created by a different spelling would leave the first one still able to get in');
+});
+
+forEachStore('rename changes the name and nothing else', async (s) => {
+  const password = await s.create('x@example.org', 'Typo Here', 'a-long-enough-password');
+  await s.rename('X@EXAMPLE.org', '  Corrected Name  ');
+
+  const person = await s.find('x@example.org');
+  assert.equal(person.name, 'Corrected Name', 'the surrounding spaces are not part of a name');
+  assert.equal(person.email, 'x@example.org', 'the e-mail is the identity and does not move');
+  assert.ok(await s.check('x@example.org', password), 'a rename must not touch the credential');
+  assert.equal((await s.list())[0].name, 'Corrected Name');
+});
+
+forEachStore('a reset hands over a new password and demands it be changed', async (s) => {
+  const first = await s.create('x@example.org', 'X', 'chosen-by-the-person', false);
+  assert.equal((await s.check('x@example.org', first)).mustChangePassword, false);
+
+  const reset = await s.resetPassword('X@Example.ORG');
+  assert.notEqual(reset, first, 'a reset that handed back the same secret would reset nothing');
+  assert.ok(reset.length >= 12, 'a password nobody chose still has to be hard');
+  assert.equal(await s.check('x@example.org', first), null, 'the old password has to stop working');
+
+  // ⚠️ The change is demanded because somebody OTHER than the owner of the account has seen this
+  // password — whoever ran the reset, and whatever channel carried it over.
+  assert.equal((await s.check('x@example.org', reset)).mustChangePassword, true);
+});
+
+forEachStore('an empty name is refused, and the old one survives the refusal', async (s) => {
+  await s.create('x@example.org', 'Real Name', 'a-long-enough-password');
+  await assert.rejects(() => s.rename('x@example.org', '   '), /name cannot be empty/);
+  assert.equal((await s.find('x@example.org')).name, 'Real Name',
+    'a refused rename must not have half-written the blank');
 });

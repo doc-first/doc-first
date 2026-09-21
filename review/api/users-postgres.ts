@@ -63,8 +63,19 @@ export class UsersPostgres extends UserStoreBase {
         salt        BYTEA NOT NULL,
         hash        BYTEA NOT NULL,
         must_change BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at  TEXT NOT NULL
+        created_at  TEXT NOT NULL,
+        enabled     BOOLEAN NOT NULL DEFAULT TRUE
       )`);
+    // ⚠️ `CREATE TABLE IF NOT EXISTS` does nothing to a table that is already there, so a database
+    // written before this column existed would keep the old six columns, every read would come
+    // back with `enabled` undefined — falsy — and the whole team would be refused at the door on
+    // the first restart after the upgrade. They would see "e-mail or password do not match"
+    // holding the right passwords, with nothing in the log explaining it.
+    //
+    // `DEFAULT TRUE` is the migration: whoever was allowed in yesterday stays allowed in today.
+    // Being disabled is an explicit act, and an upgrade is not one.
+    await pool.query(
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         id         TEXT PRIMARY KEY,
@@ -85,24 +96,36 @@ export class UsersPostgres extends UserStoreBase {
 
   protected async insertUser(row: StoredUser): Promise<void> {
     await this.#query(
-      'INSERT INTO users (email, name, salt, hash, must_change, created_at) VALUES ($1, $2, $3, $4, $5, $6)',
-      [row.email, row.name, row.salt, row.hash, row.mustChangePassword, row.createdAt]);
+      'INSERT INTO users (email, name, salt, hash, must_change, created_at, enabled) '
+      + 'VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [row.email, row.name, row.salt, row.hash, row.mustChangePassword, row.createdAt, row.enabled]);
   }
 
   protected async readUser(email: string): Promise<StoredUser | null> {
     const [r] = await this.#query('SELECT * FROM users WHERE email = $1', [email]);
-    if (!r) return null;
-    return {
-      email: r.email as string, name: r.name as string,
-      salt: Buffer.from(r.salt as Uint8Array), hash: Buffer.from(r.hash as Uint8Array),
-      mustChangePassword: !!r.must_change, createdAt: r.created_at as string,
-    };
+    return r ? rowToUser(r) : null;
   }
 
-  protected async writeCredential(email: string, salt: Buffer, hash: Buffer): Promise<void> {
+  protected async readAllUsers(): Promise<StoredUser[]> {
+    // ⚠️ `ORDER BY email` and not the database's own idea of order: Postgres sorts by the server's
+    // collation, which differs between installations, so the ordering has to be asked for out
+    // loud or the same team gets a different list depending on where the service was deployed.
+    return (await this.#query('SELECT * FROM users ORDER BY email')).map(rowToUser);
+  }
+
+  protected async writeEnabled(email: string, enabled: boolean): Promise<void> {
+    await this.#query('UPDATE users SET enabled = $1 WHERE email = $2', [enabled, email]);
+  }
+
+  protected async writeName(email: string, name: string): Promise<void> {
+    await this.#query('UPDATE users SET name = $1 WHERE email = $2', [name, email]);
+  }
+
+  protected async writeCredential(
+    email: string, salt: Buffer, hash: Buffer, mustChange: boolean): Promise<void> {
     await this.#query(
-      'UPDATE users SET salt = $1, hash = $2, must_change = FALSE WHERE email = $3',
-      [salt, hash, email]);
+      'UPDATE users SET salt = $1, hash = $2, must_change = $3 WHERE email = $4',
+      [salt, hash, mustChange, email]);
   }
 
   protected async countUsers(): Promise<number> {
@@ -138,4 +161,18 @@ export class UsersPostgres extends UserStoreBase {
     const pool = this.#pool ?? await this.#ready.catch(() => null);
     await pool?.end();
   }
+}
+
+/**
+ * One row of `users`, as the rest of the code expects it. Shared by the single read and the listing
+ * so the two can never drift — a listing that decoded `enabled` differently from the login path is
+ * a screen that shows someone as able to get in while the door says otherwise.
+ */
+function rowToUser(r: Record<string, unknown>): StoredUser {
+  return {
+    email: r.email as string, name: r.name as string,
+    salt: Buffer.from(r.salt as Uint8Array), hash: Buffer.from(r.hash as Uint8Array),
+    mustChangePassword: !!r.must_change, createdAt: r.created_at as string,
+    enabled: !!r.enabled,
+  };
 }
