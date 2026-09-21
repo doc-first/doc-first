@@ -182,7 +182,7 @@ if (comoEntrar === 'senha') {
 // ---------------------------------------------------------------- utilidades
 const json = (res: ServerResponse, codigo: number, corpo: unknown) => {
   const texto = JSON.stringify(corpo);
-  res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8' });
+  res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
   res.end(texto);
 };
 
@@ -397,6 +397,27 @@ async function estatico(url: URL, res: ServerResponse) {
   }
 }
 
+/**
+ * Headers that cost nothing and close two doors.
+ *
+ * They mattered little while an identity proxy stood in front — nobody reached a page without
+ * being let in first. The moment the service answers on the open internet with only a password,
+ * they stop being hygiene and start being the defence:
+ *
+ *   frame-ancestors 'none'   nobody can put the login screen, or the panel, inside an <iframe>.
+ *                            Without it, a hostile page can overlay an invisible "Approve" button
+ *                            on top of a real one — and an approval here is a lock in a repository.
+ *   nosniff                  the browser respects the content-type instead of guessing it. A file
+ *                            served as text does not get executed because it happened to look like
+ *                            a script.
+ *   referrer-policy          the address of an internal page does not leak to whatever is clicked.
+ */
+const SECURITY_HEADERS = {
+  'content-security-policy': "frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'same-origin',
+};
+
 /** Serves a file from disk. Used both by the site and by the engine's own files. */
 async function servirArquivo(alvo: string, res: ServerResponse, urlPath = '') {
   const ext = extname(alvo).toLowerCase();
@@ -408,6 +429,7 @@ async function servirArquivo(alvo: string, res: ServerResponse, urlPath = '') {
     'content-type': TIPOS_MIME[ext] ?? 'application/octet-stream',
     'cache-control': cache,
     'x-robots-tag': 'noindex, nofollow',
+    ...SECURITY_HEADERS,
   });
   res.end(await readFile(alvo));
 }

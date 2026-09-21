@@ -33,9 +33,66 @@ export class IdentidadeSenha {
     return this.#users.create(email, nome);
   }
 
+  /**
+   * Failed attempts per e-mail, and when the wait ends.
+   *
+   * ⚠️ In memory on purpose, and that is a real limitation worth knowing: with more than one
+   * instance, each counts on its own, and restarting forgets everything. It still raises the cost
+   * of an online brute force by orders of magnitude, and putting it in the store would mean a write
+   * on every wrong password — which is a denial of service someone can trigger for free.
+   * The real fix is a shared cache, and it is not worth the dependency today.
+   */
+  #failures = new Map<string, { count: number; freeAt: number }>();
+
+  /**
+   * How long the wait is after N failures. Free up to the fifth, then doubling, capped at 15
+   * minutes.
+   *
+   * Five free because that is the range of a person mistyping, and a tool that punishes typing is
+   * a tool people route around. The cap exists because a wait long enough to be indistinguishable
+   * from "the account is gone" stops protecting anything and starts costing support.
+   */
+  #waitAfter(count: number): number {
+    if (count <= 5) return 0;
+    return Math.min(2 ** (count - 6) * 5_000, 15 * 60_000);
+  }
+
+  /**
+   * How long this e-mail still has to wait, in seconds. Zero means it may try.
+   *
+   * The count is per e-mail and NOT per IP: behind a proxy every request shares one address, and
+   * locking by IP would let one person lock out an entire office.
+   */
+  remainingWait(email: string): number {
+    const f = this.#failures.get(email.trim().toLowerCase());
+    if (!f) return 0;
+    return Math.max(0, Math.ceil((f.freeAt - Date.now()) / 1000));
+  }
+
   async entrar(email: string, senha: string): Promise<{ pessoa: User; sessao: string } | null> {
+    const key = email.trim().toLowerCase();
+    const locked = this.remainingWait(key) > 0;
+
+    // ⚠️ An attempt made DURING the wait still counts. Without this the wait never escalates:
+    // whoever is guessing simply pauses five seconds between bursts and keeps going forever, and
+    // the doubling above would be decoration. It also means an impatient person who keeps hammering
+    // makes their own wait longer — which is the right trade, because the alternative is no
+    // protection at all.
+    // Checked even while locked, and the cost is the point: answering a locked attempt instantly
+    // while a real one takes 50ms of scrypt would tell whoever is guessing exactly when the wait
+    // is on, which is half of what they wanted to learn.
     const pessoa = await this.#users.check(email, senha);
-    if (!pessoa) return null;
+
+    if (locked || !pessoa) {
+      const f = this.#failures.get(key) ?? { count: 0, freeAt: 0 };
+      f.count++;
+      f.freeAt = Date.now() + this.#waitAfter(f.count);
+      this.#failures.set(key, f);
+      return null;
+    }
+    // Only a successful login clears it. Clearing on any attempt would let an attacker reset the
+    // counter by interleaving a login they know to be valid.
+    this.#failures.delete(key);
     return { pessoa, sessao: await this.#users.openSession(pessoa.email) };
   }
 
