@@ -5,7 +5,7 @@
     {
       "name": "doc-first",
       "source": "./plugins/doc-first",
-      "description": "A metodologia Doc First: documentação revisável, com aprovação amarrada ao texto e rastro que não se apaga."
+      "description": "The Doc First methodology: reviewable documentation, with approval tied to the text and a trail that never gets erased."
     }
   ]
 }

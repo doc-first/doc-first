@@ -1,71 +1,78 @@
 ---
 name: doc-first
-description: A metodologia Doc First — documentação revisável com aprovação rastreável. Use ao retomar o trabalho na documentação, ao aplicar um pedido de revisor, ao sincronizar as aprovações do site, ou quando alguém perguntar como o método funciona. Também ao começar a documentar um produto novo com este método.
+description: The Doc First methodology — reviewable documentation with traceable approval. Use it when resuming work on the documentation, when applying a reviewer's request, when syncing approvals from the site, or when someone asks how the method works. Also when starting to document a new product with this method.
 ---
 
-# Doc First — documentação que é revisada, não só escrita
+# Doc First — documentation that is reviewed, not just written
 
-Este arquivo vem **dentro do repositório**. Quem clonar o projeto recebe o método, a ferramenta e o
-agente juntos — antes, a skill morava fora e o método chegava sem o agente que o executa.
+This file lives **inside the repository**. Whoever clones the project gets the method, the tool
+and the agent together — before, the skill lived outside and the method arrived without the agent
+that runs it.
 
-## O que o método é, em cinco linhas
+## What the method is, in five lines
 
-A documentação é escrita **antes** do código e revisada por quem entende do assunto, não por quem
-programa. Cada trecho tem um código estável e uma **digital do texto**: a aprovação vale para aquele
-texto, e cai sozinha se o texto mudar. Os revisores **pedem alteração** no site; **só o agente
-altera**, com análise de impacto e commit rastreável. O git é a fonte do conteúdo; o site nunca edita.
+Documentation is written **before** the code, and reviewed by whoever understands the subject, not
+whoever programs. Every block has a stable code and a **fingerprint of the text**: the approval is
+for that text, and drops on its own if the text changes. Reviewers **ask for a change** on the
+site; **only the agent makes the change**, with impact analysis and a traceable commit. Git is the
+source of the content; the site never edits it.
 
-## Ao retomar o trabalho — faça nesta ordem
+## When resuming work — do it in this order
 
 ```bash
-node review/cli/doc-first.ts sincronizar   # traz os ✓ que o dono deu no site
-node review/cli/doc-first.ts listar        # pedidos aprovados, a aplicar
-node review/cli/doc-first.ts conferir      # nada validado mudou sem permissão?
+node review/cli/doc-first.ts sincronizar   # brings in the ✓ the owner gave on the site
+node review/cli/doc-first.ts listar        # approved requests, ready to apply
+node review/cli/doc-first.ts conferir      # did anything validated change without permission?
 ```
 
-Diga ao dono, em poucas linhas: quantos trechos novos foram validados, quantos pedidos há para
-aplicar e de quem. **Nunca proponha validar trecho por trecho no chat** — a validação acontece no site.
+Tell the owner, in a few lines: how many new blocks were validated, how many requests are ready to
+apply, and from whom. **Never offer to validate block by block in chat** — validation happens on
+the site.
 
-## Ao aplicar um pedido
+## When applying a request
 
-1. `doc-first ver <id>` — o que foi pedido, o texto de então e o de agora, e a conversa.
-2. `doc-first estado <id> analise "Recebido…"` — o revisor vê o andamento no painel.
-3. `doc-first impacto <id> --termo "…"` — **onde mais o assunto aparece**. Nunca altere sem isto:
-   o comando marca quais trechos estão **validados**, e esses exigem permissão do dono para mudar.
-4. Pergunte o que for ambíguo. Um pedido mal entendido vira dois pedidos.
-5. Aplique, com commit contendo os trailers `Pedido: <id>` e `Solicitado-por: <e-mail>`.
-6. `doc-first estado <id> aplicado "Feito" --commit <sha> --trechos D01.1.4,D02.3.1`
-7. Registre a lição em `docs/LICOES-DE-REVISAO.md` se a correção ensinar alguma regra.
+1. `doc-first ver <id>` — what was asked, the text then and now, and the conversation.
+2. `doc-first estado <id> analise "Received…"` — the reviewer sees the progress in the panel.
+3. `doc-first impacto <id> --termo "…"` — **everywhere else the subject shows up**. Never change
+   anything without this: the command marks which blocks are **validated**, and those need the
+   owner's permission to change.
+4. Ask about anything ambiguous. A misunderstood request turns into two requests.
+5. Apply it, with a commit that carries the trailers `Pedido: <id>` and `Solicitado-por: <e-mail>`.
+6. `doc-first estado <id> aplicado "Done" --commit <sha> --trechos D01.1.4,D02.3.1`
+7. Add the lesson to the Traps section below, if the fix teaches a rule that is not written yet.
 
-## As regras que não se negociam
+## The rules that are not up for negotiation
 
-1. **O git é a fonte.** Nada altera conteúdo fora de commit. O site só lê e registra eventos.
-2. **Os eventos não se apagam.** Aprovou, pediu, comentou, recusou — cada um com quem, quando, onde
-   e a digital do texto naquele instante.
-3. **A aprovação vale para um texto, não para um trecho.** Mudou o texto, a aprovação cai sozinha.
-4. **Só owner e admin aprovam.** O ✓ deles vira trava no repositório e manda o agente aplicar.
-   Revisor pede alteração, comenta e responde decisão.
-5. **Pedido de quem pode aprovar nasce aprovado.** Ninguém tria a si mesmo.
-6. **Impacto antes de alterar.** O agente nunca aplica um pedido sem procurar onde mais ele toca.
-7. **Nada está aprovado até estar validado.** Escreva sempre como proposta.
+1. **Git is the source.** Nothing changes content outside a commit. The site only reads and
+   records events.
+2. **Events are never erased.** Approved, asked, commented, rejected — each one with who, when,
+   where, and the fingerprint of the text at that instant.
+3. **An approval is for a text, not for a block.** Change the text and the approval drops on its
+   own.
+4. **Only owner and admin approve.** Their ✓ becomes a lock in the repository and tells the agent
+   to apply it. A reviewer asks for a change, comments, and answers decisions.
+5. **A request from whoever can approve is born approved.** Nobody triages themselves.
+6. **Impact before change.** The agent never applies a request without looking at everywhere else
+   it touches.
+7. **Nothing is approved until it is validated.** Always write it as a proposal.
 
-## Onde as coisas estão
+## Where things are
 
-| O quê | Onde |
+| What | Where |
 |---|---|
-| A regra do ciclo (estados, transições) | `review/cycle.json` — dado, não código |
-| Núcleo compartilhado (digital, ciclo, papéis, limites) | `review/core/` — roda no navegador **e** no servidor |
-| API e site | `review/api/` (TypeScript, sem build) |
-| Ferramenta do agente | `review/cli/doc-first.ts` |
-| O método por escrito | `docs/METHOD.md` |
-| Dívida conhecida | `docs/DIVIDA-TECNICA.md` |
+| The rules of the cycle (states, transitions) | `review/cycle.json` — data, not code |
+| Shared core (fingerprint, cycle, roles, limits) | `review/core/` — runs in the browser **and** on the server |
+| API and site | `review/api/` (TypeScript, no build step) |
+| The agent's tool | `review/cli/doc-first.ts` |
+| The method, in writing | `docs/METHOD.md` |
+| Known gaps | `docs/METHOD.md`, section "Not built yet" |
 
-## Armadilhas que já custaram caro aqui
+## Traps that have already cost us here
 
-- **Porta ocupada = binário velho.** Se `rodar-local.sh` recusar subir, mate o processo antes. Testar
-  o código antigo sem perceber já quase fez desfazer uma correção que estava certa.
-- **`element.focus()` não ativa `:focus-visible`.** Foco se testa com Tab.
-- **Teste que passa por motivo errado.** Uma asserção que fazia `grep` na saída acusava falha com
-  tudo passando. Prefira código de saída a texto.
-- **Aprovação forjada.** Um `data-validado` escrito à mão criava aprovação do nada; hoje `conferir`
-  pega, mas a lição fica: a trava tem de olhar os dois lados.
+- **Port already in use = stale binary.** If `review/run-local.sh` refuses to start, kill the
+  process first. Testing the old code without noticing once nearly undid a fix that was correct.
+- **`element.focus()` does not trigger `:focus-visible`.** Test focus with Tab.
+- **A test that passes for the wrong reason.** An assertion that ran `grep` on the output reported
+  failure while everything passed. Prefer an exit code to text.
+- **A forged approval.** A hand-written `data-validado` created an approval out of nothing; today
+  `conferir` catches it, but the lesson stays: the lock has to look at both sides.
