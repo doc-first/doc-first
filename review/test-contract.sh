@@ -112,7 +112,11 @@ kill $PID 2>/dev/null; wait $PID 2>/dev/null
 echo "comes up with no cloud at all (username, password and a single file):"
 # This is the path for whoever downloads the image: no Google variable, no project, no IAP.
 DATA_DIR=$(mktemp -d); COOKIES=/tmp/cookies-contract.txt; rm -f $COOKIES
-REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_IDENTIDADE=senha REVISAO_BANCO=sqlite \
+# ADMIN exists so the guards can be told apart: a MEMBER is refused because they manage nobody,
+# an ADMIN is allowed to manage and still refused on the owner. Testing only with a member would
+# leave the escalation path — admin resets the owner, signs in as the owner — completely uncovered.
+ADMIN=admin@example.org
+REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_ADMINS=$ADMIN REVISAO_IDENTIDADE=senha REVISAO_BANCO=sqlite \
   REVISAO_PESSOAS=$DATA_DIR/people.db REVISAO_SQLITE=$DATA_DIR/events.db PORT=$PORT \
   REVISAO_SITE="$PWD/examples/ola-mundo" \
   node review/api/server.ts >/tmp/node-password.log 2>&1 & PID=$!
@@ -168,6 +172,10 @@ code_owner()  { as_owner  -o /dev/null -w '%{http_code}' "$@"; }
 code_member() { as_member -o /dev/null -w '%{http_code}' "$@"; }
 emails() { as_owner $B/api/users | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).users.map(u=>u.email).join(' ')))"; }
 mlogin() { curl -s -c $MCOOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$MEMBER\",\"senha\":\"$1\"}" $B/api/entrar; }
+ACOOKIES=/tmp/cookies-admin.txt; rm -f $ACOOKIES
+as_admin()   { curl -s -b $ACOOKIES -H 'Content-Type: application/json' "$@"; }
+code_admin() { as_admin -o /dev/null -w '%{http_code}' "$@"; }
+alogin() { curl -s -c $ACOOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$ADMIN\",\"senha\":\"$1\"}" $B/api/entrar; }
 
 expect "the owner sees the list → 200"  200 "$(code_owner $B/api/users)"
 expect "and is in it"                   "$OWNER" "$(as_owner $B/api/users | jfield users.0.email)"
@@ -223,13 +231,25 @@ expect "the owner cannot be disabled → 409" 409 "$(code_owner -d '{"enabled":f
 expect "and the message says how to hand it over" 0 "$(as_owner -d '{"enabled":false}' $B/api/users/$OWNER/enabled | grep -q 'REVISAO_OWNER'; echo $?)"
 expect "and the owner is still in"      200 "$(code_owner $B/api/eu)"
 
+# ⚠️ Nobody resets the OWNER's password but the owner. Without this an admin resets it, reads the
+# new password from the response, signs in as the owner — and from then on every ✓ is signed with
+# the owner's e-mail. The audit trail becomes a lie, with nothing in the record to show it.
+APASS=$(as_owner -d "{\"email\":\"$ADMIN\",\"name\":\"An Admin\"}" $B/api/users | jfield password)
+expect "the admin signs in → 200"       200 "$(alogin "$APASS")"
+expect "an admin manages people → 200"  200 "$(code_admin $B/api/users)"
+expect "an admin cannot reset the owner → 409" 409 "$(code_admin -X POST $B/api/users/$OWNER/password)"
+expect "the owner still can, on themselves" 200 "$(code_owner -X POST $B/api/users/$OWNER/password)"
+
 expect "disabling somebody → 200"       200 "$(code_owner -d '{"enabled":false}' $B/api/users/$MEMBER/enabled)"
 # Without this the revocation would land whenever the cookie happened to expire: up to twelve hours
 # of somebody just removed still reading, still commenting, still approving.
 expect "their open session dies at once → 401" 401 "$(code_member $B/api/eu)"
 expect "and the right password no longer gets in → 401" 401 "$(mlogin "$MEMBER_PASSWORD")"
-expect "but they are still on the list"  false "$(as_owner $B/api/users | jfield users.0.enabled)"
-expect "disabling is not deleting"      "$MEMBER $OWNER" "$(emails)"
+# ⚠️ Reads the member BY E-MAIL, not by position. The list is ordered by e-mail, so `users.0` was
+# the member until an admin joined the fixture and took the first slot — a test that silently
+# changes what it asserts when somebody adds a row is worse than no test.
+expect "but they are still on the list"  false "$(as_owner $B/api/users | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const u=JSON.parse(s).users.find(u=>u.email===process.argv[1]);console.log(u?u.enabled:'not listed')})" "$MEMBER")"
+expect "disabling is not deleting"      "$ADMIN $MEMBER $OWNER" "$(emails)"
 # A missing field is not "false": read as falsy, a typo in the key would silently revoke somebody.
 expect "a body with no enabled → 400"   400 "$(code_owner -d '{}' $B/api/users/$MEMBER/enabled)"
 

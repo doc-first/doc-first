@@ -490,6 +490,19 @@ async function userRoutes(
     if (!manages()) return forbidden();
     const alvo = await found(reset[1]);
     if (!alvo) return true;
+    // ⚠️ Nobody resets the OWNER's password but the owner. Without this an admin resets it, reads
+    // the new password from this very response, signs in as the owner — and from then on every ✓
+    // is signed with the owner's e-mail. In a method whose whole claim is "who approved this, and
+    // when", that is not privilege escalation in the abstract: it is the audit trail becoming a
+    // lie, with nothing in the record to show it happened.
+    //
+    // An owner who loses the password recovers it the way the invariant implies: whoever operates
+    // the service removes the account and restarts, and the first-access password is generated
+    // again. That is an operations act, on purpose — being the owner is configuration, not a
+    // button someone else can press.
+    if (papeis.roleOf(alvo) === 'owner' && alvo !== email) {
+      return json(res, 409, { error: i18n.t(idioma(req), 'api.users.ownerPasswordIsOwnTo') }), true;
+    }
     const senha = await users.resetPassword(alvo);
     // Said once, here, and nowhere else. Not in the log line below, not in any later GET.
     log('INFO', 'user_password_reset', { email: alvo, by: email });
