@@ -22,6 +22,11 @@ export interface Trecho {
   depende: string[];
   /** The content kind: title, box, diagram, decision… (review/core/kinds.js). */
   tipo: string;
+  /** The test that defends a `rule`, written as `path/to/file.test.js::name of the test`
+   *  (`data-prova`). `null` when the block declares none — which, for a `rule`, the kind already
+   *  reports through `falta`. It is read out here because the attribute is a POINTER: unlike every
+   *  other demand, satisfying it is not something the block alone can prove. */
+  prova: string | null;
   /** What this kind demands and the block does not have. Empty means ready for approval. */
   falta: string[];
   cod: string;
@@ -83,6 +88,7 @@ export async function lerTrechos(raiz: string): Promise<Map<string, Trecho>> {
       mapa.set(id, {
         id, pagina: id.split('.')[0], caminho, cod,
         tipo, falta: whatIsMissing(tipo, contexto),
+        prova: el.getAttribute('data-prova'),
         arquivo: nomeCurto(raiz, caminho),
         texto: texto.replace(/\s+/g, ' ').trim(),
         digital: await fingerprintOfText(texto),

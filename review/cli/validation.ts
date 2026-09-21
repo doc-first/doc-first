@@ -41,7 +41,10 @@ export function salvar(raiz: string, reg: Registro) {
   writeFileSync(caminhoRegistro(raiz), JSON.stringify(ordenado, null, 1) + '\n', 'utf8');
 }
 
-/** Flags what changed after being validated, and what is marked without a registry entry. */
+/**
+ * Flags what changed after being validated, what is marked without a registry entry, and what
+ * claims a proof that is no longer on disk.
+ */
 export async function conferir(raiz: string): Promise<number> {
   const reg = carregar(raiz);
   const trechos = await lerTrechos(raiz);
@@ -57,8 +60,55 @@ export async function conferir(raiz: string): Promise<number> {
     }
   }
   problemas += await orfaos(raiz, reg);
+  problemas += missingProofs(raiz, trechos);
   console.log(`${Object.keys(reg).length} validados · ${problemas ? `${problemas} problema(s)` : 'tudo intacto'}`);
   return problemas;
+}
+
+/**
+ * A `data-prova` pointing at a file that is not there.
+ *
+ * Why this is an issue and not a shrug: `data-prova` is the one attribute in the whole catalogue
+ * that points OUTSIDE the documentation. Every other demand — an `alt`, a `<th>`, an owner, a
+ * deadline — is satisfied by something the block carries, so the block alone can be trusted to
+ * answer for it. This one names a file in the code, and files move, get renamed and get deleted by
+ * people who never open the documentation. The attribute survives all three, and a rule whose
+ * proof was deleted still LOOKS defended: the kind is `rule`, the demand is satisfied, the page
+ * shows nothing amiss. A stale path silently proves nothing, and silence is exactly the failure
+ * this engine exists to remove.
+ *
+ * The value is read as `path/to/file.test.js::name of the test`. Only the PATH is checked here.
+ * The name after `::` is informative for now — confirming that a test by that name exists inside
+ * the file means running or parsing a test runner, which is a different tool with a different
+ * failure mode, and a check that half-works is worse than one that says what it covers.
+ *
+ * ⚠️ The path is relative to the CONTENT project root — the folder holding `doc-first.json` — not
+ * to wherever the CLI was invoked from, and not to the page's own file. Anything else would make
+ * the same attribute mean different things depending on which directory somebody was standing in.
+ * A project whose tests live outside that root cannot be pointed at from here, and should say so
+ * out loud rather than have this check quietly guess a second base directory.
+ *
+ * ⚠️ It does NOT answer the other half of the question — "the rule changed and its proof did not".
+ * That one needs to compare two commits, and the git-diff layer does not exist yet. See
+ * `docs/BUGS.md`, "The bridge to the code".
+ */
+export function missingProofs(raiz: string, trechos: Map<string, Trecho>): number {
+  let achados = 0;
+  for (const [id, t] of [...trechos].sort(([a], [b]) => a.localeCompare(b))) {
+    if (t.prova === null) continue;
+    const caminho = t.prova.split('::')[0].trim();
+    if (!caminho) {
+      console.log(`  ✗ ${id}: data-prova names no file — write it as `
+        + `path/to/file.test.js::name of the test`);
+      achados++;
+      continue;
+    }
+    if (existsSync(join(raiz, ...caminho.split('/')))) continue;
+    console.log(`  ✗ ${id}: data-prova points at ${caminho}, and there is no such file — `
+      + `point it at the test that defends this rule, or the rule is not defended`);
+    achados++;
+  }
+  return achados;
 }
 
 /**

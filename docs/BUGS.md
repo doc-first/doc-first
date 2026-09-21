@@ -91,6 +91,28 @@ knows which test defends it**. It is also the easiest to get wrong — a stale p
 nothing. The path has to be checked for existence on every index, and a `data-prova` pointing at a
 file that is gone is an issue, not a shrug.
 
+### What `check` does today, and what it still does not
+
+`doc-first check` reads every `data-prova` and accuses the path that is **not on disk**
+(`missingProofs`, in `review/cli/validation.ts`). The value is read as `path::name of the test`;
+only the path is checked, relative to the **content project root** — the folder holding
+`doc-first.json`. The name after `::` is carried along and ignored: confirming a test by that name
+exists inside the file means running or parsing a test runner, which is a different tool.
+
+The other half — *the rule changed substantively in this commit range and its proof did not* — is
+**not built**, and this section should not be read as if it were. It needs to compare two commits,
+and there is no git-diff layer yet: `review/core/git.js` answers `currentCommit`, and `9ab9f68`
+only stored that commit on the index. Until that layer exists, a proof that is still on disk but
+has not been touched since the rule was rewritten passes silently. That is why the row below stays
+🟨 and not ✅.
+
+⚠️ Known and deliberately not decided here: `examples/gabarito` points a rule at
+`review/tests/cli.test.js`, a file of THIS repository, which does not exist under the template's
+own root. Running `check` inside the template reports it. Either the template's proof moves to
+something inside the template, or a project whose tests live outside its content root needs a way
+to say where its code root is — and inventing a second base directory inside this check would make
+the same attribute mean two things depending on where you stand.
+
 ## Where it plugs in
 
 | Needed | Status |
@@ -101,5 +123,5 @@ file that is gone is an issue, not a shrug.
 | the three outcomes as triage results, instead of approve/reject | ⬜ |
 | `rule` as a fifteenth kind | ✅ exists |
 | `entails` on the kind | ✅ exists |
-| `data-prova`, and the check that the proof moved too | 🟨 half: the kind demands it, nobody checks the proof moved |
+| `data-prova`, and the check that the proof moved too | 🟨 half: the kind demands it and `check` accuses a path that is gone; nobody checks the proof **moved** — that needs the git-diff layer |
 | a report that lands on **no** block — the hole case | ⬜ the hard one: it needs a subject before it has a home |

@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lerTrechos, arquivosDeFolhas } from '../cli/pages.ts';
-import { orfaos, carregar } from '../cli/validation.ts';
+import { orfaos, carregar, missingProofs } from '../cli/validation.ts';
 
 const RAIZ = new URL('../../', import.meta.url).pathname;
 const EXEMPLO = join(RAIZ, 'examples', 'ola-mundo');
@@ -70,6 +70,51 @@ test('conferir catches a forged approval', async () => {
 
     writeFileSync(folha, '<main><div data-validado="2026-09-18">x</div></main>');
     assert.equal(await orfaos(tmp, reg, [folha]), 1, 'a mark with no data-id gets caught');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The rule's proof is the only demand satisfied by something OUTSIDE the documentation, so it is
+ * the only one that can stop being true without anybody touching the page. Deleting a test is the
+ * ordinary way it happens, and the block goes on looking defended.
+ */
+test('check catches a data-prova whose file is gone', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'docfirst-prova-'));
+  try {
+    mkdirSync(join(tmp, 'p'));
+    mkdirSync(join(tmp, 'tests'));
+    writeFileSync(join(tmp, 'doc-first.json'),
+      JSON.stringify({ owner: 'x@y.org', conteudo: { pastas: ['p'], registro: 'r.json' } }));
+    const prova = join(tmp, 'tests', 'deadline.test.js');
+    writeFileSync(prova, '// the test that defends the rule\n');
+
+    const folha = join(tmp, 'p', 'X01.html');
+    const rule = (caminho) => '<main><div data-id="X01.1.1" data-cod="1.1" data-tipo="rule"'
+      + ` data-prova="${caminho}">an answer is owed within 24 hours</div></main>`;
+
+    writeFileSync(folha, rule('tests/deadline.test.js::responds within 24h'));
+    const comProva = await lerTrechos(tmp);
+    assert.deepEqual(comProva.get('X01.1.1').falta, [], 'the kind is satisfied: the attribute is there');
+    assert.equal(missingProofs(tmp, comProva), 0, 'a proof that is on disk is not accused');
+
+    rmSync(prova);
+    assert.equal(missingProofs(tmp, await lerTrechos(tmp)), 1,
+      'delete the test and the rule stops being defended — that is the whole point of the check');
+
+    // The `::` and everything after it are informative for now, so a path with no test name is
+    // still a path that has to exist.
+    writeFileSync(folha, rule('tests/nowhere.test.js'));
+    assert.equal(missingProofs(tmp, await lerTrechos(tmp)), 1, 'no `::` does not mean no check');
+
+    writeFileSync(folha, rule('::responds within 24h'));
+    assert.equal(missingProofs(tmp, await lerTrechos(tmp)), 1, 'a test name with no file is not a proof');
+
+    // Blocks that declare nothing are none of this check's business: a `rule` with no `data-prova`
+    // is already reported by the kind, and any other kind never had a proof to lose.
+    writeFileSync(folha, '<main><div data-id="X01.1.1" data-cod="1.1">plain text</div></main>');
+    assert.equal(missingProofs(tmp, await lerTrechos(tmp)), 0, 'no data-prova, nothing to check');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

@@ -37,6 +37,7 @@ person who joins the project.
 | **validation** | a human ✓ tied to **one fingerprint**, not to a block. Change one letter and the approval stops holding, because nobody approved the new text |
 | **lock** | the consequence of that ✓ in the repository. Only the owner's ✓ locks; a reviewer's approval is recorded but does not lock |
 | **dependency** | block B stands on block A. Declared by hand today, in `data-depende` |
+| **proof** | the test that defends a `rule`. Declared in `data-prova`, as `path/to/file.test.js::name of the test`, with the path relative to the content project root. It is the only demand satisfied by something OUTSIDE the documentation, so it is the only one that stops being true without anybody touching the page — `doc-first check` accuses a path that is gone (`missingProofs`) |
 
 The fingerprint existed three times, in three languages, until `2026-09-18`, and the three agreed
 only by luck — one of them did not strip the review UI, so merely saving a marker into the HTML

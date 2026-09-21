@@ -31,7 +31,8 @@ doc-first — the agent's tool for the Doc First method
 
   The validation lock (the human ✓)
     sync                        pulls in the ✓ the owner gave on the site
-    check                       a validated block that changed, and a ✓ with no trail
+    check                       a validated block that changed, a ✓ with no trail, and a
+                                  data-prova pointing at a file that is not on disk
     index                       rebuilds the index: kinds, dependencies, what is missing
     kinds                       the catalogue of content kinds
     lights                      the state of the whole documentation: 🟢 🟡 🔴 ⚪
