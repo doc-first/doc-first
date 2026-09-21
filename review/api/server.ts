@@ -15,6 +15,7 @@ import {
   normalizeEmail, isEmailAddress, MAX_NAME_LENGTH, type UserStore,
 } from './users.ts';
 import { renderLoginPage } from './login-page.ts';
+import { LANGUAGE_ROUTE, chosenLanguage, languageSwitch } from './language.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
 import { TIPOS_DE_EVENTO, type Evento, type NovoEvento, type Registro } from './types.ts';
@@ -45,8 +46,12 @@ const dicionarios = Object.fromEntries(
   readdirSync(pastaDeIdiomas).filter((f) => f.endsWith('.json')).map((f) =>
     [f.slice(0, -5), JSON.parse(readFileSync(new URL(f, pastaDeIdiomas), 'utf8'))]));
 const i18n = createI18n(dicionarios, 'en');
+// `person` is what makes a deliberate choice beat the browser header — see review/api/language.ts.
 const idioma = (req: IncomingMessage) =>
-  i18n.choose({ acceptLanguage: req.headers['accept-language'] as string, project: doProjeto.idioma });
+  i18n.choose({
+    person: chosenLanguage(req.headers.cookie),
+    acceptLanguage: req.headers['accept-language'] as string, project: doProjeto.idioma,
+  });
 
 const cfg = {
   porta: Number(process.env.PORT ?? 8080),
@@ -651,6 +656,13 @@ const servidor = createServer(async (req, res) => {
   try {
     if (url.pathname === '/api/saude') return json(res, 200, { ok: true });
 
+    // Before the authentication guard on purpose: the login screen is where most people change
+    // language, and it is the one page they can reach without a session.
+    if (url.pathname === LANGUAGE_ROUTE) {
+      const cabecalhos = languageSwitch(url, i18n.languages, cfg.ambiente !== 'Development');
+      return (res.writeHead(302, cabecalhos), res.end());
+    }
+
     // /api/entrar is the only API route without a session: it is the one that creates it.
     if (porSenha && url.pathname === '/api/entrar' && req.method === 'POST') {
       const corpo = (await corpoJson(req)) as { email?: string; senha?: string };
@@ -691,7 +703,7 @@ const servidor = createServer(async (req, res) => {
         });
         // The text goes in before the bytes leave: no untranslated flash, no second request, and
         // the labels are there with JavaScript off. See review/api/login-page.ts.
-        return res.end(renderLoginPage(i18n, idioma(req)));
+        return res.end(renderLoginPage(i18n, idioma(req), url.pathname + url.search));
       }
       const destino = encodeURIComponent(url.pathname + url.search);
       return (res.writeHead(302, { location: `${TELA_DE_ENTRADA}?destino=${destino}` }), res.end());

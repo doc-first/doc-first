@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { MIN_PASSWORD_LENGTH } from './users.ts';
+import { LANGUAGE_ROUTE } from './language.ts';
 
 /**
  * The login screen, with its sentences already inside it.
@@ -46,6 +47,7 @@ export const LOGIN_KEYS = [
   'login.error.changeFailed',
   'login.error.passwordsDiffer',
   'login.error.noAnswer',
+  'language.label',
 ] as const;
 
 /** Read once: the template does not change while the process lives. */
@@ -81,6 +83,36 @@ const forHtml = (text: string) => text.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
  */
 export interface Translator {
   t(lang: string, key: string, params?: Record<string, string | number>): string;
+  readonly languages: string[];
+}
+
+/**
+ * The three buttons of the language selector.
+ *
+ * ⚠️ **A globe, never a flag.** A flag is a country, not a language. Spanish would have to fly
+ * Spain's or Mexico's, English the United Kingdom's or the United States', Portuguese Portugal's
+ * or Brazil's — and whichever one is chosen tells everyone who speaks that language somewhere
+ * else that the tool was not built with them in mind. It is the classic i18n trap: it turns
+ * picking a language into a claim about nationality. A globe belongs to nobody, and the name of
+ * the language does the actual work.
+ *
+ * The name comes from each dictionary's own `language.name` — `es.json` says "Español", not
+ * "Spanish". Somebody looking for their language scans for the word they would write themselves,
+ * and a person who does not read the current interface language cannot be expected to recognise
+ * their own language spelled in it. It also keeps the README's promise that adding a language is
+ * copying one file: the list is read from the dictionaries, not kept here.
+ *
+ * Sorted by tag so the order is the same on every machine — `readdirSync` makes no such promise.
+ */
+function languageButtons(i18n: Translator, current: string): string {
+  return [...i18n.languages].sort().map((tag) => {
+    // `aria-current` and not `disabled`: the current language stays reachable by keyboard. A
+    // disabled button is skipped by Tab, so someone navigating without a mouse would never find
+    // out which language they are already in.
+    const here = tag === current ? ' aria-current="true"' : '';
+    return `<button type="submit" name="lang" value="${forHtml(tag)}" class="lang"${here}>`
+      + `${forHtml(i18n.t(tag, 'language.name'))}</button>`;
+  }).join('\n    ');
 }
 
 /**
@@ -88,8 +120,11 @@ export interface Translator {
  *
  * @param i18n  the translator built in server.ts from review/locales/
  * @param lang  the language chosen for THIS request — see `idioma()` in server.ts
+ * @param here  the address being served, so the selector can send the person back to it with the
+ *              `destino` they were heading for intact. Losing it would drop someone who followed a
+ *              link to a page into the home page, as a punishment for changing language.
  */
-export function renderLoginPage(i18n: Translator, lang: string): string {
+export function renderLoginPage(i18n: Translator, lang: string, here = '/'): string {
   // `{min}` belongs to the change-password sentence. Handing the same params to every key is
   // harmless: `t` only replaces a placeholder the text actually contains.
   const params = { min: MIN_PASSWORD_LENGTH };
@@ -98,6 +133,9 @@ export function renderLoginPage(i18n: Translator, lang: string): string {
   return TEMPLATE.replace(/\{\{([^}]+)\}\}/g, (whole, name: string) => {
     if (name === '#lang') return forHtml(lang);
     if (name === '#minPassword') return String(MIN_PASSWORD_LENGTH);
+    if (name === '#languageRoute') return forHtml(LANGUAGE_ROUTE);
+    if (name === '#languageButtons') return languageButtons(i18n, lang);
+    if (name === '#here') return forHtml(here);
     // The whole set, not a hand-picked subset of what the script happens to need today: a subset
     // is a second list to forget. `<` becomes `<` so a translation containing `</script>`
     // cannot close the tag it lives in.

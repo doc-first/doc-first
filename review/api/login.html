@@ -43,6 +43,25 @@
   button:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
   #warning { margin-top: 16px; font-size: 14px; color: #a3231f; min-height: 1.5em; }
   #warning:empty { margin: 0; min-height: 0; }
+
+  /* The language selector. A row of plain words, not a control that looks like the sign-in button:
+     it is a way out of the wrong language, not the thing the page is asking you to do. */
+  .languages {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--linha);
+  }
+  .languages .globe { font-size: 14px; margin-right: 4px; line-height: 1; }
+  .languages .lang {
+    width: auto; margin: 0; padding: 4px 8px; font-size: 13px; font-weight: 400;
+    color: #5b7183; background: none; border-radius: 6px;
+  }
+  .languages .lang:hover { color: var(--tinta); background: var(--fundo); }
+  /* The language in force, marked so it can be SEEN and not only heard: colour alone would leave
+     it invisible to whoever does not distinguish these two greys. The underline carries the same
+     fact as `aria-current`, in the other channel. */
+  .languages .lang[aria-current] {
+    color: var(--tinta); font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -73,6 +92,29 @@
     <!-- role=alert so the screen reader announces the error; without it, someone who cannot see
          the screen presses Enter again with no idea what happened. -->
     <p id="warning" role="alert"></p>
+  </form>
+
+  <!--
+    The language selector.
+
+    A <form method="get"> with one submit button per language, and NOT a <select> that navigates on
+    change. This is the only screen a person sees before they know the tool at all, and it is the
+    one screen that has to work with JavaScript off: a <select> would need a script to react, or an
+    extra "Go" button to explain. Here the button IS the choice — the browser turns it into
+    `GET /language?lang=es&next=…` with nothing running on the page. A GET is right because
+    nothing is created: it stores a preference and hands back the same screen.
+
+    `next` carries this exact address, `destino` and all, so switching language does not throw away
+    the page the person was trying to reach. review/api/language.ts refuses anything in it that
+    points off this site.
+
+    ⚠️ No flags — the reasoning is written out in review/api/login-page.ts, where the buttons are
+    built. Short version: a flag is a country, not a language.
+  -->
+  <form class="languages" method="get" action="{{#languageRoute}}" aria-label="{{language.label}}">
+    <input type="hidden" name="next" value="{{#here}}">
+    <span class="globe" aria-hidden="true">🌐</span>
+    {{#languageButtons}}
   </form>
 </main>
 

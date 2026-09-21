@@ -176,13 +176,16 @@ whoever owns the documentation.
 
 ## Language
 
-The engine ships in English. Messages the reviewer reads go through `review/core/i18n.js`, so adding
-a language is copying one file — see `examples/locales/`.
+The engine ships **English, Portuguese and Spanish** (`review/locales/`). Messages the reviewer
+reads go through `review/core/i18n.js`, so adding a fourth is copying one file — see
+`examples/locales/README.md`.
 
-The **login screen** is in there too. The server renders its text before sending the page, in the
-language the browser asked for, so there is no untranslated flash and the labels are there with
-JavaScript off. With no preference stated, English: set `idioma` in `doc-first.json` (or
-`REVISAO_IDIOMA`) to change what the project defaults to.
+The **login screen** is in there too. The server renders its text before sending the page, so there
+is no untranslated flash and the labels are there with JavaScript off. A globe in the corner of
+that screen switches language, and it works with JavaScript off as well: it is a form that submits
+a `GET /language`. The choice is kept in a cookie and **beats the browser's `Accept-Language`** —
+it is the only one the person made on purpose. With neither, the project's default: set `idioma` in
+`doc-first.json` (or `REVISAO_IDIOMA`); with none of the three, English.
 
 Logs stay English always: a log is evidence, and evidence that changes wording by locale cannot be
 grepped.

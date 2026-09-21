@@ -93,11 +93,12 @@ test('the bug category is in the cycle, in every language, and rides an event', 
   assert.ok(tabela.request_categories.bug,
     'cycle.json is the source of the categories, and bug has to be one of them');
 
-  // The label, in both dictionaries. The parity check in i18n.test.js would catch a key present in
-  // one and missing in the other; it would NOT catch the key missing from both, which is exactly
-  // how a new category ships untranslated.
+  // The label, in every dictionary. The parity check in i18n.test.js would catch a key present in
+  // one and missing in another; it would NOT catch the key missing from all of them, which is
+  // exactly how a new category ships untranslated.
   for (const [language, file] of [['en', '../locales/en.json'],
-                                  ['pt-BR', '../../examples/locales/pt-BR.json']]) {
+                                  ['pt-BR', '../locales/pt-BR.json'],
+                                  ['es', '../locales/es.json']]) {
     const dictionary = JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'));
     assert.ok(dictionary['cycle.category.bug'], `${language} has no label for the bug category`);
   }

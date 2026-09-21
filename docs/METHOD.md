@@ -250,8 +250,9 @@ which to believe.
 
 ## Language
 
-The engine is in English. Messages the reviewer reads go through `review/core/i18n.js`; adding a
-language is copying one file (`examples/locales/` has a worked one).
+The engine is in English and ships three dictionaries — English, Portuguese and Spanish, in
+`review/locales/`. Messages the reviewer reads go through `review/core/i18n.js`; adding a fourth is
+copying one file (`examples/locales/README.md` says how).
 
 Three audiences, and they are not the same:
 
