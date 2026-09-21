@@ -1,5 +1,4 @@
 import type { User, UserStore } from './users.ts';
-import { randomBytes } from 'node:crypto';
 
 /**
  * Identity by user and password, inside the service itself — the alternative to Google IAP.
@@ -149,6 +148,16 @@ export class IdentidadeSenha {
     return this.#users.fromSession(this.#lerCookie(cabecalhos, COOKIE));
   }
 
+  /**
+   * `SameSite=Strict` IS the CSRF defence here, and it is the only one: current browsers never
+   * attach this cookie to a request started by another site, so a forged POST arrives with no
+   * session and is refused like any anonymous call. A single-use token generator used to sit in
+   * this class and nothing ever called it — dead code in an auth file is what someone wires up by
+   * mistake later, trusting a protection that was never exercised, so it was removed.
+   *
+   * A token becomes necessary again the day a form is meant to POST here from ANOTHER origin:
+   * that requires loosening `SameSite`, and loosening it is what brings CSRF back.
+   */
   cabecalhoDeSessao(id: string, horas = 12): string {
     const partes = [
       `${COOKIE}=${id}`, 'Path=/', 'HttpOnly', 'SameSite=Strict', `Max-Age=${horas * 3600}`,
@@ -171,7 +180,4 @@ export class IdentidadeSenha {
     }
     return undefined;
   }
-
-  /** Single-use token for forms, against CSRF on POST. */
-  novoToken(): string { return randomBytes(24).toString('base64url'); }
 }
