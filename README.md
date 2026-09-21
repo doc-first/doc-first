@@ -137,6 +137,11 @@ SQLite pays for a driver they will never open.
 > an access created today disappears when the platform recycles the instance, with **no error and
 > no log**. The person whose account was created simply stops getting in, and nobody connects the
 > two events. Use `firestore` or `postgres://…`.
+>
+> The service now says so itself: when it starts on a runtime that looks ephemeral (`K_SERVICE`,
+> which Cloud Run sets) with people kept in a file, it logs a `WARNING` naming what will be lost
+> and what to set instead. It **warns and starts** — the configuration works, it just forgets
+> people, and refusing to come up would be a worse surprise.
 
 All three implementations are checked by **the same suite**,
 `review/tests/users-conformance.test.js`. A store that does not pass it is not supported. What that

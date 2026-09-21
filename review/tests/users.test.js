@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { rmSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { UsersSqlite } from '../api/users-sqlite.ts';
+import { ephemeralUserStoreWarning, looksEphemeral } from '../api/users.ts';
 import { IdentidadeSenha } from '../api/identity-password.ts';
 import { RegistroSqlite } from '../api/store-sqlite.ts';
 
@@ -182,4 +183,39 @@ test('a user database written in Portuguese still opens, and the password still 
   } finally {
     for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
   }
+});
+
+/**
+ * The combination that loses people: a file, on a disk that does not survive the instance.
+ *
+ * The false positive is tested as hard as the true one. A warning that fires on a laptop, where a
+ * file is the right answer, is a warning everybody learns to scroll past — and then it says
+ * nothing on the day it is true.
+ */
+test('it warns when people are kept in a file on a runtime that looks ephemeral', () => {
+  const warning = ephemeralUserStoreWarning('sqlite:/data/users.db', { K_SERVICE: 'doc-first' });
+  assert.ok(warning, 'a file plus an ephemeral runtime is exactly the case that has to be announced');
+  assert.match(warning, /recycles/, 'it has to say what will happen, not only that something is wrong');
+  assert.match(warning, /REVISAO_USERS=firestore/, 'it has to say what to do instead');
+  assert.match(warning, /postgres/, 'the other way out belongs in the same line');
+});
+
+test('the default store warns too: not configuring it is how people get there', () => {
+  assert.ok(ephemeralUserStoreWarning(undefined, { K_SERVICE: 'doc-first' }));
+  assert.ok(ephemeralUserStoreWarning('sqlite', { K_SERVICE: 'doc-first' }));
+});
+
+test('it stays quiet when nothing is at stake', () => {
+  const ephemeral = { K_SERVICE: 'doc-first' };
+  assert.equal(ephemeralUserStoreWarning('sqlite::memory:', ephemeral), null, 'memory is already understood to be thrown away');
+  assert.equal(ephemeralUserStoreWarning('sqlite://:memory:', ephemeral), null, 'the // form names the same store');
+  assert.equal(ephemeralUserStoreWarning('firestore', ephemeral), null, 'firestore survives the instance');
+  assert.equal(ephemeralUserStoreWarning('postgres://u:p@host/db', ephemeral), null, 'and so does postgres');
+  assert.equal(ephemeralUserStoreWarning('sqlite:/data/users.db', {}), null, 'on a laptop a file is the right answer');
+});
+
+test('K_SERVICE is a signal, and an empty one is no signal at all', () => {
+  assert.equal(looksEphemeral({}), false);
+  assert.equal(looksEphemeral({ K_SERVICE: '' }), false, 'an empty variable is evidence of nothing');
+  assert.equal(looksEphemeral({ K_SERVICE: 'doc-first' }), true);
 });

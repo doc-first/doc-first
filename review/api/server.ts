@@ -10,7 +10,7 @@ import { overLimit, validCommit } from '../core/limits.js';
 import { createI18n } from '../core/i18n.js';
 import { RegistroEmMemoria, RegistroFirestore } from './store.ts';
 import { RegistroSqlite } from './store-sqlite.ts';
-import { openUserStore, DEFAULT_SQLITE_PATH, UserInputError } from './users.ts';
+import { openUserStore, ephemeralUserStoreWarning, DEFAULT_SQLITE_PATH, UserInputError } from './users.ts';
 import { renderLoginPage } from './login-page.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
@@ -166,6 +166,17 @@ if (comoEntrar === 'senha') {
   }
   porSenha = new IdentidadeSenha(users, { seguro: cfg.ambiente !== 'Development' });
   await users.purgeExpiredSessions();
+
+  // ⚠️ It WARNS, it does not refuse. This configuration works — it just forgets people — and a
+  // service that refuses to start is a new way to be stuck at three in the morning over something
+  // that was never an emergency. The choice stays with whoever deploys; what they were missing is
+  // the information.
+  //
+  // One structured line at WARNING rather than a banner of '=': this fires only on a hosted
+  // runtime, where nobody is watching a terminal and the log collector is the only reader. A
+  // banner is loud on a screen; a severity is loud in a log.
+  const ephemeralWarning = ephemeralUserStoreWarning(process.env.REVISAO_USERS);
+  if (ephemeralWarning) log('WARNING', 'ephemeral_user_store', { warning: ephemeralWarning });
 
   // First boot: creates the owner's access and shows the password ONCE. A fixed password like
   // "admin" is an invitation, and an internal tool stays up for years with nobody looking.

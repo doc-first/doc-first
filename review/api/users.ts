@@ -284,6 +284,59 @@ export async function openUserStore(
     + '(use sqlite:<path>, firestore, postgres://… or postgresql://…)');
 }
 
+/**
+ * Does this value end up keeping people in a FILE on the local disk?
+ *
+ * Absent and `sqlite` both land on SQLite at a path, so both count. `sqlite::memory:` does not:
+ * it is already understood to be thrown away, and warning about it would be noise. Anything else
+ * — firestore, postgres, or a value this factory does not recognise — is not a local file.
+ */
+export function isFileBackedUserStore(url: string | undefined): boolean {
+  const chosen = (url ?? '').trim();
+  if (chosen === '' || chosen === 'sqlite') return true;
+  if (!chosen.startsWith('sqlite:')) return false;
+  return sqlitePathOf(chosen) !== ':memory:';
+}
+
+/**
+ * Does the runtime look like one whose disk does not survive the instance?
+ *
+ * ⚠️ `K_SERVICE` is a SIGNAL, not a certainty. It is what Cloud Run sets on every instance, and
+ * it is the cheapest reliable evidence available at boot — but a container on Fly, App Runner or
+ * a Kubernetes pod with no volume loses a file just as quietly, and each announces itself with a
+ * different variable. This list is expected to GROW. A `false` here means "no evidence", never
+ * "the disk is safe".
+ */
+export function looksEphemeral(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.K_SERVICE);
+}
+
+/**
+ * The boot warning for the combination that loses people, or `null` when there is nothing to say.
+ *
+ * ⚠️ It says what WILL happen and what to do instead, because "warning: ephemeral storage" is a
+ * line everybody scrolls past. The failure it describes is silent by nature — the account is
+ * simply gone and nobody connects it to a deploy — so this line is the only chance anyone gets to
+ * connect the two.
+ *
+ * English and hard-coded, NOT through i18n: this prints before there is a session, a person or a
+ * chosen language. The comment at the top of review/core/i18n.js is the long version.
+ *
+ * ⚠️ Both halves of the condition matter equally. A warning that shows up on a laptop, where a
+ * file is exactly the right answer, is a warning people learn to ignore — and then it protects
+ * nothing on the day it is true.
+ */
+export function ephemeralUserStoreWarning(
+  url: string | undefined,
+  env: Record<string, string | undefined> = process.env,
+): string | null {
+  if (!isFileBackedUserStore(url) || !looksEphemeral(env)) return null;
+  return 'users are kept in a file on a disk that looks ephemeral (K_SERVICE is set). '
+    + 'Accounts created here vanish when the platform recycles the instance, with no error and no '
+    + 'log: the person simply stops being able to sign in. '
+    + 'Set REVISAO_USERS=firestore (with REVISAO_PROJETO) or REVISAO_USERS=postgres://… to keep them.';
+}
+
 /** Hides `user:password@` in anything URL-shaped, so a connection string can be quoted safely. */
 export function maskCredentials(value: string): string {
   return value.replace(/:\/\/[^@/]*@/, '://***@');
