@@ -209,7 +209,7 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 | `REVISAO_IDENTIDADE` | `senha`, `iap`, or `dev` — never `dev` outside Development |
 | `REVISAO_USERS` | where the people who log in are kept — see below |
 | `REVISAO_PESSOAS` | the SQLite users file. An alias for `sqlite:<path>`, kept because it is published |
-| `REVISAO_IDIOMA` | the project's default language, when the reader has no preference |
+| `REVISAO_IDIOMA` | the project's default language, when the reader has no preference (default: `en`) |
 
 **Where the users live.** People and sessions are stored apart from the events, and the storage is
 pluggable for the same reason Keycloak's is — a file is right on a laptop and wrong on a platform

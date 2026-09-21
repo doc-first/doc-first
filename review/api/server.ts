@@ -10,7 +10,8 @@ import { overLimit, validCommit } from '../core/limits.js';
 import { createI18n } from '../core/i18n.js';
 import { RegistroEmMemoria, RegistroFirestore } from './store.ts';
 import { RegistroSqlite } from './store-sqlite.ts';
-import { openUserStore, DEFAULT_SQLITE_PATH } from './users.ts';
+import { openUserStore, DEFAULT_SQLITE_PATH, UserInputError } from './users.ts';
+import { renderLoginPage } from './login-page.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
 import { TIPOS_DE_EVENTO, type Evento, type NovoEvento, type Registro } from './types.ts';
@@ -224,11 +225,13 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   if (porSenha && req.method === 'POST' && rota === '/trocar-senha') {
     const corpo = (await corpoJson(req)) as { atual?: string; nova?: string };
     const conferida = await porSenha.users.check(email, corpo.atual ?? '');
-    if (!conferida) return json(res, 403, { erro: 'a senha atual não confere' });
+    if (!conferida) return json(res, 403, { erro: i18n.t(idioma(req), 'api.password.currentWrong') });
     try {
       await porSenha.users.changePassword(email, corpo.nova ?? '');
     } catch (erro) {
-      return json(res, 400, { erro: erro instanceof Error ? erro.message : 'senha inválida' });
+      // Translated HERE, at the edge, and only here: the store throws a key, never a sentence.
+      const falha = UserInputError.from(erro, 'api.password.invalid');
+      return json(res, 400, { erro: i18n.t(idioma(req), falha.key, falha.params) });
     }
     log('INFO', 'senha_trocada', { email });
     return json(res, 200, { ok: true });
@@ -448,7 +451,7 @@ const servidor = createServer(async (req, res) => {
         // The same answer for an unknown e-mail and a wrong password: saying which of the two
         // failed hands over who has an account. The response time matches too (see users.ts).
         log('AVISO', 'entrada_recusada', { email: corpo.email });
-        return json(res, 401, { erro: 'e-mail ou senha não conferem' });
+        return json(res, 401, { erro: i18n.t(idioma(req), 'api.credentials.invalid') });
       }
       res.setHeader('set-cookie', porSenha.cabecalhoDeSessao(r.sessao));
       log('INFO', 'entrou', { email: r.pessoa.email, precisaTrocarSenha: r.pessoa.mustChangePassword });
@@ -471,7 +474,9 @@ const servidor = createServer(async (req, res) => {
     if (porSenha && !(await porSenha.daRequisicao(req.headers))) {
       if (url.pathname === TELA_DE_ENTRADA) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-        return res.end(await readFile(new URL('./login.html', import.meta.url)));
+        // The text goes in before the bytes leave: no untranslated flash, no second request, and
+        // the labels are there with JavaScript off. See review/api/login-page.ts.
+        return res.end(renderLoginPage(i18n, idioma(req)));
       }
       const destino = encodeURIComponent(url.pathname + url.search);
       return (res.writeHead(302, { location: `${TELA_DE_ENTRADA}?destino=${destino}` }), res.end());

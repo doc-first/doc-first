@@ -46,8 +46,40 @@ const derive = promisify(scrypt) as (secret: string, salt: Buffer, length: numbe
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
 
-/** Short enough to type, long enough that guessing is not a strategy. */
-const MIN_PASSWORD_LENGTH = 12;
+/**
+ * Short enough to type, long enough that guessing is not a strategy.
+ *
+ * Exported because the login screen states the rule before the person breaks it, and a screen
+ * saying "12 or more" next to a server enforcing something else is the kind of mismatch nobody
+ * catches until someone is stuck at the door.
+ */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * A rule the PERSON broke — not the program. It carries the i18n key so the edge can say it in
+ * their language (see review/core/i18n.js for who reads what).
+ *
+ * ⚠️ `message` stays English, always. It is what reaches a log and a stack trace, and evidence
+ * that changes wording by locale is evidence nobody can grep. The key is the translated half; the
+ * message is the greppable half. Both, on purpose.
+ */
+export class UserInputError extends Error {
+  readonly key: string;
+  readonly params: Record<string, string | number>;
+
+  constructor(message: string, key: string, params: Record<string, string | number> = {}) {
+    super(message);
+    this.name = 'UserInputError';
+    this.key = key;
+    this.params = params;
+  }
+
+  /** Anything thrown, as something the edge can translate. An unknown cause gets a generic key. */
+  static from(cause: unknown, fallbackKey: string): UserInputError {
+    if (cause instanceof UserInputError) return cause;
+    return new UserInputError(cause instanceof Error ? cause.message : String(cause), fallbackKey);
+  }
+}
 
 /** A person, as the rest of the service sees them. No secret in here. */
 export interface User {
@@ -150,7 +182,9 @@ export abstract class UserStoreBase implements UserStore {
 
   async changePassword(email: string, next: string): Promise<void> {
     if (next.length < MIN_PASSWORD_LENGTH) {
-      throw new Error(`a password needs at least ${MIN_PASSWORD_LENGTH} characters`);
+      throw new UserInputError(
+        `a password needs at least ${MIN_PASSWORD_LENGTH} characters`,
+        'api.password.tooShort', { min: MIN_PASSWORD_LENGTH });
     }
     const salt = randomBytes(SALT_LENGTH);
     const hash = await this.#hash(next, salt);

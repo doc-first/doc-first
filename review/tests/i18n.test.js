@@ -10,11 +10,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createI18n } from '../core/i18n.js';
+import { LOGIN_KEYS, keysUsedByTemplate, renderLoginPage } from '../api/login-page.ts';
 
-const dir = new URL('../locales/', import.meta.url);
-const dicts = Object.fromEntries(readdirSync(dir)
+const read = (dir) => Object.fromEntries(readdirSync(dir)
   .filter((f) => f.endsWith('.json'))
   .map((f) => [f.replace('.json', ''), JSON.parse(readFileSync(new URL(f, dir), 'utf8'))]));
+
+const dicts = read(new URL('../locales/', import.meta.url));
+
+// ⚠️ The engine ships English only, so `review/locales/` on its own can never catch a key present
+// in one language and missing in another — there is only one language in there. The worked
+// translation in examples/locales/ is the second language, and the check is worth little without
+// it. Left out until now, which is exactly how a hole this test exists to find stays open.
+const everyDict = { ...dicts, ...read(new URL('../../examples/locales/', import.meta.url)) };
 
 test('a missing key returns the key, never nothing', () => {
   // A page showing `block.approved` is ugly and diagnosable in one second. A page showing an empty
@@ -58,11 +66,53 @@ test('a fallback with no dictionary is caught at build time, not at render', () 
 });
 
 test('every key exists in every language', () => {
-  const i18n = createI18n(dicts, 'en');
+  const i18n = createI18n(everyDict, 'en');
   const holes = i18n.missing().filter((h) => !h.key.startsWith('_'));
   assert.deepEqual(holes, [],
     `keys missing per language:\n${holes.map((h) => `  ${h.lang}: ${h.key}`).join('\n')}`);
-  // The engine ships English only. The check still earns its place: it is what will catch the
-  // missing key on the day somebody drops a second dictionary in — see examples/locales/.
   assert.ok(i18n.languages.includes('en'), 'English is the fallback and has to be there');
+  assert.ok(i18n.languages.includes('pt-BR'), 'without a second language the check proves nothing');
+});
+
+test('the login screen asks for exactly the keys it declares', () => {
+  // Both directions on purpose. A key in the markup and not in the list renders as `{{…}}`; a key
+  // in the list and not in the markup is a translation everyone keeps translating for nothing.
+  assert.deepEqual(keysUsedByTemplate(), [...LOGIN_KEYS].sort());
+});
+
+test('every key the login screen uses exists in every language', () => {
+  // The one screen a person sees before they are anybody. A key missing here is not a blemish in
+  // a corner of the panel — it is the first impression, in a language nobody chose.
+  for (const [lang, dict] of Object.entries(everyDict)) {
+    const holes = LOGIN_KEYS.filter((k) => !(k in dict));
+    assert.deepEqual(holes, [], `${lang} is missing: ${holes.join(', ')}`);
+  }
+});
+
+test('the login screen comes out translated, with nothing left to fill in', () => {
+  const i18n = createI18n(everyDict, 'en');
+  const english = renderLoginPage(i18n, 'en');
+  const portuguese = renderLoginPage(i18n, 'pt-BR');
+
+  assert.match(english, /<html lang="en">/);
+  assert.match(english, /<title>Sign in<\/title>/);
+  assert.match(portuguese, /<html lang="pt-BR">/);
+  assert.match(portuguese, /<title>Entrar<\/title>/);
+
+  // No placeholder survives the render — the failure this catches is a page that ships a raw
+  // `{{login.submit}}` on the button, which no type checker and no lint would ever notice.
+  for (const page of [english, portuguese]) assert.doesNotMatch(page, /\{\{/);
+
+  // `{min}` comes from users.ts, not from the sentence: a screen promising a different number from
+  // the one the server enforces locks someone out with a password they believe is long enough.
+  assert.match(portuguese, /12 caracteres ou mais/);
+});
+
+test('a translation cannot close the script tag it travels in', () => {
+  // The dictionaries are files someone contributes. `</script>` inside one would end the JSON
+  // block and turn the rest of the sentence into code running on the login page.
+  const nasty = { ...everyDict.en, 'login.error.noAnswer': '</script><script>alert(1)</script>' };
+  const page = renderLoginPage(createI18n({ en: nasty }, 'en'), 'en');
+  assert.doesNotMatch(page, /<\/script><script>alert/);
+  assert.match(page, /\\u003c\/script/);
 });

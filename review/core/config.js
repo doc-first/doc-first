@@ -53,7 +53,15 @@ export function readConfig(root, io, env = {}) {
     trimPrefix: content.recortar ?? 'front/',
     /** Only for the invalid-page error message. Empty means: give no example. */
     pageExamples: content.exemplosDePagina ?? '',
-    /** The project's default language, when the reader states no preference. */
-    idioma: file.idioma ?? env.REVISAO_IDIOMA ?? 'pt-BR',
+    /**
+     * The project's default language, when the reader states no preference.
+     *
+     * ⚠️ The default is English, and not the language of the project this engine grew in. It used
+     * to be `pt-BR`, which contradicted the README on the line where it says the engine ships in
+     * English, and handed a Portuguese login screen to anyone who cloned it and dropped a second
+     * dictionary in. A project that reviews in another language says so in its own
+     * `doc-first.json` — one line, and it is the project's statement, not the engine's assumption.
+     */
+    idioma: file.idioma ?? env.REVISAO_IDIOMA ?? 'en',
   };
 }

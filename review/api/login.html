@@ -1,15 +1,21 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="{{#lang}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entrar</title>
+<title>{{login.title}}</title>
 <!--
-  A única página que se vê sem sessão, e por isso ela é AUTOCONTIDA: nada de /front/ds, nada de
-  fonte baixada. Se ela importasse o tema, a exceção de autenticação teria de liberar a pasta
-  inteira do tema — e "quase tudo fechado" não fecha nada. Aqui a exceção é um arquivo só.
-  Mora em review/api/ e não em front/ porque é do MOTOR: quem adota o Doc First troca o front
-  inteiro e continua precisando de uma porta de entrada.
+  The only page seen without a session, and that is why it is SELF-CONTAINED: no /front/ds, no
+  downloaded font. If it imported the theme, the authentication exception would have to open the
+  whole theme folder — and "almost everything closed" closes nothing. Here the exception is one
+  file.
+  It lives in review/api/ and not in front/ because it belongs to the ENGINE: whoever adopts Doc
+  First replaces the whole front end and still needs a front door.
+
+  ⚠️ NO sentence lives in this file. Every placeholder written in double braces is replaced by
+  review/api/login-page.ts, before the bytes leave the server, with the text from review/locales/
+  in the language the person asked for. The reasoning for rendering on the server instead of
+  fetching a dictionary from the browser is written there.
 -->
 <style>
   :root { --tinta: #12263a; --marca: #0883C5; --linha: #d7e2ea; --fundo: #f4f7f9; }
@@ -25,7 +31,7 @@
   p.sub { margin: 0 0 24px; color: #5b7183; font-size: 14px; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
   input {
-    width: 100%; padding: 11px 12px; font-size: 16px; /* 16px: menos que isso e o iPhone dá zoom */
+    width: 100%; padding: 11px 12px; font-size: 16px; /* 16px: any less and the iPhone zooms in */
     border: 1px solid var(--linha); border-radius: 8px; background: #fff; color: inherit;
   }
   input:focus-visible { outline: 2px solid var(--marca); outline-offset: 1px; border-color: var(--marca); }
@@ -35,89 +41,105 @@
   }
   button:disabled { opacity: .6; cursor: progress; }
   button:focus-visible { outline: 2px solid var(--tinta); outline-offset: 2px; }
-  #aviso { margin-top: 16px; font-size: 14px; color: #a3231f; min-height: 1.5em; }
-  #aviso:empty { margin: 0; min-height: 0; }
+  #warning { margin-top: 16px; font-size: 14px; color: #a3231f; min-height: 1.5em; }
+  #warning:empty { margin: 0; min-height: 0; }
 </style>
 </head>
 <body>
 <main>
-  <h1 id="titulo">Entrar</h1>
-  <p class="sub" id="sub">Documentação revisável — é preciso se identificar.</p>
+  <h1 id="heading">{{login.title}}</h1>
+  <p class="sub" id="sub">{{login.subtitle}}</p>
 
-  <form id="form" autocomplete="on">
-    <div id="campos-entrada">
-      <label for="email">E-mail</label>
-      <input id="email" name="email" type="email" autocomplete="username" required autofocus>
-      <label for="senha">Senha</label>
-      <input id="senha" name="senha" type="password" autocomplete="current-password" required>
+  <form id="form" autocomplete="on" aria-label="{{login.form.label}}">
+    <div id="sign-in-fields">
+      <label for="email">{{login.email.label}}</label>
+      <input id="email" name="email" type="email" autocomplete="username"
+             placeholder="{{login.email.placeholder}}" required autofocus>
+      <label for="password">{{login.password.label}}</label>
+      <input id="password" name="password" type="password" autocomplete="current-password"
+             placeholder="{{login.password.placeholder}}" required>
     </div>
 
-    <div id="campos-troca" hidden>
-      <label for="nova">Nova senha</label>
-      <input id="nova" name="nova" type="password" autocomplete="new-password" minlength="12">
-      <label for="repete">Repita a nova senha</label>
-      <input id="repete" name="repete" type="password" autocomplete="new-password" minlength="12">
+    <div id="change-fields" hidden>
+      <label for="new-password">{{login.change.new.label}}</label>
+      <input id="new-password" name="new-password" type="password" autocomplete="new-password"
+             minlength="{{#minPassword}}">
+      <label for="repeat-password">{{login.change.repeat.label}}</label>
+      <input id="repeat-password" name="repeat-password" type="password" autocomplete="new-password"
+             minlength="{{#minPassword}}">
     </div>
 
-    <button id="botao" type="submit">Entrar</button>
-    <!-- role=alert para o leitor de tela anunciar o erro; sem isso, quem não enxerga a tela
-         aperta Entrar de novo sem saber o que houve. -->
-    <p id="aviso" role="alert"></p>
+    <button id="button" type="submit">{{login.submit}}</button>
+    <!-- role=alert so the screen reader announces the error; without it, someone who cannot see
+         the screen presses Enter again with no idea what happened. -->
+    <p id="warning" role="alert"></p>
   </form>
 </main>
 
+<!-- The handful of sentences the script needs AFTER the page is open — the change-password step
+     and the error lines. Rendered here by the server, in the same pass as the rest, so the page
+     never fetches a dictionary and never shows a raw key while it waits. -->
+<script type="application/json" id="texts">{{#texts}}</script>
+
 <script>
   const $ = (id) => document.getElementById(id);
-  const avisar = (texto) => { $('aviso').textContent = texto; };
-  let trocando = false;
+  const TEXTS = JSON.parse($('texts').textContent);
+  const say = (key) => TEXTS[key] ?? key;
+  const warn = (text) => { $('warning').textContent = text; };
+  let changing = false;
 
-  async function pede(rota, corpo) {
-    const r = await fetch(rota, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo),
+  async function ask(route, body) {
+    const r = await fetch(route, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
     });
-    let dados = {};
-    try { dados = await r.json(); } catch { /* resposta sem corpo: o status já basta */ }
-    return { ok: r.ok, dados };
+    let data = {};
+    try { data = await r.json(); } catch { /* no body: the status alone is enough */ }
+    return { ok: r.ok, data };
   }
 
-  function pedirTroca() {
-    trocando = true;
-    $('titulo').textContent = 'Trocar a senha';
-    $('sub').textContent = 'Esta ainda é a senha do primeiro acesso. Escolha uma sua, com 12 caracteres ou mais.';
-    $('campos-entrada').hidden = true;
-    $('campos-troca').hidden = false;
-    $('botao').textContent = 'Trocar e continuar';
-    $('nova').focus();
+  function askForChange() {
+    changing = true;
+    $('heading').textContent = say('login.change.title');
+    $('sub').textContent = say('login.change.subtitle');
+    $('sign-in-fields').hidden = true;
+    $('change-fields').hidden = false;
+    $('button').textContent = say('login.change.submit');
+    $('new-password').focus();
   }
 
-  $('form').addEventListener('submit', async (evento) => {
-    evento.preventDefault();
-    avisar('');
-    $('botao').disabled = true;
+  // ⚠️ The request and response FIELDS stay in Portuguese (`senha`, `atual`, `nova`,
+  // `precisaTrocarSenha`): they are the published contract of /api/entrar. Only what a person
+  // reads is translated.
+  $('form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    warn('');
+    $('button').disabled = true;
     try {
-      if (!trocando) {
-        const { ok, dados } = await pede('/api/entrar', { email: $('email').value, senha: $('senha').value });
-        if (!ok) return avisar(dados.erro || 'não foi possível entrar');
-        if (dados.precisaTrocarSenha) return pedirTroca();
-        return irParaODestino();
+      if (!changing) {
+        const { ok, data } = await ask('/api/entrar', { email: $('email').value, senha: $('password').value });
+        if (!ok) return warn(data.erro || say('login.error.signInFailed'));
+        if (data.precisaTrocarSenha) return askForChange();
+        return goToDestination();
       }
 
-      if ($('nova').value !== $('repete').value) return avisar('as duas senhas não são iguais');
-      const { ok, dados } = await pede('/api/trocar-senha', { atual: $('senha').value, nova: $('nova').value });
-      if (!ok) return avisar(dados.erro || 'não foi possível trocar a senha');
-      irParaODestino();
+      if ($('new-password').value !== $('repeat-password').value) {
+        return warn(say('login.error.passwordsDiffer'));
+      }
+      const { ok, data } = await ask('/api/trocar-senha', { atual: $('password').value, nova: $('new-password').value });
+      if (!ok) return warn(data.erro || say('login.error.changeFailed'));
+      goToDestination();
     } catch {
-      avisar('o serviço não respondeu');
+      warn(say('login.error.noAnswer'));
     } finally {
-      $('botao').disabled = false;
+      $('button').disabled = false;
     }
   });
 
-  // Volta para a página que a pessoa tentou abrir. Só caminho interno: um `destino` vindo de fora
-  // com http://outro-site vira um redirecionamento aberto, que é phishing com o nosso domínio.
-  function irParaODestino() {
-    const pedido = new URLSearchParams(location.search).get('destino') || '';
-    location.href = /^\/[^/\\]/.test(pedido) ? pedido : '/';
+  // Back to the page the person tried to open. Internal paths only: a `destino` coming from
+  // outside with http://another-site becomes an open redirect, which is phishing with our domain.
+  function goToDestination() {
+    const asked = new URLSearchParams(location.search).get('destino') || '';
+    location.href = /^\/[^/\\]/.test(asked) ? asked : '/';
   }
 </script>
 </body>
