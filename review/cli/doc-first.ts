@@ -2,9 +2,9 @@
 import { parseArgs } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { readConfig } from '../core/config.js';
-import { Fonte } from './remote.ts';
-import * as pedidos from './requests.ts';
-import * as validacao from './validation.ts';
+import { Source } from './remote.ts';
+import * as requests from './requests.ts';
+import * as validation from './validation.ts';
 
 /**
  * The agent's tool for the Doc First methodology.
@@ -26,7 +26,7 @@ doc-first — the agent's tool for the Doc First method
     impact <id> [--term x]      where else the subject shows up, and what is validated
     summary                     approvals and requests, per page
     state <id> <new> "msg"      records progress (whoever asked sees it in the panel)
-                                  --commit <sha>    required for "aplicado"
+                                  --commit <sha>    required for "applied"
                                   --blocks A01.1.4,A02.3.1
 
   The validation lock (the human ✓)
@@ -147,29 +147,29 @@ async function main() {
   // The project configuration (name, owner, cloud project) comes from the doc-first.json at the root.
   const projectConfig = readConfig(root, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env);
   if (projectConfig.owner) process.env.REVISAO_OWNER ??= projectConfig.owner;
-  const source = new Fonte({
+  const source = new Source({
     local: values.local,
-    projeto: projectConfig.project ?? undefined,
-    conta: projectConfig.account ?? undefined,
-    banco: values.db,
+    project: projectConfig.project ?? undefined,
+    account: projectConfig.account ?? undefined,
+    db: values.db,
   });
 
   switch (command) {
-    case 'list':       await pedidos.listar(root, source, values.all); return 0;
-    case 'show':       await pedidos.ver(root, source, requireArg(arg, 'show <id>')); return 0;
-    case 'impact':     await pedidos.impacto(root, source, requireArg(arg, 'impact <id>'), values.term ?? []); return 0;
-    case 'summary':    await pedidos.resumo(root, source); return 0;
-    case 'state':      await pedidos.estado(root, source, requireArg(arg, 'state <id> <state> "message"'),
+    case 'list':       await requests.list(root, source, values.all); return 0;
+    case 'show':       await requests.show(root, source, requireArg(arg, 'show <id>')); return 0;
+    case 'impact':     await requests.impact(root, source, requireArg(arg, 'impact <id>'), values.term ?? []); return 0;
+    case 'summary':    await requests.summary(root, source); return 0;
+    case 'state':      await requests.setState(root, source, requireArg(arg, 'state <id> <state> "message"'),
                          requireArg(positionals[2], 'state <id> <state> "message"'),
                          requireArg(positionals[3], 'state <id> <state> "message"'),
-                         { commit: values.commit, caixas: values.blocks }); return 0;
-    case 'sync':       await validacao.sincronizar(root, source); return 0;
-    case 'check':      return (await validacao.conferir(root)) ? 1 : 0;
-    case 'index':      await validacao.indexar(root, values.db); return 0;
-    case 'kinds':      await validacao.tipos(); return 0;
-    case 'lights':     await validacao.mostrarSemaforo(root, { so: values.only }); return 0;
-    case 'restamp':    await validacao.restamp(root); return 0;
-    case 'if-i-touch': return validacao.seEuMexer(root, requireArg(arg, 'if-i-touch <id>'));
+                         { commit: values.commit, blocks: values.blocks }); return 0;
+    case 'sync':       await validation.sync(root, source); return 0;
+    case 'check':      return (await validation.check(root)) ? 1 : 0;
+    case 'index':      await validation.rebuildIndex(root, values.db); return 0;
+    case 'kinds':      await validation.listKinds(); return 0;
+    case 'lights':     await validation.showLights(root, { only: values.only }); return 0;
+    case 'restamp':    await validation.restamp(root); return 0;
+    case 'if-i-touch': return validation.ifITouch(root, requireArg(arg, 'if-i-touch <id>'));
     default:
       console.error(`unknown command: ${given}\n`);
       console.error(HELP.trim());

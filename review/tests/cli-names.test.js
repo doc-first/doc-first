@@ -98,7 +98,7 @@ test('the old long options are aliases too', (t) => {
   const viaNew = run(['lights', '--root', dir], ROOT);
   assert.doesNotMatch(viaOld, /unknown command|Unknown option/);
   assert.equal(viaOld, viaNew);
-  assert.match(viaNew, /8 trecho/, 'it really read the project it was pointed at');
+  assert.match(viaNew, /8 block/, 'it really read the project it was pointed at');
 
   // `--raiz=<value>` in one token takes a different branch of the rewrite than `--raiz <value>`.
   assert.equal(run(['lights', `--raiz=${dir}`], ROOT), viaNew);

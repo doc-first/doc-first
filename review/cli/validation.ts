@@ -5,16 +5,25 @@ import { fingerprintOfText } from '../core/fingerprint.js';
 import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
 import { readConfig } from '../core/config.js';
 import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
-import { Fonte } from './remote.ts';
+import { Source } from './remote.ts';
 
 /**
  * The validation lock: an approved block does not change without permission, and no approval mark
  * exists without a trail.
  *
  * The most critical piece of the method — it decides whether a human approval still holds.
+ *
+ * ⚠️ Everything printed from here is English, and deliberately NOT routed through
+ * `review/core/i18n.js`. The reader of these lines is whoever operates the tool, and the line they
+ * read is also the line they paste into a report and grep for months later. Evidence that changes
+ * wording by locale is evidence nobody can search. The reviewer's own language lives in the
+ * browser, not here.
  */
 
-export interface Registro {
+export interface Registry {
+  /** ⚠️ The keys stay in Portuguese: this is the on-disk shape of the approvals file in every
+   *  project that already adopted the method. Renaming them here would invalidate every registry
+   *  out there — that is a migration, not a translation. */
   [id: string]: { arquivo: string; data: string; digital_texto: string; digital?: string;
                   origem?: string; evento?: string; texto?: string; migrado_de?: string[];
                   /** The fingerprint EACH dependency had at the moment of the ✓. Without this there is
@@ -26,43 +35,43 @@ export interface Registro {
  * Where the approval registry lives. It comes from `doc-first.json` (`conteudo.registro`), not from
  * the code: `docs/validacoes.json` was a decision of the first project, written inside the engine.
  */
-const caminhoRegistro = (raiz: string) =>
-  join(raiz, ...readConfig(raiz, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env)
+const registryPath = (root: string) =>
+  join(root, ...readConfig(root, { readFile: (p: string) => readFileSync(p, 'utf8') }, process.env)
     .registry.split('/'));
 
-export function carregar(raiz: string): Registro {
-  const p = caminhoRegistro(raiz);
+export function loadRegistry(root: string): Registry {
+  const p = registryPath(root);
   return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : {};
 }
 
-export function salvar(raiz: string, reg: Registro) {
-  const ordenado: Registro = {};
-  for (const k of Object.keys(reg).sort()) ordenado[k] = reg[k];
-  writeFileSync(caminhoRegistro(raiz), JSON.stringify(ordenado, null, 1) + '\n', 'utf8');
+export function saveRegistry(root: string, registry: Registry) {
+  const sorted: Registry = {};
+  for (const k of Object.keys(registry).sort()) sorted[k] = registry[k];
+  writeFileSync(registryPath(root), JSON.stringify(sorted, null, 1) + '\n', 'utf8');
 }
 
 /**
  * Flags what changed after being validated, what is marked without a registry entry, and what
  * claims a proof that is no longer on disk.
  */
-export async function conferir(raiz: string): Promise<number> {
-  const reg = carregar(raiz);
-  const trechos = await lerTrechos(raiz);
-  let problemas = 0;
+export async function check(root: string): Promise<number> {
+  const registry = loadRegistry(root);
+  const blocks = await lerTrechos(root);
+  let problems = 0;
 
-  for (const [id, info] of Object.entries(reg).sort()) {
-    const t = trechos.get(id);
-    if (!t) { console.log(`  ✗ ${id}: elemento sumiu (${info.arquivo})`); problemas++; continue; }
-    if (!t.validado) { console.log(`  ✗ ${id}: perdeu a marca de validado`); problemas++; }
-    if (t.digital !== info.digital_texto) {
-      console.log(`  ✗ ${id}: o TEXTO mudou depois de validado em ${info.data} — precisa de permissão do dono`);
-      problemas++;
+  for (const [id, entry] of Object.entries(registry).sort()) {
+    const block = blocks.get(id);
+    if (!block) { console.log(`  ✗ ${id}: the block is gone (${entry.arquivo})`); problems++; continue; }
+    if (!block.validado) { console.log(`  ✗ ${id}: it lost the validated mark`); problems++; }
+    if (block.digital !== entry.digital_texto) {
+      console.log(`  ✗ ${id}: the TEXT changed after it was validated on ${entry.data} — this needs the owner's permission`);
+      problems++;
     }
   }
-  problemas += await orfaos(raiz, reg);
-  problemas += missingProofs(raiz, trechos);
-  console.log(`${Object.keys(reg).length} validados · ${problemas ? `${problemas} problema(s)` : 'tudo intacto'}`);
-  return problemas;
+  problems += await orphanMarks(root, registry);
+  problems += missingProofs(root, blocks);
+  console.log(`${Object.keys(registry).length} validated · ${problems ? `${problems} problem(s)` : 'all intact'}`);
+  return problems;
 }
 
 /**
@@ -92,23 +101,23 @@ export async function conferir(raiz: string): Promise<number> {
  * That one needs to compare two commits, and the git-diff layer does not exist yet. See
  * `docs/BUGS.md`, "The bridge to the code".
  */
-export function missingProofs(raiz: string, trechos: Map<string, Trecho>): number {
-  let achados = 0;
-  for (const [id, t] of [...trechos].sort(([a], [b]) => a.localeCompare(b))) {
-    if (t.prova === null) continue;
-    const caminho = t.prova.split('::')[0].trim();
-    if (!caminho) {
+export function missingProofs(root: string, blocks: Map<string, Trecho>): number {
+  let found = 0;
+  for (const [id, block] of [...blocks].sort(([a], [b]) => a.localeCompare(b))) {
+    if (block.prova === null) continue;
+    const path = block.prova.split('::')[0].trim();
+    if (!path) {
       console.log(`  ✗ ${id}: data-prova names no file — write it as `
         + `path/to/file.test.js::name of the test`);
-      achados++;
+      found++;
       continue;
     }
-    if (existsSync(join(raiz, ...caminho.split('/')))) continue;
-    console.log(`  ✗ ${id}: data-prova points at ${caminho}, and there is no such file — `
+    if (existsSync(join(root, ...path.split('/')))) continue;
+    console.log(`  ✗ ${id}: data-prova points at ${path}, and there is no such file — `
       + `point it at the test that defends this rule, or the rule is not defended`);
-    achados++;
+    found++;
   }
-  return achados;
+  return found;
 }
 
 /**
@@ -118,196 +127,201 @@ export function missingProofs(raiz: string, trechos: Map<string, Trecho>): numbe
  * nothing — and the site shows it, because the seal comes from the attribute. Approval with no trail,
  * in a method whose thesis is traceable approval.
  */
-export async function orfaos(raiz: string, reg: Registro, arquivos?: string[]): Promise<number> {
-  let achados = 0;
-  for (const caminho of arquivos ?? arquivosDeFolhas(raiz)) {
-    const { document } = parseHTML(readFileSync(caminho, 'utf8'));
+export async function orphanMarks(root: string, registry: Registry, files?: string[]): Promise<number> {
+  let found = 0;
+  for (const path of files ?? arquivosDeFolhas(root)) {
+    const { document } = parseHTML(readFileSync(path, 'utf8'));
     for (const el of document.querySelectorAll('[data-validado]')) {
       const id = el.getAttribute('data-id');
-      const data = el.getAttribute('data-validado');
+      const when = el.getAttribute('data-validado');
       if (!id) {
-        console.log(`  ✗ ${caminho}: marca de validado num elemento SEM data-id`); achados++;
-      } else if (!reg[id]) {
-        console.log(`  ✗ ${id}: marcado como validado em ${data}, e NÃO existe registro — aprovação sem rastro`);
-        achados++;
-      } else if (reg[id].data !== data) {
-        console.log(`  ✗ ${id}: a data no HTML (${data}) não bate com a do registro (${reg[id].data})`);
-        achados++;
+        console.log(`  ✗ ${path}: a validated mark on a block with NO data-id`); found++;
+      } else if (!registry[id]) {
+        console.log(`  ✗ ${id}: marked as validated on ${when}, and there is NO registry entry — an approval with no trail`);
+        found++;
+      } else if (registry[id].data !== when) {
+        console.log(`  ✗ ${id}: the date in the HTML (${when}) does not match the one in the registry (${registry[id].data})`);
+        found++;
       }
     }
   }
-  return achados;
+  return found;
 }
 
 /** Writes a block's lock: marks the HTML and records the fingerprint. */
-export async function marcar(raiz: string, reg: Registro, id: string, quando: string,
-                             origem: string, evento?: string,
-                             digitaisAgora?: Map<string, string>): Promise<string | null> {
-  const achado = acharArquivoDoTrecho(raiz, id);
-  if (!achado) { console.log(`  ✗ ${id}: não encontrado`); return null; }
+export async function mark(root: string, registry: Registry, id: string, when: string,
+                           source: string, event?: string,
+                           fingerprintsNow?: Map<string, string>): Promise<string | null> {
+  const found = acharArquivoDoTrecho(root, id);
+  if (!found) { console.log(`  ✗ ${id}: not found`); return null; }
 
-  const comMarca = achado.html.replace(
+  const marked = found.html.replace(
     new RegExp(`(data-id="${id.replace(/\./g, '\\.')}")(?! data-validado)`),
-    `$1 data-validado="${quando}"`);
-  if (comMarca !== achado.html) writeFileSync(achado.caminho, comMarca, 'utf8');
+    `$1 data-validado="${when}"`);
+  if (marked !== found.html) writeFileSync(found.caminho, marked, 'utf8');
 
-  const { document } = parseHTML(comMarca);
+  const { document } = parseHTML(marked);
   const el = document.querySelector(`[data-id="${id}"]`)!;
-  const copia = el.cloneNode(true) as Element;
-  copia.querySelectorAll('[data-revisao-ui]').forEach((x: Element) => x.remove());
-  const texto = copia.textContent ?? '';
-  const digital = await fingerprintOfText(texto);
+  const copy = el.cloneNode(true) as Element;
+  copy.querySelectorAll('[data-revisao-ui]').forEach((x: Element) => x.remove());
+  const text = copy.textContent ?? '';
+  const fingerprint = await fingerprintOfText(text);
 
   // What this block depends on, and how each dependency looked RIGHT NOW. Keeping the snapshot of the
   // dependencies is what allows saying, months later, "the text is still the same but the base moved".
   // Without it the red light would have nothing to compare against.
-  const declaradas = (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean);
+  const declared = (el.getAttribute('data-depende') ?? '').split(/\s+/).filter(Boolean);
   const depende: Record<string, string> = {};
-  for (const outro of declaradas) {
-    const d = digitaisAgora?.get(outro);
-    if (d) depende[outro] = d;
-    else console.log(`  ⚠ ${id} declara depender de ${outro}, que não existe`);
+  for (const other of declared) {
+    const d = fingerprintsNow?.get(other);
+    if (d) depende[other] = d;
+    else console.log(`  ⚠ ${id} declares a dependency on ${other}, which does not exist`);
   }
 
   // The browser needs two snapshots to paint the traffic light without asking the server:
   //   data-digital-validada  the text that was approved  → without it there is no 🟡
   //   data-dependia-de       the ground at that moment   → without it there is no 🔴
   // The JSON is the truth; these attributes are the copy that travels with the page.
-  const atributos: Record<string, string> = { 'data-digital-validada': digital };
+  const attributes: Record<string, string> = { 'data-digital-validada': fingerprint };
   if (Object.keys(depende).length) {
-    atributos['data-dependia-de'] = JSON.stringify(depende).replace(/"/g, '&quot;');
+    attributes['data-dependia-de'] = JSON.stringify(depende).replace(/"/g, '&quot;');
   }
-  let html = readFileSync(achado.caminho, 'utf8');
-  for (const [attr, valor] of Object.entries(atributos)) {
-    const alvo = new RegExp(`(data-id="${id.replace(/\./g, '\\.')}")((?:(?!${attr})[^>])*?)>`);
-    html = html.replace(alvo, `$1$2 ${attr}="${valor}">`);
+  let html = readFileSync(found.caminho, 'utf8');
+  for (const [attr, value] of Object.entries(attributes)) {
+    const target = new RegExp(`(data-id="${id.replace(/\./g, '\\.')}")((?:(?!${attr})[^>])*?)>`);
+    html = html.replace(target, `$1$2 ${attr}="${value}">`);
   }
-  writeFileSync(achado.caminho, html, 'utf8');
+  writeFileSync(found.caminho, html, 'utf8');
 
-  const antigo = reg[id];
-  reg[id] = {
-    arquivo: nomeCurto(raiz, achado.caminho),
-    data: quando, digital_texto: digital, origem,
-    texto: texto.replace(/\s+/g, ' ').trim().slice(0, 120),
+  const previous = registry[id];
+  registry[id] = {
+    arquivo: nomeCurto(root, found.caminho),
+    data: when, digital_texto: fingerprint, origem: source,
+    texto: text.replace(/\s+/g, ' ').trim().slice(0, 120),
     ...(Object.keys(depende).length ? { depende } : {}),
-    ...(evento ? { evento } : {}),
-    ...(antigo?.migrado_de ? { migrado_de: antigo.migrado_de } : {}),
-    ...(antigo?.digital ? { digital: antigo.digital } : {}),
+    ...(event ? { evento: event } : {}),
+    ...(previous?.migrado_de ? { migrado_de: previous.migrado_de } : {}),
+    ...(previous?.digital ? { digital: previous.digital } : {}),
   };
-  return digital;
+  return fingerprint;
 }
 
 /** Brings into the repository the ✓ the owner gave on the site. Only his: a reviewer's approval does not lock. */
-export async function sincronizar(raiz: string, fonte: Fonte, opcoes: { dono?: string } = {}) {
-  const dono = (opcoes.dono ?? process.env.REVISAO_OWNER ?? '').toLowerCase();
-  if (!dono) throw new Error('defina REVISAO_OWNER: é o ✓ dele que vira trava.');
+export async function sync(root: string, source: Source, options: { owner?: string } = {}) {
+  const owner = (options.owner ?? process.env.REVISAO_OWNER ?? '').toLowerCase();
+  if (!owner) throw new Error('set REVISAO_OWNER: it is THEIR ✓ that becomes a lock.');
 
   // The cloud being down must not take the whole session down with it. The registry in the repository
   // is the source of what is already validated; the cloud only adds what came from the site. Without
   // it the local score still holds — what must NOT happen is the session going on unaware it read a
   // frozen snapshot.
-  let eventos: Awaited<ReturnType<typeof fonte.eventos>>;
+  let events: Awaited<ReturnType<typeof source.events>>;
   try {
-    eventos = await fonte.eventos();
+    events = await source.events();
   } catch (e) {
-    const reg = carregar(raiz);
-    console.log(`⚠ não consegui falar com a nuvem, então nenhum ✓ novo do site entrou:\n  ${(e as Error).message}`);
-    console.log(`  Seguindo com o registro do repositório: ${Object.keys(reg).length} validados (retrato parado).`);
-    return { novos: 0, iguais: 0, vencidas: 0, offline: true };
+    const registry = loadRegistry(root);
+    console.log(`⚠ could not reach the cloud, so no new ✓ from the site came in:\n  ${(e as Error).message}`);
+    console.log(`  Going on with the registry in the repository: ${Object.keys(registry).length} validated (a frozen snapshot).`);
+    return { added: 0, unchanged: 0, expired: 0, offline: true };
   }
-  const aprovacoes = eventos.filter((e) => e.tipo === 'aprovacao');
-  const doDono = aprovacoes.filter((e) => (e.autor ?? '').toLowerCase() === dono);
-  if (aprovacoes.length !== doDono.length) {
-    console.log(`  · ${aprovacoes.length - doDono.length} aprovação(ões) de outra pessoa ignorada(s): só o ✓ do dono trava`);
+  const approvals = events.filter((e) => e.tipo === 'aprovacao');
+  const theOwners = approvals.filter((e) => (e.autor ?? '').toLowerCase() === owner);
+  if (approvals.length !== theOwners.length) {
+    console.log(`  · ${approvals.length - theOwners.length} approval(s) by somebody else ignored: only the owner's ✓ locks`);
   }
 
-  const reg = carregar(raiz);
-  const trechos = await lerTrechos(raiz);
-  const digitaisAgora = new Map([...trechos].map(([id, t]) => [id, t.digital]));
-  let novos = 0, iguais = 0, vencidas = 0;
+  const registry = loadRegistry(root);
+  const blocks = await lerTrechos(root);
+  const fingerprintsNow = new Map([...blocks].map(([id, t]) => [id, t.digital]));
+  let added = 0, unchanged = 0, expired = 0;
 
-  for (const e of doDono.sort((a, b) => a.quando.localeCompare(b.quando))) {
+  for (const e of theOwners.sort((a, b) => a.quando.localeCompare(b.quando))) {
     const id = e.caixa;
     if (!id) continue;
-    const quando = (e.quando || '').slice(0, 10);
-    const t = trechos.get(id);
-    if (!t) { console.log(`  ✗ ${id}: aprovado no site, não existe no repositório`); continue; }
-    if (e.digital !== t.digital) {
-      console.log(`  ⚠ ${id}: o ✓ de ${quando} é de uma versão anterior do texto — não vale mais`);
-      vencidas++; continue;
+    const when = (e.quando || '').slice(0, 10);
+    const block = blocks.get(id);
+    if (!block) { console.log(`  ✗ ${id}: approved on the site, and does not exist in the repository`); continue; }
+    if (e.digital !== block.digital) {
+      console.log(`  ⚠ ${id}: the ✓ from ${when} is for an earlier version of the text — it does not hold any more`);
+      expired++; continue;
     }
-    if (reg[id]?.digital_texto === t.digital) { iguais++; continue; }
-    if (await marcar(raiz, reg, id, quando, 'site', e.id, digitaisAgora)) {
-      console.log(`  ✓ ${id} validado por você no site em ${quando}`);
-      novos++;
+    if (registry[id]?.digital_texto === block.digital) { unchanged++; continue; }
+    if (await mark(root, registry, id, when, 'site', e.id, fingerprintsNow)) {
+      console.log(`  ✓ ${id} validated by you on the site on ${when}`);
+      added++;
     }
   }
-  salvar(raiz, reg);
-  console.log(`${novos} novo(s) · ${iguais} já estavam · ${vencidas} ✓ vencido(s) · ${Object.keys(reg).length} validados no total`);
-  return { novos, iguais, vencidas, offline: false };
+  saveRegistry(root, registry);
+  console.log(`${added} new · ${unchanged} already there · ${expired} ✓ expired · ${Object.keys(registry).length} validated in all`);
+  return { added, unchanged, expired, offline: false };
+}
+
+/**
+ * A `Trecho` as the traffic light sees it.
+ *
+ * ⚠️ This function exists because of a bug that hid for days behind `as never`. `review/core/`
+ * speaks English — `fingerprint`, `dependsOn` — and the page reader's own type still speaks
+ * Portuguese — `digital`, `depende`. Passing one where the other was expected type-checks ONLY
+ * because the cast erases the mismatch, and then `block.fingerprint` is `undefined` at run time.
+ *
+ * What it cost: the traffic light reported EVERY validated block as 🟡 forever, because `undefined`
+ * never equals a recorded fingerprint — while `check`, which reads the right field, said
+ * "17 validated · all intact" on the same repository. Two commands of the same tool, one lock,
+ * opposite answers. And `if-i-touch` always replied "nothing depends on this", which is worse: it
+ * is the answer you get right before you break something.
+ *
+ * The lesson is not "be careful with casts". It is that the translation between the two vocabularies
+ * has to live in ONE named place that a test can point at — which is this one.
+ */
+export function asTheCoreSeesIt(blocks: Map<string, Trecho>) {
+  return new Map([...blocks].map(([id, t]) =>
+    [id, { id, fingerprint: t.digital, dependsOn: t.depende }]));
 }
 
 /**
  * The documentation traffic light: where each block stands, and what needs a human eye.
  *
- * This is the command that answers "can I trust this documentation today?". `conferir` answers a
- * smaller and older question — whether someone tampered with a mark. This one answers today's question.
+ * This is the command that answers "can I trust this documentation today?". `check` answers a
+ * smaller and older question — whether someone tampered with a mark. This one answers today's
+ * question.
  */
-/**
- * A `Trecho` as the traffic light sees it.
- *
- * ⚠️ This function exists because of a bug that hid for days behind `as never`. `review/core/`
- * speaks English — `fingerprint`, `dependsOn` — and the CLI's own type speaks Portuguese —
- * `digital`, `depende`. Passing one where the other was expected type-checks ONLY because the cast
- * erases the mismatch, and then `block.fingerprint` is `undefined` at run time.
- *
- * What it cost: `semaforo` reported EVERY validated block as 🟡 forever, because `undefined` never
- * equals a recorded fingerprint — while `conferir`, which reads the right field, said "17 ·
- * everything intact" on the same repository. Two commands of the same tool, one lock, opposite
- * answers. And `se-eu-mexer` always replied "nothing depends on this", which is worse: it is the
- * answer you get right before you break something.
- *
- * The lesson is not "be careful with casts". It is that the translation between the two vocabularies
- * has to live in ONE named place that a test can point at — which is this one.
- */
-export function comoONucleoVe(trechos: Map<string, Trecho>) {
-  return new Map([...trechos].map(([id, t]) =>
-    [id, { id, fingerprint: t.digital, dependsOn: t.depende }]));
-}
+export async function showLights(root: string, options: { only?: string } = {}) {
+  const blocks = await lerTrechos(root);
+  const registry = loadRegistry(root);
+  const { byBlock, tally } = trafficLight(asTheCoreSeesIt(blocks), registry as never);
 
-export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}) {
-  const trechos = await lerTrechos(raiz);
-  const reg = carregar(raiz);
-  const { byBlock, tally } = trafficLight(comoONucleoVe(trechos), reg as never);
+  const total = blocks.size;
+  const line = (state: 'valid' | 'stale' | 'broken' | 'none', meaning: string) =>
+    `  ${COLOURS[state]} ${String(tally[state]).padStart(4)}  ${meaning}`;
 
-  const total = trechos.size;
-  const linha = (e: 'valid' | 'stale' | 'broken' | 'none', nome: string) =>
-    `  ${COLOURS[e]} ${String(tally[e]).padStart(4)}  ${nome}`;
-
-  console.log(`\nDocumentação: ${total} trecho(s)\n`);
-  console.log(linha('valid',  'validados, e nada mudou desde então'));
-  console.log(linha('stale',  'o texto mudou depois do ✓ — reaprovar'));
-  console.log(linha('broken', 'o texto está igual, mas a base mudou — CONFERIR'));
-  console.log(linha('none',   'ninguém validou ainda'));
+  console.log(`\nDocumentation: ${total} block(s)\n`);
+  console.log(line('valid',  'validated, and nothing has changed since'));
+  console.log(line('stale',  'the text changed after the ✓ — approve it again'));
+  console.log(line('broken', 'the text is the same, but the ground moved — CHECK IT'));
+  console.log(line('none',   'nobody has validated it yet'));
 
   // Red comes first, and named: it is the only state nobody spots on their own by reading the page,
   // because nothing on the page changed.
-  const vermelhos = [...byBlock].filter(([, r]) => r.state === 'broken');
-  if (vermelhos.length) {
-    console.log(`\n🔴 Precisam de conferência — mudou o chão, não o texto:\n`);
-    for (const [id, r] of vermelhos) {
+  const red = [...byBlock].filter(([, r]) => r.state === 'broken');
+  if (red.length) {
+    console.log(`\n🔴 Need a check — the ground moved, not the text:\n`);
+    for (const [id, r] of red) {
       console.log(`  ${id}`);
-      console.log(`     depende de: ${r.blame.join(', ')} — e isso mudou desde o ✓`);
+      console.log(`     depends on: ${r.blame.join(', ')} — and that changed since the ✓`);
     }
   }
 
-  const amarelos = [...byBlock].filter(([, r]) => r.state === 'stale');
-  if (amarelos.length && opcoes.so !== 'vermelho') {
-    console.log(`\n🟡 Reaprovar (o texto mudou):\n  ${amarelos.map(([id]) => id).join('  ')}`);
+  // `--only red` keeps the list to what nobody can spot by reading the page. `vermelho` still
+  // answers for the same reason the old command names do: it is typed by hand and baked into
+  // scripts out there, and a silent rename reads like the caller's repository is broken.
+  const onlyRed = options.only === 'red' || options.only === 'vermelho';
+  const yellow = [...byBlock].filter(([, r]) => r.state === 'stale');
+  if (yellow.length && !onlyRed) {
+    console.log(`\n🟡 Approve again (the text changed):\n  ${yellow.map(([id]) => id).join('  ')}`);
   }
 
-  if (!vermelhos.length && !amarelos.length) {
-    console.log(`\n✓ nada pendente de conferência.`);
+  if (!red.length && !yellow.length) {
+    console.log(`\n✓ nothing waiting to be checked.`);
   }
   console.log('');
   return tally;
@@ -318,7 +332,7 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
  *
  * Why this has to exist: the registry (`digital_texto`) is the truth, but the BROWSER cannot read
  * it — the page is static and the panel has no server to ask. It paints the traffic light from
- * three attributes that travel with the page, and `marcar()` only writes them at the moment an
+ * three attributes that travel with the page, and `mark()` only writes them at the moment an
  * approval arrives. Any approval recorded before those attributes existed has `data-validado` and
  * nothing else.
  *
@@ -333,69 +347,69 @@ export async function mostrarSemaforo(raiz: string, opcoes: { so?: string } = {}
  * the very command meant to reveal it. So a block that drifted gets stamped with the OLD
  * fingerprint and correctly shows 🟡.
  */
-export async function restamp(raiz: string) {
-  const reg = carregar(raiz);
-  const trechos = await lerTrechos(raiz);
-  let escritos = 0, jaTinham = 0, semTrecho = 0;
-  const vaoFicarAmarelos: string[] = [];
+export async function restamp(root: string) {
+  const registry = loadRegistry(root);
+  const blocks = await lerTrechos(root);
+  let written = 0, alreadyHad = 0, noSuchBlock = 0;
+  const willTurnYellow: string[] = [];
 
-  for (const [id, r] of Object.entries(reg)) {
-    const gravada = (r as { digital_texto?: string }).digital_texto;
-    if (!gravada) continue;
-    const achado = acharArquivoDoTrecho(raiz, id);
-    if (!achado) { semTrecho++; continue; }
+  for (const [id, entry] of Object.entries(registry)) {
+    const recorded = (entry as { digital_texto?: string }).digital_texto;
+    if (!recorded) continue;
+    const found = acharArquivoDoTrecho(root, id);
+    if (!found) { noSuchBlock++; continue; }
 
-    const atual = trechos.get(id)?.digital;
-    if (atual && atual !== gravada) vaoFicarAmarelos.push(id);
+    const current = blocks.get(id)?.digital;
+    if (current && current !== recorded) willTurnYellow.push(id);
 
-    const escapado = id.replace(/\./g, '\\.');
-    if (new RegExp(`data-id="${escapado}"[^>]*data-digital-validada`).test(achado.html)) {
-      jaTinham++; continue;
+    const escaped = id.replace(/\./g, '\\.');
+    if (new RegExp(`data-id="${escaped}"[^>]*data-digital-validada`).test(found.html)) {
+      alreadyHad++; continue;
     }
 
-    const atributos: Record<string, string> = { 'data-digital-validada': gravada };
-    const dependia = (r as { depende?: Record<string, string> }).depende;
-    if (dependia && Object.keys(dependia).length) {
-      atributos['data-dependia-de'] = JSON.stringify(dependia).replace(/"/g, '&quot;');
+    const attributes: Record<string, string> = { 'data-digital-validada': recorded };
+    const dependedOn = (entry as { depende?: Record<string, string> }).depende;
+    if (dependedOn && Object.keys(dependedOn).length) {
+      attributes['data-dependia-de'] = JSON.stringify(dependedOn).replace(/"/g, '&quot;');
     }
 
-    let html = readFileSync(achado.caminho, 'utf8');
-    for (const [attr, valor] of Object.entries(atributos)) {
-      html = html.replace(new RegExp(`(data-id="${escapado}")((?:(?!${attr})[^>])*?)>`),
-                          `$1$2 ${attr}="${valor}">`);
+    let html = readFileSync(found.caminho, 'utf8');
+    for (const [attr, value] of Object.entries(attributes)) {
+      html = html.replace(new RegExp(`(data-id="${escaped}")((?:(?!${attr})[^>])*?)>`),
+                          `$1$2 ${attr}="${value}">`);
     }
-    writeFileSync(achado.caminho, html, 'utf8');
-    escritos++;
+    writeFileSync(found.caminho, html, 'utf8');
+    written++;
   }
 
-  console.log(`\n${escritos} trecho(s) receberam a marca que faltava · ${jaTinham} já tinham`);
-  if (semTrecho) console.log(`⚠ ${semTrecho} do registro não existem mais nas folhas`);
-  if (vaoFicarAmarelos.length) {
-    console.log(`\n🟡 ${vaoFicarAmarelos.length} vão aparecer AMARELOS no site, e é o certo —`);
-    console.log(`   o texto mudou depois do ✓:\n   ${vaoFicarAmarelos.join('  ')}`);
+  console.log(`\n${written} block(s) got the mark they were missing · ${alreadyHad} already had it`);
+  if (noSuchBlock) console.log(`⚠ ${noSuchBlock} entries in the registry no longer exist in the pages`);
+  if (willTurnYellow.length) {
+    console.log(`\n🟡 ${willTurnYellow.length} will show up YELLOW on the site, and that is right —`);
+    console.log(`   the text changed after the ✓:\n   ${willTurnYellow.join('  ')}`);
   }
   console.log('');
-  return escritos;
+  return written;
 }
 
 /** What else do I have to look at if I touch this? The question to ask BEFORE editing. */
-export async function seEuMexer(raiz: string, id: string) {
-  const trechos = await lerTrechos(raiz);
-  if (!trechos.has(id)) { console.log(`✗ não achei o trecho ${id}`); return 1; }
+export async function ifITouch(root: string, id: string) {
+  const blocks = await lerTrechos(root);
+  if (!blocks.has(id)) { console.log(`✗ no such block: ${id}`); return 1; }
 
-  const dependentes = dependentsOf(id, comoONucleoVe(trechos));
-  const reg = carregar(raiz);
+  const dependents = dependentsOf(id, asTheCoreSeesIt(blocks));
+  const registry = loadRegistry(root);
 
-  console.log(`\nSe você mexer em ${id}:\n`);
-  if (!dependentes.length) {
-    console.log('  nada declara depender deste trecho.');
-    console.log('  (o que não quer dizer que nada dependa — só que ninguém declarou)\n');
+  console.log(`\nIf you touch ${id}:\n`);
+  if (!dependents.length) {
+    console.log('  nothing declares a dependency on this block.');
+    console.log('  (which does not mean nothing depends on it — only that nobody declared it)\n');
     return 0;
   }
-  console.log(`  ${dependentes.length} trecho(s) vão ficar 🔴 e precisar de conferência:\n`);
-  for (const d of dependentes) {
-    const validado = reg[d] ? `✓ validado em ${reg[d].data}` : 'nunca validado';
-    console.log(`  ${d.padEnd(14)} ${validado}`);
+  console.log(`  ${dependents.length} block(s) will turn 🔴 and need a check:\n`);
+  for (const d of dependents) {
+    const validated = registry[d] ? `✓ validated on ${registry[d].data}` : 'never validated';
+    console.log(`  ${d.padEnd(14)} ${validated}`);
   }
   console.log('');
   return 0;
@@ -411,27 +425,27 @@ export async function seEuMexer(raiz: string, id: string) {
  * has diff and authorship. This is a snapshot, and it exists for the questions a file answers badly:
  * "every diagram in the project", "every decision without an owner", "what breaks if I touch this".
  */
-export async function indexar(raiz: string, caminhoDoBanco?: string) {
+export async function rebuildIndex(root: string, databasePath?: string) {
   const { Index } = await import('../api/index-store.ts');
   const { currentCommit } = await import('../core/git.js');
-  const banco = caminhoDoBanco ?? process.env.REVISAO_SQLITE ?? join(raiz, 'dados', 'events.db');
-  const trechos = await lerTrechos(raiz);
+  const database = databasePath ?? process.env.REVISAO_SQLITE ?? join(root, 'dados', 'events.db');
+  const blocks = await lerTrechos(root);
 
   // Which commit the content was sitting on, so that a later run can ask git which files changed
   // instead of reparsing all of them. ⚠️ null when the content is not in a git repository — a
   // plain folder is a legitimate way to use this tool — and that is not an error: the index is
   // merely less useful, and indexing proceeds exactly the same.
-  const commit = currentCommit(raiz);
+  const commit = currentCommit(root);
 
-  const idx = new Index(banco);
+  const idx = new Index(database);
   try {
-    const quantos = idx.rebuild([...trechos.values()].map((t) => ({
+    const howMany = idx.rebuild([...blocks.values()].map((t) => ({
       id: t.id, page: t.pagina, kind: t.tipo, file: t.arquivo, code: t.cod || null,
       numbered: t.numerado, fingerprint: t.digital, text: t.texto.slice(0, 400),
       dependsOn: t.depende, missing: t.falta,
     })), commit);
 
-    console.log(`\nIndexados ${quantos} trecho(s) em ${banco}\n`);
+    console.log(`\nIndexed ${howMany} block(s) in ${database}\n`);
     for (const { kind, count } of idx.byKind()) {
       console.log(`  ${String(count).padStart(4)}  ${kind}`);
     }
@@ -454,23 +468,23 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
       if (needsAPerson.length > 10) console.log(`    … and ${needsAPerson.length - 10} more`);
     }
 
-    const quebradas = idx.brokenDependencies();
-    if (quebradas.length) {
-      console.log(`\n✗ ${quebradas.length} dependência(s) apontam para trecho que não existe:`);
-      for (const q of quebradas) console.log(`    ${q.block} → ${q.dependsOn}`);
+    const broken = idx.brokenDependencies();
+    if (broken.length) {
+      console.log(`\n✗ ${broken.length} dependency(ies) point at a block that does not exist:`);
+      for (const b of broken) console.log(`    ${b.block} → ${b.dependsOn}`);
     }
 
-    const faltas = idx.issues();
-    if (faltas.length) {
-      console.log(`\n⚠ ${faltas.length} pendência(s) de tipo:\n`);
-      for (const f of faltas.slice(0, 20)) console.log(`  ${f.id.padEnd(14)} ${f.missing}`);
-      if (faltas.length > 20) console.log(`  … e mais ${faltas.length - 20}`);
+    const issues = idx.issues();
+    if (issues.length) {
+      console.log(`\n⚠ ${issues.length} block(s) are missing what their kind demands:\n`);
+      for (const i of issues.slice(0, 20)) console.log(`  ${i.id.padEnd(14)} ${i.missing}`);
+      if (issues.length > 20) console.log(`  … and ${issues.length - 20} more`);
     } else {
-      console.log('\n✓ nenhuma pendência de tipo.');
+      console.log('\n✓ every block has what its kind demands.');
     }
     console.log('');
     return {
-      quantos, commit, faltas: faltas.length, quebradas: quebradas.length,
+      howMany, commit, issues: issues.length, broken: broken.length,
       severities: Object.fromEntries(levels.map((l) => [l.severity, l.count])),
     };
   } finally {
@@ -479,11 +493,11 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
 }
 
 /** The catalogue of kinds, for whoever is writing and wants to know what exists. */
-export async function tipos() {
+export async function listKinds() {
   const { catalogue } = await import('../core/kinds.js');
-  console.log('\nTipos de conteúdo — todo trecho validável é de um destes:\n');
-  for (const t of catalogue()) {
-    console.log(`  ${t.id.padEnd(11)} ${t.name}${t.numbered ? '' : '   (sem número na página)'}`);
-    console.log(`  ${''.padEnd(11)} ${t.description.replace(/\s+/g, ' ')}\n`);
+  console.log('\nContent kinds — every block that can be validated is one of these:\n');
+  for (const kind of catalogue()) {
+    console.log(`  ${kind.id.padEnd(11)} ${kind.name}${kind.numbered ? '' : '   (no number on the page)'}`);
+    console.log(`  ${''.padEnd(11)} ${kind.description.replace(/\s+/g, ' ')}\n`);
   }
 }

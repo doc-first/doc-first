@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { comoONucleoVe } from '../cli/validation.ts';
+import { asTheCoreSeesIt } from '../cli/validation.ts';
 import { trafficLight, dependentsOf } from '../core/validity.js';
 
 /**
@@ -26,14 +26,14 @@ test('a validated block whose text did not change is GREEN, not stale', () => {
   const trechos = new Map([trecho('A.1.1', 'abc123')]);
   const registro = { 'A.1.1': { digital_texto: 'abc123', data: '2026-09-16' } };
 
-  const { tally } = trafficLight(comoONucleoVe(trechos), registro);
+  const { tally } = trafficLight(asTheCoreSeesIt(trechos), registro);
 
   assert.equal(tally.valid, 1, 'the approval still holds — this is the bug that hid behind `as never`');
   assert.equal(tally.stale, 0);
 });
 
 test('the adapter carries the fingerprint over, and does not leave it undefined', () => {
-  const [[, bloco]] = comoONucleoVe(new Map([trecho('A.1.1', 'abc123')]));
+  const [[, bloco]] = asTheCoreSeesIt(new Map([trecho('A.1.1', 'abc123')]));
   assert.equal(bloco.fingerprint, 'abc123');
   assert.notEqual(bloco.fingerprint, undefined);
 });
@@ -45,11 +45,11 @@ test('the adapter carries the declared dependencies over', () => {
     trecho('A.1.1', 'aaa'),
     trecho('B.2.1', 'bbb', ['A.1.1']),
   ]);
-  assert.deepEqual(dependentsOf('A.1.1', comoONucleoVe(trechos)), ['B.2.1']);
+  assert.deepEqual(dependentsOf('A.1.1', asTheCoreSeesIt(trechos)), ['B.2.1']);
 });
 
 test('a text that really changed is still stale', () => {
   const trechos = new Map([trecho('A.1.1', 'NOVO')]);
   const registro = { 'A.1.1': { digital_texto: 'abc123' } };
-  assert.equal(trafficLight(comoONucleoVe(trechos), registro).tally.stale, 1);
+  assert.equal(trafficLight(asTheCoreSeesIt(trechos), registro).tally.stale, 1);
 });

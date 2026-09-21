@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lerTrechos, arquivosDeFolhas } from '../cli/pages.ts';
-import { orfaos, carregar, missingProofs } from '../cli/validation.ts';
+import { orphanMarks, loadRegistry, missingProofs } from '../cli/validation.ts';
 
 const RAIZ = new URL('../../', import.meta.url).pathname;
 const EXEMPLO = join(RAIZ, 'examples', 'ola-mundo');
@@ -60,16 +60,16 @@ test('conferir catches a forged approval', async () => {
     const reg = { 'A.1.1': { arquivo: 'telas/X01.html', data: '2026-09-16', digital_texto: 'x' } };
 
     writeFileSync(folha, '<main><div data-id="A.1.1" data-validado="2026-09-16">x</div></main>');
-    assert.equal(await orfaos(tmp, reg, [folha]), 0, 'a seal with a record and the right date passes');
+    assert.equal(await orphanMarks(tmp, reg, [folha]), 0, 'a seal with a record and the right date passes');
 
     writeFileSync(folha, '<main><div data-id="A.9.9" data-validado="2026-09-18">x</div></main>');
-    assert.equal(await orfaos(tmp, reg, [folha]), 1, 'a seal with NO record gets caught');
+    assert.equal(await orphanMarks(tmp, reg, [folha]), 1, 'a seal with NO record gets caught');
 
     writeFileSync(folha, '<main><div data-id="A.1.1" data-validado="2026-09-18">x</div></main>');
-    assert.equal(await orfaos(tmp, reg, [folha]), 1, 'a tampered date gets caught');
+    assert.equal(await orphanMarks(tmp, reg, [folha]), 1, 'a tampered date gets caught');
 
     writeFileSync(folha, '<main><div data-validado="2026-09-18">x</div></main>');
-    assert.equal(await orfaos(tmp, reg, [folha]), 1, 'a mark with no data-id gets caught');
+    assert.equal(await orphanMarks(tmp, reg, [folha]), 1, 'a mark with no data-id gets caught');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -122,24 +122,24 @@ test('check catches a data-prova whose file is gone', async () => {
 
 /**
  * Picking the work back up cannot depend on the cloud. These two cases were born in a real session:
- * `sincronizar` built the Source with no project, the URL came out as `projects//databases/…`, and
+ * `sync` built the Source with no project, the URL came out as `projects//databases/…`, and
  * the cloud answered with a 400 that said nothing — with the session opening blind, no scoreboard.
  */
-test('sincronizar carries on with the local record when the cloud fails', async () => {
-  const { sincronizar } = await import('../cli/validation.ts');
-  const fonteQueCai = { eventos: async () => { throw new Error('cloud is down'); } };
-  const antes = Object.keys(carregar(RAIZ)).length;
+test('sync carries on with the local record when the cloud fails', async () => {
+  const { sync } = await import('../cli/validation.ts');
+  const sourceThatFails = { events: async () => { throw new Error('cloud is down'); } };
+  const before = Object.keys(loadRegistry(RAIZ)).length;
 
-  const r = await sincronizar(RAIZ, fonteQueCai, { dono: 'who@example.org' });
+  const r = await sync(RAIZ, sourceThatFails, { owner: 'who@example.org' });
 
   assert.equal(r.offline, true, 'it has to say it read a frozen snapshot');
-  assert.equal(r.novos, 0);
-  assert.equal(Object.keys(carregar(RAIZ)).length, antes, 'it must not touch the record');
+  assert.equal(r.added, 0);
+  assert.equal(Object.keys(loadRegistry(RAIZ)).length, before, 'it must not touch the record');
 });
 
 test('the Source refuses a cloud with no project, instead of sending an invalid URL', async () => {
-  const { Fonte } = await import('../cli/remote.ts');
-  await assert.rejects(() => new Fonte({}).eventos(), /nuvem.projeto|REVISAO_PROJETO/);
+  const { Source } = await import('../cli/remote.ts');
+  await assert.rejects(() => new Source({}).events(), /nuvem.projeto|REVISAO_PROJETO/);
 });
 
 /**
