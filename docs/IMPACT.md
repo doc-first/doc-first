@@ -154,8 +154,14 @@ Three layers, each answering a question the layer below would have to scan for:
 | **reverse index** | who has to be repainted: `SELECT block FROM dependencies WHERE depends_on IN (…)` | one query |
 
 The third already exists — `index-store.ts` creates `dependencies_reverse ON dependencies
-(depends_on)` for exactly this. What is missing from the first is storing the **commit** the index
-was built at, not just the timestamp.
+(depends_on)` for exactly this. The first now has somewhere to start from: `index_meta` stores the
+**commit** the index was built at, and `Index.builtFrom()` gives it back. What is still missing is
+the comparison itself — nothing yet runs `git diff --name-only <sha>..HEAD` and reparses only what
+it names.
+
+⚠️ `commit_sha` is nullable, and the layer has to cope: content kept in a plain folder produces an
+index with no commit, and then there is no starting point and a reindex costs a full parse. Less
+useful, not broken.
 
 Repainting after a commit costs *blocks changed + their direct dependents*. Never the documentation.
 

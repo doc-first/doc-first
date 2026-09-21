@@ -363,8 +363,15 @@ export async function seEuMexer(raiz: string, id: string) {
  */
 export async function indexar(raiz: string, caminhoDoBanco?: string) {
   const { Index } = await import('../api/index-store.ts');
+  const { currentCommit } = await import('../core/git.js');
   const banco = caminhoDoBanco ?? process.env.REVISAO_SQLITE ?? join(raiz, 'dados', 'events.db');
   const trechos = await lerTrechos(raiz);
+
+  // Which commit the content was sitting on, so that a later run can ask git which files changed
+  // instead of reparsing all of them. ⚠️ null when the content is not in a git repository — a
+  // plain folder is a legitimate way to use this tool — and that is not an error: the index is
+  // merely less useful, and indexing proceeds exactly the same.
+  const commit = currentCommit(raiz);
 
   const idx = new Index(banco);
   try {
@@ -372,7 +379,7 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
       id: t.id, page: t.pagina, kind: t.tipo, file: t.arquivo, code: t.cod || null,
       numbered: t.numerado, fingerprint: t.digital, text: t.texto.slice(0, 400),
       dependsOn: t.depende, missing: t.falta,
-    })));
+    })), commit);
 
     console.log(`\nIndexados ${quantos} trecho(s) em ${banco}\n`);
     for (const { kind, count } of idx.byKind()) {
@@ -413,7 +420,7 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
     }
     console.log('');
     return {
-      quantos, faltas: faltas.length, quebradas: quebradas.length,
+      quantos, commit, faltas: faltas.length, quebradas: quebradas.length,
       severities: Object.fromEntries(levels.map((l) => [l.severity, l.count])),
     };
   } finally {

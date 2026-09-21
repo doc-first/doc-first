@@ -57,6 +57,21 @@ export class Index {
 
       CREATE TABLE IF NOT EXISTS issues (block TEXT NOT NULL, missing TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS issues_by_block ON issues (block);
+
+      -- ONE row, enforced by the CHECK: the commit and the instant belong to the index as a whole,
+      -- not to any block in it. Stamping them on every block, which is what indexed_at does,
+      -- invites the reader to believe two rows could disagree, and to write a query that groups by
+      -- them. They cannot disagree: a rebuild is all-or-nothing.
+      --
+      -- Why the commit and not only the hour: an hour cannot name a tree. Knowing the index was
+      -- built at commit <sha> lets a later run ask git which FILES changed since then and reparse
+      -- only those. Knowing it was built at 14:02 leaves no honest answer but "reparse everything".
+      --
+      -- commit_sha is nullable on purpose. The reason is in the doc comment of rebuild.
+      CREATE TABLE IF NOT EXISTS index_meta (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        commit_sha TEXT,
+        built_at TEXT NOT NULL);
     `);
   }
 
@@ -81,12 +96,24 @@ export class Index {
    * Rebuilds the whole index. Wipes and rewrites inside a transaction: a half-written index would
    * lie worse than a stale one — anyone reading mid-rebuild would see documentation that never
    * existed.
+   *
+   * `commit` is the commit the content was sitting on. ⚠️ null is a legitimate value, not an
+   * error: the documentation may live in a plain folder nobody ever ran `git init` in, and the
+   * tool has to keep working there. An index with no commit is a LESS USEFUL index — the git layer
+   * has nothing to diff against, so the next run reparses everything — but it is not a broken one,
+   * and refusing to index would trade a real loss for an imaginary one.
    */
-  rebuild(blocks: IndexedBlock[]) {
+  rebuild(blocks: IndexedBlock[], commit: string | null = null) {
     const now = new Date().toISOString();
     this.#db.exec('BEGIN');
     try {
       this.#db.exec('DELETE FROM issues; DELETE FROM dependencies; DELETE FROM blocks');
+      // Rewritten, never accumulated: the metadata describes THIS index, and the previous one is
+      // gone by the line above. Inside the transaction with everything else, so a rollback cannot
+      // leave a commit pointing at blocks that were never written.
+      this.#db.exec('DELETE FROM index_meta');
+      this.#db.prepare('INSERT INTO index_meta (id, commit_sha, built_at) VALUES (1, ?, ?)')
+        .run(commit, now);
       const b = this.#db.prepare(
         `INSERT INTO blocks (id, page, kind, file, code, numbered, fingerprint, text, position, indexed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -189,6 +216,22 @@ export class Index {
   indexedAt(): string | null {
     const r = this.#db.prepare('SELECT MAX(indexed_at) AS at FROM blocks').get() as { at: string | null };
     return r?.at ?? null;
+  }
+
+  /**
+   * Where this index came from: the commit of the content and the instant it was built.
+   *
+   * Two absences that mean different things, and the return type keeps them apart. `null` is
+   * "never built" — there is nothing to compare against at all. `{ commit: null }` is "built from
+   * content that is not in a repository", which is a perfectly usable index; it just cannot tell
+   * the git layer where to start, so a reindex costs a full parse.
+   */
+  builtFrom(): { commit: string | null; at: string } | null {
+    // Not aliased to `commit` in SQL: COMMIT is a keyword, and SQLite fails on the bare word with
+    // a message that names the column and not the reason. The rename happens in TypeScript.
+    const r = this.#db.prepare('SELECT commit_sha, built_at FROM index_meta WHERE id = 1')
+      .get() as { commit_sha: string | null; built_at: string } | undefined;
+    return r ? { commit: r.commit_sha, at: r.built_at } : null;
   }
 
   close() { this.#db.close(); }

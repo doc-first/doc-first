@@ -107,6 +107,69 @@ test('a rebuild rewrites the severities instead of leaving the old ones behind',
   idx.close();
 });
 
+/**
+ * The metadata of the index itself: the commit the content was on, and when it was built.
+ *
+ * ⚠️ Storing it is all these prove. Nothing here diffs anything against git — that is the next
+ * piece, and it needs this one to have somewhere to start from.
+ */
+
+test('an index that was never built has no metadata at all', () => {
+  const idx = open();
+  // null and `{ commit: null }` are different answers and the calling code will have to tell them
+  // apart: "never built" versus "built from content that is not in a repository".
+  assert.equal(idx.builtFrom(), null);
+  idx.close();
+});
+
+test('the commit is stored once for the whole index, not once per block', () => {
+  const idx = open();
+  const sha = 'a'.repeat(40);
+  idx.rebuild([block('D01.1', 'config'), block('D01.2', 'text', ['D01.1'])], sha);
+
+  const meta = idx.builtFrom();
+  assert.equal(meta.commit, sha);
+  assert.match(meta.at, /^\d{4}-\d{2}-\d{2}T/);
+  // Two blocks went in, and the answer is a single object rather than a row per block: the commit
+  // is a property of the index, and two rows could never honestly disagree about it.
+  assert.equal(idx.byKind().reduce((sum, k) => sum + k.count, 0), 2);
+  idx.close();
+});
+
+test('an index built outside a repository stores no commit and still holds everything else', () => {
+  const idx = open();
+  // The default is null because content is not always in a repository. It has to produce an index
+  // that is merely less useful, never an index that failed to be built.
+  idx.rebuild([block('D01.1', 'config'), block('D01.2', 'text', ['D01.1'])]);
+
+  const meta = idx.builtFrom();
+  assert.equal(meta.commit, null);
+  assert.match(meta.at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(idx.needsAPerson().length, 1);
+  idx.close();
+});
+
+test('a rebuild replaces the metadata instead of stacking a second row', () => {
+  const idx = open();
+  idx.rebuild([block('D01.1', 'config')], 'a'.repeat(40));
+  idx.rebuild([block('D01.1', 'config')], 'b'.repeat(40));
+  // An insert that did not clear the table first would hit the CHECK on the single row, and the
+  // index would keep claiming a tree it was not built from.
+  assert.equal(idx.builtFrom().commit, 'b'.repeat(40));
+  idx.close();
+});
+
+test('reindexing a plain folder clears the commit an earlier repository left behind', () => {
+  const idx = open();
+  idx.rebuild([block('D01.1', 'config')], 'a'.repeat(40));
+  // The same database, now fed content with no commit. Keeping the old SHA would be the worst of
+  // the three outcomes: the git layer would diff against a tree that has nothing to do with what
+  // was just indexed, and conclude that almost nothing needs reparsing.
+  idx.rebuild([block('D01.1', 'config')], null);
+  assert.equal(idx.builtFrom().commit, null);
+  idx.close();
+});
+
 test('an index written before severity existed is rebuilt, not crashed into', () => {
   const path = join(mkdtempSync(join(tmpdir(), 'doc-first-index-')), 'events.db');
   const old = new DatabaseSync(path);
