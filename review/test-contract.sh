@@ -110,7 +110,11 @@ REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_IDENTIDADE=senha REVISA
   node review/api/server.ts >/tmp/node-password.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
-PASSWORD=$(grep -A2 'PRIMEIRO ACESSO' /tmp/node-password.log | sed -n 's/.*senha: *//p')
+# ⚠️ Matches both wordings. The banner said `senha:` until v0.2.1 and says `password:` after, and
+# this line is read by scripts that pin an OLDER image on purpose. Changing the banner without this
+# turned ten checks red at once, and the product was fine — only the reader was stale.
+PASSWORD=$(grep -A2 -E 'PRIMEIRO ACESSO|FIRST ACCESS' /tmp/node-password.log \
+  | sed -n -E 's/.*(senha|password): *//p' | head -1)
 expect "the first password is said once" 0 "$([ -n "$PASSWORD" ] && echo 0 || echo 1)"
 expect "and it isn't 'admin'"          1 "$(echo "$PASSWORD" | grep -qx 'admin'; echo $?)"
 login() { curl -s -c $COOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$OWNER\",\"senha\":\"$1\"}" $B/api/entrar; }
