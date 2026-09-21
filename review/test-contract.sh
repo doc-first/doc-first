@@ -1,152 +1,156 @@
 #!/usr/bin/env bash
-# Mesmo contrato HTTP que o testar-local.sh cobra da API — agora contra o servidor Node.
-# Uso: bash review/test-contract.sh
+# Same HTTP contract that testar-local.sh demands from the API — now against the Node server.
+# Usage: bash review/test-contract.sh
 set -uo pipefail
-RAIZ=$(cd "$(dirname "$0")" && pwd); cd "$RAIZ/.."
-PORTA=${PORTA:-18095}; B=http://127.0.0.1:$PORTA; FALHAS=0
-export DONO=dono@exemplo.org; export KAM=revisora@exemplo.org
+ROOT=$(cd "$(dirname "$0")" && pwd); cd "$ROOT/.."
+PORT=${PORT:-18095}; B=http://127.0.0.1:$PORT; FAILURES=0
+export OWNER=owner@example.org; export REVIEWER=reviewer@example.org
 
-espera() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FALHA $1 — esperado $2, veio $3"; FALHAS=$((FALHAS+1)); fi; }
+expect() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FAIL $1 — expected $2, got $3"; FAILURES=$((FAILURES+1)); fi; }
 
-# Porta ocupada é a falha mais traiçoeira que já vi aqui: o servidor novo morre com EADDRINUSE, o
-# velho continua respondendo, e a suíte inteira testa o código anterior — uma vez isso quase me fez
-# desfazer uma correção que estava certa. Melhor não rodar do que rodar mentindo.
+# A port already in use is the most treacherous failure I've seen here: the new server dies with
+# EADDRINUSE, the old one keeps answering, and the whole suite ends up testing the previous code —
+# once this nearly made me undo a fix that was actually correct. Better not to run than to run while
+# lying.
 if curl -s -o /dev/null --max-time 2 $B/api/saude; then
-  echo "porta $PORTA já está ocupada — o teste rodaria contra OUTRO servidor."
-  ss -ltnp 2>/dev/null | grep ":$PORTA " || true
-  echo "  mate o processo (ou rode com PORTA=outra) e tente de novo."
+  echo "port $PORT is already in use — the test would run against ANOTHER server."
+  ss -ltnp 2>/dev/null | grep ":$PORT " || true
+  echo "  kill the process (or run with PORT=another) and try again."
   exit 1
 fi
-# Um servidor deixado para trás por uma execução interrompida também derruba a rodada seguinte.
+# A server left behind by an interrupted run also breaks the next round.
 PID=
 trap 'kill $PID 2>/dev/null' EXIT INT TERM
 post()  { curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $1" -H 'Content-Type: application/json' -d "$2" $B/api/eventos; }
-corpo() { curl -s -H "X-Dev-Email: $1" -H 'Content-Type: application/json' -d "$2" $B/api/eventos; }
-novo()  { corpo "$1" "$2" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).id))"; }
-est()   { post "$1" "{\"tipo\":\"pedido_estado\",\"pagina\":\"D02\",\"texto\":\"$4\",\"dados\":{\"pedido\":\"$2\",\"estado\":\"$3\"${5:-}}}"; }
+body() { curl -s -H "X-Dev-Email: $1" -H 'Content-Type: application/json' -d "$2" $B/api/eventos; }
+new_request()  { body "$1" "$2" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).id))"; }
+state()   { post "$1" "{\"tipo\":\"pedido_estado\",\"pagina\":\"D02\",\"texto\":\"$4\",\"dados\":{\"pedido\":\"$2\",\"estado\":\"$3\"${5:-}}}"; }
 
-# REVISAO_DEV_EMAIL vazio de propósito: com `desenvolvimento.comoQuem` no doc-first.json, uma
-# requisição sem cabeçalho passaria a ser identificada — que é o certo para abrir o navegador, mas
-# esconderia o teste de que sem identidade NENHUMA a resposta é 401.
-REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER=$DONO REVISAO_DEV_EMAIL= PORT=$PORTA \
+# REVISAO_DEV_EMAIL empty on purpose: with `desenvolvimento.comoQuem` in doc-first.json, a request
+# with no header would end up identified — which is the right behavior for opening the browser, but
+# it would hide the test that proves that with NO identity at all the response is 401.
+REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER=$OWNER REVISAO_DEV_EMAIL= PORT=$PORT \
   REVISAO_SITE="$PWD/examples/ola-mundo" \
-  node review/api/server.ts >/tmp/node-testes.log 2>&1 & PID=$!
+  node review/api/server.ts >/tmp/node-tests.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
-echo "identidade e papéis:"
-espera "sem identidade → 401"          401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/eventos)"
-espera "owner é owner"                 owner "$(curl -s -H "X-Dev-Email: $DONO" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
-espera "revisora é outro"              outro "$(curl -s -H "X-Dev-Email: $KAM" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
-espera "capacidade em vez de papel"    true "$(curl -s -H "X-Dev-Email: $DONO" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).podeAprovar))")"
+echo "identity and roles:"
+expect "no identity → 401"             401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/eventos)"
+expect "owner is owner"                owner "$(curl -s -H "X-Dev-Email: $OWNER" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
+expect "reviewer is other"             outro "$(curl -s -H "X-Dev-Email: $REVIEWER" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
+expect "capability instead of role"    true "$(curl -s -H "X-Dev-Email: $OWNER" $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).podeAprovar))")"
 
-echo "aprovação:"
-espera "revisora NÃO aprova → 403"     403 "$(post $KAM '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}')"
-espera "owner aprova → 201"            201 "$(post $DONO '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}')"
-espera "aprovação sem digital → 400"   400 "$(post $DONO '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4"}')"
-espera "tipo desconhecido → 400"       400 "$(post $DONO '{"tipo":"apagar","pagina":"D01"}')"
+echo "approval:"
+expect "reviewer does NOT approve → 403" 403 "$(post $REVIEWER '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}')"
+expect "owner approves → 201"          201 "$(post $OWNER '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}')"
+expect "approval without digital → 400" 400 "$(post $OWNER '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4"}')"
+expect "unknown type → 400"            400 "$(post $OWNER '{"tipo":"delete","pagina":"D01"}')"
 
-echo "limites:"
-GRANDE=$(node -e "console.log('x'.repeat(500))")
-espera "caixa gigante → 400"           400 "$(post $DONO "{\"tipo\":\"aprovacao\",\"pagina\":\"D01\",\"caixa\":\"$GRANDE\",\"digital\":\"a\"}")"
-espera "página inválida → 400"         400 "$(post $DONO '{"tipo":"comentario","pagina":"../etc","texto":"oi"}')"
-espera "UC-01 é página válida → 201"   201 "$(post $DONO '{"tipo":"comentario","pagina":"UC-01","texto":"oi"}')"
-# O erro tem de dizer QUAL campo estourou, não só "campo grande demais": com sete limites, uma
-# mensagem genérica obriga quem chamou a adivinhar. Procura `snapshot`, a palavra do motor.
-# ⚠️ O contrato ainda recebe o campo como `foto` (pt-BR) e o erro já responde `snapshot` (inglês) —
-# quem chama vê um nome que não mandou. Fecha no passo 5, quando o contrato virar inglês.
-espera "erro diz QUAL campo"           0 "$(corpo $DONO "{\"tipo\":\"comentario\",\"pagina\":\"D01\",\"texto\":\"oi\",\"foto\":\"$(node -e "console.log('y'.repeat(20001))")\"}" | grep -qi snapshot; echo $?)"
+echo "limits:"
+LARGE=$(node -e "console.log('x'.repeat(500))")
+expect "giant caixa → 400"             400 "$(post $OWNER "{\"tipo\":\"aprovacao\",\"pagina\":\"D01\",\"caixa\":\"$LARGE\",\"digital\":\"a\"}")"
+expect "invalid page → 400"            400 "$(post $OWNER '{"tipo":"comentario","pagina":"../etc","texto":"hi"}')"
+expect "UC-01 is a valid page → 201"   201 "$(post $OWNER '{"tipo":"comentario","pagina":"UC-01","texto":"hi"}')"
+# The error has to say WHICH field overflowed, not just "field too big": with seven limits, a
+# generic message forces whoever called it to guess. Look for `snapshot`, the engine's word.
+# ⚠️ The contract still receives the field as `foto` (pt-BR) and the error already answers with
+# `snapshot` (English) — the caller sees a name it never sent. This closes in step 5, when the
+# contract turns English.
+expect "error says WHICH field"        0 "$(body $OWNER "{\"tipo\":\"comentario\",\"pagina\":\"D01\",\"texto\":\"hi\",\"foto\":\"$(node -e "console.log('y'.repeat(20001))")\"}" | grep -qi snapshot; echo $?)"
 
-echo "ciclo do pedido:"
-P=$(novo $KAM '{"tipo":"pedido","pagina":"D02","caixa":"D02.1.1","digital":"x","texto":"trocar termo","foto":"texto de então"}')
-espera "revisora não tria → 403"       403 "$(est $KAM $P aprovado 'x')"
-espera "recusar sem motivo → 400"      400 "$(est $DONO $P recusado '')"
-espera "owner recusa → 201"            201 "$(est $DONO $P recusado 'falta dizer onde')"
-espera "recusado → aprovado → 201"     201 "$(est $DONO $P aprovado 'revi')"
-espera "aprovado não volta → 409"      409 "$(est $DONO $P recusado 'mudei de ideia')"
-espera "aplicado sem commit → 400"     400 "$(est agente@teste $P aplicado 'feito')"
-espera "aplicado com commit → 201"     201 "$(est agente@teste $P aplicado 'feito' ',"commit":"abc1234"')"
+echo "request cycle:"
+P=$(new_request $REVIEWER '{"tipo":"pedido","pagina":"D02","caixa":"D02.1.1","digital":"x","texto":"change term","foto":"the earlier text"}')
+expect "reviewer can't triage → 403"   403 "$(state $REVIEWER $P aprovado 'x')"
+expect "reject without a reason → 400" 400 "$(state $OWNER $P recusado '')"
+expect "owner rejects → 201"           201 "$(state $OWNER $P recusado 'does not say where')"
+expect "rejected → approved → 201"     201 "$(state $OWNER $P aprovado 'reviewed')"
+expect "approved doesn't go back → 409" 409 "$(state $OWNER $P recusado 'changed my mind')"
+expect "applied without a commit → 400" 400 "$(state agent@test $P aplicado 'done')"
+expect "applied with a commit → 201"   201 "$(state agent@test $P aplicado 'done' ',"commit":"abc1234"')"
 
-echo "pedido de quem pode aprovar nasce aprovado:"
-P2=$(novo $DONO '{"tipo":"pedido","pagina":"D02","caixa":"D02.2.1","digital":"x","texto":"meu pedido"}')
-espera "já nasce aprovado → 409"       409 "$(est $DONO $P2 aprovado 'redundante')"
-espera "o agente aplica direto → 201"  201 "$(est agente@teste $P2 analise 'vendo')"
+echo "a request from someone who can approve is born approved:"
+P2=$(new_request $OWNER '{"tipo":"pedido","pagina":"D02","caixa":"D02.2.1","digital":"x","texto":"my request"}')
+expect "already born approved → 409"   409 "$(state $OWNER $P2 aprovado 'redundant')"
+expect "the agent applies directly → 201" 201 "$(state agent@test $P2 analise 'looking')"
 
-echo "situação calculada pelo servidor:"
-espera "pedido do owner: aprovado"     analise "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.DONO);console.log(e.situacao.estado)})")"
-espera "triagem vazia em aprovado"     0 "$(curl -s -H "X-Dev-Email: $DONO" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.DONO);console.log(e.situacao.triagem.length)})")"
+echo "situation calculated by the server:"
+expect "owner's request: approved"     analise "$(curl -s -H "X-Dev-Email: $OWNER" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.OWNER);console.log(e.situacao.estado)})")"
+expect "empty triage when approved"    0 "$(curl -s -H "X-Dev-Email: $OWNER" "$B/api/eventos?pagina=D02" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const e=JSON.parse(s).find(x=>x.tipo==='pedido'&&x.autor===process.env.OWNER);console.log(e.situacao.triagem.length)})")"
 
-echo "contrato e site:"
-ID=$(novo $DONO '{"tipo":"comentario","pagina":"D01","texto":"achar por id"}')
-espera "GET /api/eventos/{id} → 200"   200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eventos/$ID)"
-espera "id inexistente → 404"          404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eventos/naoexiste)"
-espera "site estático serve"           200 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
-espera "raiz redireciona"              302 "$(curl -s -o /dev/null -w '%{http_code}' $B/)"
-# O `new URL()` do Node já normaliza `../`, então esse vetor chega como /etc/passwd e dá 404 (não
-# vaza, mas por outro motivo). O que a guarda de prefixo realmente pega é o `..` CODIFICADO, que
-# sobrevive ao parse e só vira `..` no decodeURIComponent.
-espera "travessia codificada → 403"    403 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is "$B/%2e%2e%2f%2e%2e%2fetc/passwd")"
-espera "travessia crua não vaza"       404 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/front/../../../etc/passwd)"
+echo "contract and site:"
+ID=$(new_request $OWNER '{"tipo":"comentario","pagina":"D01","texto":"find by id"}')
+expect "GET /api/eventos/{id} → 200"   200 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eventos/$ID)"
+expect "nonexistent id → 404"          404 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eventos/doesnotexist)"
+expect "static site serves"            200 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
+expect "root redirects"                302 "$(curl -s -o /dev/null -w '%{http_code}' $B/)"
+# Node's `new URL()` already normalizes `../`, so this vector arrives as /etc/passwd and returns 404
+# (it doesn't leak, but for a different reason). What the prefix guard actually catches is the
+# ENCODED `..`, which survives parsing and only becomes `..` at decodeURIComponent.
+expect "encoded traversal → 403"       403 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is "$B/%2e%2e%2f%2e%2e%2fetc/passwd")"
+expect "raw traversal doesn't leak"    404 "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/front/../../../etc/passwd)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
-echo "modo local NÃO liga fora de desenvolvimento:"
-REVISAO_MODO=local REVISAO_AMBIENTE=Production REVISAO_OWNER=$DONO REVISAO_AUDIENCIA=/projects/0/x PORT=$PORTA \
+echo "local mode does NOT turn on outside development:"
+REVISAO_MODO=local REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_AUDIENCIA=/projects/0/x PORT=$PORT \
   REVISAO_SITE="$PWD/examples/ola-mundo" \
   node review/api/server.ts >/tmp/node-prod.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
-espera "X-Dev-Email ignorado → 401"    401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eu)"
-espera "e avisa no log"                0 "$(grep -qi 'IGNORADO' /tmp/node-prod.log; echo $?)"
-espera "e-mail forjado → 401"          401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-authenticated-user-email: accounts.google.com:x@y' $B/api/eu)"
-espera "JWT forjado → 401"             401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-iap-jwt-assertion: eyJhbGciOiJFUzI1NiJ9.eyJlbWFpbCI6ImhhY2tlckB4In0.abc' $B/api/eu)"
+expect "X-Dev-Email ignored → 401"     401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eu)"
+expect "and warns in the log"          0 "$(grep -qi 'IGNORADO' /tmp/node-prod.log; echo $?)"
+expect "forged email → 401"            401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-authenticated-user-email: accounts.google.com:x@y' $B/api/eu)"
+expect "forged JWT → 401"              401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-iap-jwt-assertion: eyJhbGciOiJFUzI1NiJ9.eyJlbWFpbCI6ImhhY2tlckB4In0.abc' $B/api/eu)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
-echo "sobe sem nuvem nenhuma (usuário, senha e um arquivo):"
-# É o caminho de quem baixa a imagem: nenhuma variável do Google, nenhum projeto, nenhum IAP.
-DADOS=$(mktemp -d); LOGIN=/tmp/cookies-contrato.txt; rm -f $LOGIN
-REVISAO_AMBIENTE=Production REVISAO_OWNER=$DONO REVISAO_IDENTIDADE=senha REVISAO_BANCO=sqlite \
-  REVISAO_PESSOAS=$DADOS/pessoas.db REVISAO_SQLITE=$DADOS/eventos.db PORT=$PORTA \
+echo "comes up with no cloud at all (username, password and a single file):"
+# This is the path for whoever downloads the image: no Google variable, no project, no IAP.
+DATA_DIR=$(mktemp -d); COOKIES=/tmp/cookies-contract.txt; rm -f $COOKIES
+REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_IDENTIDADE=senha REVISAO_BANCO=sqlite \
+  REVISAO_PESSOAS=$DATA_DIR/people.db REVISAO_SQLITE=$DATA_DIR/events.db PORT=$PORT \
   REVISAO_SITE="$PWD/examples/ola-mundo" \
-  node review/api/server.ts >/tmp/node-senha.log 2>&1 & PID=$!
+  node review/api/server.ts >/tmp/node-password.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
-SENHA=$(grep -A2 'PRIMEIRO ACESSO' /tmp/node-senha.log | sed -n 's/.*senha: *//p')
-espera "a primeira senha é dita uma vez" 0 "$([ -n "$SENHA" ] && echo 0 || echo 1)"
-espera "e não é 'admin'"                 1 "$(echo "$SENHA" | grep -qx 'admin'; echo $?)"
-entra() { curl -s -c $LOGIN -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$DONO\",\"senha\":\"$1\"}" $B/api/entrar; }
+PASSWORD=$(grep -A2 'PRIMEIRO ACESSO' /tmp/node-password.log | sed -n 's/.*senha: *//p')
+expect "the first password is said once" 0 "$([ -n "$PASSWORD" ] && echo 0 || echo 1)"
+expect "and it isn't 'admin'"          1 "$(echo "$PASSWORD" | grep -qx 'admin'; echo $?)"
+login() { curl -s -c $COOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$OWNER\",\"senha\":\"$1\"}" $B/api/entrar; }
 
-espera "sem sessão → 401"                401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/eu)"
-# Aqui não há IAP na borda: se o site estático não exigir sessão, a documentação inteira fica aberta
-# a quem alcançar a porta — e quem subiu a imagem acreditando ter configurado login nem desconfia.
-espera "a doc NÃO abre sem sessão"       302 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
-espera "e manda para a tela de entrada"  0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -qi 'location: /entrar'; echo $?)"
-espera "guardando para onde ela ia"      0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -q 'destino=%2Fpaginas%2FA01'; echo $?)"
-espera "a tela de entrada abre → 200"    200 "$(curl -s -o /dev/null -w '%{http_code}' $B/entrar)"
-espera "e ela não pede nada de fora"     1 "$(curl -s $B/entrar | grep -qE '<link|src=\"/front'; echo $?)"
-espera "X-Dev-Email não vale aqui → 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $DONO" $B/api/eu)"
-espera "senha errada → 401"              401 "$(entra 'nao-e-a-senha')"
-espera "senha certa → 200"               200 "$(entra "$SENHA")"
-espera "e a sessão identifica o owner"   owner "$(curl -s -b $LOGIN $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
-espera "e o owner aprova de verdade"     201 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}' $B/api/eventos)"
-espera "a senha do primeiro acesso pede troca" true "$(curl -s -b $LOGIN $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).precisaTrocarSenha))")"
-espera "agora a doc abre → 200"          200 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
-# O HTML NÃO pode ser cacheado: senão uma correção de texto não chega a quem já abriu a página —
-# e, pior, a digital que o navegador calcula passa a ser de um texto que já mudou no disco.
-espera "HTML não é cacheado"             0 "$(curl -s -b $LOGIN -D- -o /dev/null $B/paginas/A01.html | grep -qi 'cache-control: no-cache'; echo $?)"
-espera "e /entrar já não tem o que fazer" 302 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/entrar)"
-espera "sair → 200"                      200 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' -X POST $B/api/sair)"
-espera "e depois de sair → 401"          401 "$(curl -s -b $LOGIN -o /dev/null -w '%{http_code}' $B/api/eu)"
+expect "no session → 401"              401 "$(curl -s -o /dev/null -w '%{http_code}' $B/api/eu)"
+# There is no IAP at the edge here: if the static site doesn't require a session, the whole
+# documentation is left open to anyone who reaches the port — and whoever brought the image up
+# believing they had configured login never suspects a thing.
+expect "the docs do NOT open without a session" 302 "$(curl -s -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
+expect "and sends it to the login screen" 0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -qi 'location: /entrar'; echo $?)"
+expect "keeping track of where it was headed" 0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -q 'destino=%2Fpaginas%2FA01'; echo $?)"
+expect "the login screen opens → 200"  200 "$(curl -s -o /dev/null -w '%{http_code}' $B/entrar)"
+expect "and it doesn't ask for anything external" 1 "$(curl -s $B/entrar | grep -qE '<link|src=\"/front'; echo $?)"
+expect "X-Dev-Email doesn't count here → 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eu)"
+expect "wrong password → 401"          401 "$(login 'not-the-password')"
+expect "correct password → 200"        200 "$(login "$PASSWORD")"
+expect "and the session identifies the owner" owner "$(curl -s -b $COOKIES $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).papel))")"
+expect "and the owner truly approves"  201 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"tipo":"aprovacao","pagina":"D01","caixa":"D01.1.4","digital":"abc123"}' $B/api/eventos)"
+expect "the first-access password requires a change" true "$(curl -s -b $COOKIES $B/api/eu | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).precisaTrocarSenha))")"
+expect "now the docs open → 200"       200 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/paginas/A01.html)"
+# The HTML must NOT be cached: otherwise a text fix never reaches someone who already opened the
+# page — and, worse, the digital the browser computes ends up matching text that has already
+# changed on disk.
+expect "HTML is not cached"            0 "$(curl -s -b $COOKIES -D- -o /dev/null $B/paginas/A01.html | grep -qi 'cache-control: no-cache'; echo $?)"
+expect "and /entrar no longer has anything to do" 302 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/entrar)"
+expect "logout → 200"                  200 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' -X POST $B/api/sair)"
+expect "and after logging out → 401"   401 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/api/eu)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
-# O evento gravado tem de sobreviver ao desligamento — é a diferença entre sqlite e memória.
-espera "o evento continua lá depois de desligar" 1 "$(node -e "
+# The recorded event has to survive shutdown — that's the difference between sqlite and memory.
+expect "the event is still there after shutdown" 1 "$(node -e "
   const {DatabaseSync}=require('node:sqlite');
-  console.log(new DatabaseSync('$DADOS/eventos.db').prepare('SELECT COUNT(*) c FROM events').get().c)")"
-rm -rf $DADOS $LOGIN
+  console.log(new DatabaseSync('$DATA_DIR/events.db').prepare('SELECT COUNT(*) c FROM events').get().c)")"
+rm -rf $DATA_DIR $COOKIES
 
-echo "sem configuração, não sobe:"
-# Fora de um projeto (sem doc-first.json) e sem variável: não há de onde tirar o owner.
-mkdir -p /tmp/doc-first-vazio
-REVISAO_SITE=/tmp/doc-first-vazio PORT=$PORTA timeout 15 node review/api/server.ts >/tmp/node-semcfg.log 2>&1
-espera "sem owner em lugar nenhum → sai 1" 1 "$?"
-espera "e diz o que falta"             0 "$(grep -qi 'REVISAO_OWNER' /tmp/node-semcfg.log; echo $?)"
+echo "with no configuration, it won't come up:"
+# Outside a project (no doc-first.json) and no variable: there's nowhere to pull the owner from.
+mkdir -p /tmp/doc-first-empty
+REVISAO_SITE=/tmp/doc-first-empty PORT=$PORT timeout 15 node review/api/server.ts >/tmp/node-no-config.log 2>&1
+expect "no owner anywhere → exits 1"   1 "$?"
+expect "and says what's missing"       0 "$(grep -qi 'REVISAO_OWNER' /tmp/node-no-config.log; echo $?)"
 
-echo; [ $FALHAS -eq 0 ] && echo "tudo certo" || { echo "$FALHAS falha(s)"; exit 1; }
+echo; [ $FAILURES -eq 0 ] && echo "all good" || { echo "$FAILURES failure(s)"; exit 1; }

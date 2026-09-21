@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
-# Sobe o site + a API na sua máquina, igual ao que roda na nuvem, com dados de TESTE em memória.
-# Nada vai para o Firestore; ao parar (Ctrl+C), os eventos de teste somem.
-# As páginas vêm direto do repositório: editou, recarregue o navegador.
-# Uso:  bash review/run-local.sh              → http://localhost:8095
-#       COMO=revisora@exemplo.org bash review/run-local.sh   → simula outra pessoa
+# Brings up the site + the API on your machine, just like it runs in the cloud, with TEST data in memory.
+# Nothing goes to Firestore; when you stop it (Ctrl+C), the test events disappear.
+# The pages come straight from the repository: edit, reload the browser.
+# Usage: bash review/run-local.sh              → http://localhost:8095
+#        ACTING_AS=reviewer@example.org bash review/run-local.sh   → simulates another person
 set -euo pipefail
-RAIZ=$(cd "$(dirname "$0")/.." && pwd)
-cd "$RAIZ"
-# Quem aprova e quem você finge ser vêm do doc-first.json do projeto — o motor não tem e-mail fixo.
-leia() { node -e "
-const {lerConfig}=await import('./review/core/config.js');
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+cd "$ROOT"
+# Who approves and who you pretend to be come from the project's doc-first.json — the engine has no fixed email.
+read_config() { node -e "
+const {readConfig}=await import('./review/core/config.js');
 const fs=await import('node:fs');
-const c=lerConfig(process.cwd(),{leArquivo:p=>fs.readFileSync(p,'utf8')},process.env);
+const c=readConfig(process.cwd(),{readFile:p=>fs.readFileSync(p,'utf8')},process.env);
 console.log(c[process.argv[1]] ?? '');" --input-type=module "$1" 2>/dev/null; }
-DONO=${REVISAO_OWNER:-$(leia owner)}
-COMO=${COMO:-${REVISAO_DEV_EMAIL:-$(leia comoQuem)}}
-PORTA=${PORTA:-$(leia porta)}; PORTA=${PORTA:-8095}
-[ -n "$DONO" ] || { echo "✗ falta o owner: ponha em doc-first.json ou em REVISAO_OWNER."; exit 1; }
+OWNER=${REVISAO_OWNER:-$(read_config owner)}
+ACTING_AS=${ACTING_AS:-${REVISAO_DEV_EMAIL:-$(read_config actAs)}}
+PORT=${PORT:-$(read_config port)}; PORT=${PORT:-8095}
+[ -n "$OWNER" ] || { echo "✗ missing the owner: put it in doc-first.json or in REVISAO_OWNER."; exit 1; }
 
-# Se a porta já estiver ocupada, o processo ANTIGO continua respondendo — e você fica testando o
-# binário anterior sem saber. Aconteceu duas vezes em 17/09, e uma delas quase me fez desfazer uma
-# correção que estava certa. Melhor não subir do que subir uma mentira.
-if ss -ltn 2>/dev/null | grep -q ":$PORTA "; then
-  PID=$(ss -ltnp 2>/dev/null | grep ":$PORTA " | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)
-  echo "✗ a porta $PORTA já está ocupada (pid ${PID:-?})."
-  echo "  O que responde ali é o processo ANTIGO, não o código que você acabou de mudar."
-  echo "  Pare com:  kill ${PID:-<pid>}      ou use outra:  PORTA=8096 bash review/run-local.sh"
+# If the port is already in use, the OLD process keeps answering — and you end up testing the
+# previous binary without knowing it. It happened twice on 2026-09-17, and one of those times nearly
+# made me undo a fix that was actually correct. Better not to come up than to come up lying.
+if ss -ltn 2>/dev/null | grep -q ":$PORT "; then
+  PID=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2)
+  echo "✗ port $PORT is already in use (pid ${PID:-?})."
+  echo "  What answers there is the OLD process, not the code you just changed."
+  echo "  Stop it with:  kill ${PID:-<pid>}      or use another one:  PORT=8096 bash review/run-local.sh"
   exit 1
 fi
 
-[ -d node_modules ] || { echo "instalando dependências..."; npm install --silent; }
+[ -d node_modules ] || { echo "installing dependencies..."; npm install --silent; }
 ( cd front && python3 gerar_index.py >/dev/null )
 
-echo "Doc First local → http://localhost:$PORTA   (você está como: $COMO · dados de teste, somem ao parar)"
-exec env REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER="$DONO" \
-  REVISAO_DEV_EMAIL="$COMO" REVISAO_SITE="$RAIZ" PORT="$PORTA" \
+echo "Doc First local → http://localhost:$PORT   (you are acting as: $ACTING_AS · test data, disappears when you stop)"
+exec env REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER="$OWNER" \
+  REVISAO_DEV_EMAIL="$ACTING_AS" REVISAO_SITE="$ROOT" PORT="$PORT" \
   node review/api/server.ts
