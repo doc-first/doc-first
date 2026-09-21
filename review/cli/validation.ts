@@ -379,6 +379,24 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
       console.log(`  ${String(count).padStart(4)}  ${kind}`);
     }
 
+    // The summary of where the dependencies landed, and not the list of them: the funnel is judged
+    // by how little reaches a person, and that is a number you can read in one glance and compare
+    // with the last run. ⚠️ Matrix only — no "before" text exists at index time, so these are the
+    // levels the kinds alone produce; see the note in `rebuild`.
+    const levels = idx.bySeverity();
+    const pairs = levels.reduce((sum, l) => sum + l.count, 0);
+    if (pairs) {
+      console.log(`\n${pairs} dependency pair(s), by severity (kinds only, no edit signals):`);
+      for (const { severity, count } of levels) {
+        console.log(`  ${String(count).padStart(4)}  ${severity}`);
+      }
+      const needsAPerson = idx.needsAPerson();
+      for (const p of needsAPerson.slice(0, 10)) {
+        console.log(`    person: ${p.block} (${p.kind}) → ${p.dependsOn} (${p.dependsOnKind ?? '?'})`);
+      }
+      if (needsAPerson.length > 10) console.log(`    … and ${needsAPerson.length - 10} more`);
+    }
+
     const quebradas = idx.brokenDependencies();
     if (quebradas.length) {
       console.log(`\n✗ ${quebradas.length} dependência(s) apontam para trecho que não existe:`);
@@ -394,7 +412,10 @@ export async function indexar(raiz: string, caminhoDoBanco?: string) {
       console.log('\n✓ nenhuma pendência de tipo.');
     }
     console.log('');
-    return { quantos, faltas: faltas.length, quebradas: quebradas.length };
+    return {
+      quantos, faltas: faltas.length, quebradas: quebradas.length,
+      severities: Object.fromEntries(levels.map((l) => [l.severity, l.count])),
+    };
   } finally {
     idx.close();
   }

@@ -167,7 +167,7 @@ Repainting after a commit costs *blocks changed + their direct dependents*. Neve
 | ✅ | dependency declared by block id (`data-depende`), and the reverse index |
 | ⬜ | **subject** — linking by name instead of by number |
 | ✅ | **weight** — `gravity`, `sensitivity` and `entails` on the kind, the matrix and the three signals of stage 3b, in `review/core/impact.js` |
-| ⬜ | **the wiring** — nothing calls `severityOf` yet: it is a function, not a pipeline |
+| 🟡 | **the wiring** — `doc-first index` now stores a severity on every dependency pair and counts them by level, and `needsAPerson()` asks for the ones that reached a person. The **matrix only**: an index built from the files on disk has no earlier text, so the three signals of stage 3b wait for the git layer |
 | ⬜ | **the respect** of a dependency |
 | ⬜ | **stage 4** — the agent closing what did not reach |
 | ⬜ | **the queue** — every open impact in the project, in one place |
