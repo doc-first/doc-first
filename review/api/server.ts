@@ -169,13 +169,21 @@ if (comoEntrar === 'senha') {
 
   // First boot: creates the owner's access and shows the password ONCE. A fixed password like
   // "admin" is an invitation, and an internal tool stays up for years with nobody looking.
-  const senha = await porSenha.primeiroAcesso(cfg.owner!, 'Owner');
+  //
+  // The display name comes from configuration because the alternative is everyone's first account
+  // being called "Owner" — and a review history where every approval is signed by a job title
+  // instead of a person is a history that answers "who said this?" with "the owner did".
+  //
+  // ⚠️ English, hard-coded, and NOT through i18n. This prints before anyone has a session, so
+  // there is no person and no chosen language yet — the same reason boot errors stay English. The
+  // comment at the top of review/core/i18n.js is the long version.
+  const senha = await porSenha.primeiroAcesso(cfg.owner!, process.env.REVISAO_OWNER_NAME || 'Owner');
   if (senha) {
     console.log('\n' + '='.repeat(72));
-    console.log('  PRIMEIRO ACESSO — anote agora, esta senha não será mostrada de novo:');
-    console.log(`     entrar com: ${cfg.owner}`);
-    console.log(`     senha:      ${senha}`);
-    console.log('  Você terá de trocá-la ao entrar.');
+    console.log('  FIRST ACCESS — write it down now, this password is not shown again:');
+    console.log(`     sign in with: ${cfg.owner}`);
+    console.log(`     password:     ${senha}`);
+    console.log('  You will have to change it when you sign in.');
     console.log('='.repeat(72) + '\n');
   }
 }

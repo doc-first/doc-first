@@ -204,6 +204,7 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 |---|---|
 | `REVISAO_OWNER` | who approves. Their ✓ is what becomes a lock |
 | `REVISAO_ADMINS` | e-mails, comma separated |
+| `REVISAO_OWNER_NAME` | the owner's display name on their first access (default: `Owner`) |
 | `REVISAO_SITE` | where the pages live (default: what `doc-first.json` says) |
 | `REVISAO_SQLITE` | the events file (default: `./dados/eventos.db`) |
 | `REVISAO_IDENTIDADE` | `senha`, `iap`, or `dev` — never `dev` outside Development |
