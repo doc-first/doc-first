@@ -473,7 +473,14 @@ const servidor = createServer(async (req, res) => {
     // had no way to suspect otherwise. Found while testing.
     if (porSenha && !(await porSenha.daRequisicao(req.headers))) {
       if (url.pathname === TELA_DE_ENTRADA) {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        // ⚠️ SECURITY_HEADERS here is not decoration, and I left it out on the first try: the
+        // login screen does not go through json() nor through servirArquivo(), so it was the ONE
+        // page without `frame-ancestors 'none'` — the exact page the comment on those headers
+        // names as the clickjacking target. A rule applied everywhere except where it matters.
+        res.writeHead(200, {
+          'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+          ...SECURITY_HEADERS,
+        });
         // The text goes in before the bytes leave: no untranslated flash, no second request, and
         // the labels are there with JavaScript off. See review/api/login-page.ts.
         return res.end(renderLoginPage(i18n, idioma(req)));

@@ -123,6 +123,11 @@ expect "the docs do NOT open without a session" 302 "$(curl -s -o /dev/null -w '
 expect "and sends it to the login screen" 0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -qi 'location: /entrar'; echo $?)"
 expect "keeping track of where it was headed" 0 "$(curl -s -D- -o /dev/null $B/paginas/A01.html | grep -q 'destino=%2Fpaginas%2FA01'; echo $?)"
 expect "the login screen opens → 200"  200 "$(curl -s -o /dev/null -w '%{http_code}' $B/entrar)"
+# The login screen is the clickjacking target: an invisible "Approve" laid over a real one, and an
+# approval here is a lock in a repository. It does not go through json() nor through the static
+# file path, so it was the one page missing the header — checked here so it cannot happen twice.
+expect "and it refuses to be framed"     1 "$(curl -s -D- -o /dev/null $B/entrar | grep -ci "frame-ancestors 'none'")"
+expect "and it says nosniff"             1 "$(curl -s -D- -o /dev/null $B/entrar | grep -ci 'x-content-type-options: nosniff')"
 expect "and it doesn't ask for anything external" 1 "$(curl -s $B/entrar | grep -qE '<link|src=\"/front'; echo $?)"
 expect "X-Dev-Email doesn't count here → 401" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eu)"
 expect "wrong password → 401"          401 "$(login 'not-the-password')"
