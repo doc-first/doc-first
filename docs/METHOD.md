@@ -193,6 +193,7 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 | Event store | `review/api/store-sqlite.ts` | SQLite on `/data`; the interface takes other stores |
 | Index | `review/api/index-store.ts` | derived, disposable, rebuilt by `index` |
 | Identity | `review/api/identity-password.ts`, `identity-iap.ts` | password, or a signed header from an identity proxy |
+| User store | `review/api/users.ts` + `users-sqlite.ts`, `users-firestore.ts`, `users-postgres.ts` | one interface, three databases; the hashing lives in the interface so none of them can diverge |
 | Review panel | `review/web/` | React, bundled into `painel-react.js` |
 | The agent's tool | `review/cli/doc-first.ts` | the commands above |
 | Example content | `examples/gabarito/`, `examples/ola-mundo/` | a template with eleven sections, and a two-page tour |
@@ -206,7 +207,31 @@ whoever owns the documentation, and the API answers 403 to anyone else.
 | `REVISAO_SITE` | where the pages live (default: what `doc-first.json` says) |
 | `REVISAO_SQLITE` | the events file (default: `./dados/eventos.db`) |
 | `REVISAO_IDENTIDADE` | `senha`, `iap`, or `dev` — never `dev` outside Development |
+| `REVISAO_USERS` | where the people who log in are kept — see below |
+| `REVISAO_PESSOAS` | the SQLite users file. An alias for `sqlite:<path>`, kept because it is published |
 | `REVISAO_IDIOMA` | the project's default language, when the reader has no preference |
+
+**Where the users live.** People and sessions are stored apart from the events, and the storage is
+pluggable for the same reason Keycloak's is — a file is right on a laptop and wrong on a platform
+that recycles its instances.
+
+| `REVISAO_USERS` | Store |
+|---|---|
+| *(not set)* | SQLite, at `REVISAO_PESSOAS` or `./dados/pessoas.db` |
+| `sqlite:/data/users.db` | SQLite in that file |
+| `firestore` | Firestore, in the project named by `REVISAO_PROJETO` |
+| `postgres://…` | Postgres, through the optional `pg` package. `postgresql://…` too |
+
+The scrypt hashing, the salt, the constant-time comparison and the session lifetime live in
+`UserStoreBase`, not in the implementations. That is not tidiness: a password hashed one way in
+SQLite and another way in Postgres is an account that works in one deployment and not in the other,
+and the person is told "e-mail or password do not match" while holding the right password. The
+implementations know about rows; none of them knows about scrypt.
+
+`review/tests/users-conformance.test.js` runs **one** suite against every available store. An
+implementation that does not pass it is not supported. When a store cannot be reached — no Docker
+for Postgres, no emulator for Firestore — its tests **skip with the reason printed**, because a
+green test that never ran buys confidence with nothing behind it.
 
 ## Truth and index
 
@@ -253,6 +278,17 @@ Honest, `2026-09-20`:
 - **AI assistance.** Designed, not built. Each project brings its own key.
 - **Identity beyond password and identity proxy.** OIDC, Google, LDAP: the interface is there, the
   piece is not.
+- **On Cloud Run, SQLite loses users on instance recycling.** The disk there is ephemeral and per
+  instance. An access created at 10:00 lives on the instance that served the request; when the
+  platform recycles it, `pessoas.db` goes with it, and the person who had an account simply stops
+  getting in — **no error, no log, nothing to grep**. Nobody finds this on the day they deploy;
+  they find it weeks later, from "it forgot me again". `REVISAO_USERS` is the way out
+  (`postgres://…` or `firestore`), and it is configuration, not a fix: **the service still starts
+  happily in the losing combination.** Refusing to boot on SQLite plus Cloud Run, or at least
+  saying so loudly, is not built.
+- **The Firestore user store has never been executed.** It is written against the same interface
+  and reviewed by eye; there is no emulator in this project's test environment, so its conformance
+  tests skip. Reviewed is not tested, and this document will not call it tested.
 - **Some configuration keys are still Portuguese** (`conteudo`, `REVISAO_*`). The commands have
   been renamed already, and their old Portuguese names still work as aliases.
 

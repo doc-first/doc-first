@@ -87,6 +87,9 @@ export default [
       globals: {
         process: 'readonly', console: 'readonly', globalThis: 'writable', crypto: 'readonly',
         fetch: 'readonly', URL: 'readonly', Buffer: 'readonly', setTimeout: 'readonly',
+        // A test that waits on something external has to be able to stop waiting. A suite that
+        // hangs gets killed, and killed is not the same as failed.
+        clearTimeout: 'readonly',
       },
     },
   },

@@ -263,3 +263,33 @@ And the folders and files themselves: `revisão` → `review/`, `núcleo` → `r
 → `fingerprint.js`, `ciclo` → `cycle.js`, `papéis` → `roles.js`, `limites` → `limits.js`,
 `registro` → `store.ts`, `pessoas` → `users.ts`, `identidade` → `identity-iap.ts` and
 `identity-password.ts`, `fonte` → `remote.ts`.
+
+## Already renamed in the user store (`2026-09-21`)
+
+Renamed when the storage became pluggable — SQLite, Firestore or Postgres behind one interface.
+
+| Portuguese | English | Where |
+|---|---|---|
+| `Pessoas` | `UsersSqlite` | moved to `users-sqlite.ts`; `UserStore` is now the interface |
+| `Pessoa` | `User` | `users.ts` |
+| `criar` / `conferir` | `create` / `check` | `users.ts` |
+| `trocarSenha` / `achar` / `vazio` | `changePassword` / `find` / `isEmpty` | `users.ts` |
+| `abrirSessao` / `daSessao` | `openSession` / `fromSession` | `users.ts` |
+| `fecharSessao` / `limparSessoesVencidas` | `closeSession` / `purgeExpiredSessions` | `users.ts` |
+| `fechar` | `close` | `users.ts` |
+| field `nome` | `name` | `User` |
+| field `precisaTrocarSenha` | `mustChangePassword` | `User` |
+| field `criadaEm` | `createdAt` | `User` |
+| field `sal` | `salt` | `StoredUser` |
+| table `pessoas` | `users` | migrated on open — see `users-sqlite.ts` |
+| table `sessoes` | `sessions` | not migrated: a session costs one login to replace |
+| column `trocar` | `must_change` | `users` |
+| column `criada_em` | `created_at` | `users` |
+| column `criada` / `expira` | `created_at` / `expires_at` | `sessions` |
+
+⚠️ The **API** keys did not move. `/api/eu` and `/api/entrar` still answer `nome` and
+`precisaTrocarSenha`, because the login screen reads them and they are published. The seam is in
+`server.ts`, in one place, and it closes when the contract turns English.
+
+`REVISAO_PESSOAS` did not move either, and is not going to: it names the SQLite file in compose
+files people already copied. It is an alias for `REVISAO_USERS=sqlite:<path>`.

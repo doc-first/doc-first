@@ -1,34 +1,30 @@
 /**
  * Own authentication and storage with no cloud — what lets Doc First be used the way Keycloak is:
  * bring it up, log in, work.
+ *
+ * Behaviour every store has to share is NOT here: it lives in users-conformance.test.js, which
+ * runs one suite against all of them. What stays here is what is specific — the bytes SQLite
+ * writes to disk, the migration of a database written in Portuguese, and the cookie the identity
+ * layer hands out.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { rmSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { Pessoas } from '../api/users.ts';
+import { UsersSqlite } from '../api/users-sqlite.ts';
 import { IdentidadeSenha } from '../api/identity-password.ts';
 import { RegistroSqlite } from '../api/store-sqlite.ts';
 
-test('the right password gets in, the wrong one does not, and neither does an unknown e-mail', async () => {
-  const p = new Pessoas(':memory:');
-  const senha = await p.criar('alguem@exemplo.org', 'Someone');
-  assert.ok(await p.conferir('alguem@exemplo.org', senha));
-  assert.equal(await p.conferir('alguem@exemplo.org', senha + 'x'), null);
-  assert.equal(await p.conferir('ninguem@exemplo.org', senha), null);
-  assert.ok(await p.conferir('  Alguem@Exemplo.ORG  ', senha), 'the e-mail depends on neither case nor spacing');
-});
-
 test('the password is never stored as text', async () => {
-  const p = new Pessoas('/tmp/teste-pessoas.db');
+  const p = new UsersSqlite('/tmp/teste-pessoas.db');
   try {
-    const senha = await p.criar('x@exemplo.org', 'X', 'secret-test-password');
-    p.fechar();
+    const password = await p.create('x@example.org', 'X', 'secret-test-password');
+    await p.close();
     // Read the raw file: the password cannot be anywhere in it.
     const { readFileSync } = await import('node:fs');
-    const bruto = readFileSync('/tmp/teste-pessoas.db').toString('latin1');
-    assert.equal(bruto.includes('secret-test-password'), false, 'the password showed up in the database file');
-    assert.ok(senha);
+    const raw = readFileSync('/tmp/teste-pessoas.db').toString('latin1');
+    assert.equal(raw.includes('secret-test-password'), false, 'the password showed up in the database file');
+    assert.ok(password);
   } finally {
     rmSync('/tmp/teste-pessoas.db', { force: true });
     rmSync('/tmp/teste-pessoas.db-wal', { force: true });
@@ -36,36 +32,21 @@ test('the password is never stored as text', async () => {
   }
 });
 
-test('the first password demands a change; once changed, it does not', async () => {
-  const p = new Pessoas(':memory:');
-  const senha = await p.criar('admin@exemplo.org', 'Admin');
-  assert.equal((await p.conferir('admin@exemplo.org', senha)).precisaTrocarSenha, true);
-  await p.trocarSenha('admin@exemplo.org', 'a-very-long-password');
-  assert.equal((await p.conferir('admin@exemplo.org', 'a-very-long-password')).precisaTrocarSenha, false);
-  assert.equal(await p.conferir('admin@exemplo.org', senha), null, 'the old password has to stop working');
-});
-
-test('a short password is refused', async () => {
-  const p = new Pessoas(':memory:');
-  await p.criar('x@exemplo.org', 'X');
-  await assert.rejects(() => p.trocarSenha('x@exemplo.org', 'short'), /12 caracteres/);
-});
-
 test('session: it opens, it holds, and it stops holding on logout', async () => {
-  const p = new Pessoas(':memory:');
-  const senha = await p.criar('x@exemplo.org', 'X');
+  const p = new UsersSqlite(':memory:');
+  const password = await p.create('x@example.org', 'X');
   const id = new IdentidadeSenha(p, { seguro: false });
-  const r = await id.entrar('x@exemplo.org', senha);
+  const r = await id.entrar('x@example.org', password);
   assert.ok(r);
-  assert.equal(id.daRequisicao({ cookie: `docfirst_sessao=${r.sessao}` })?.email, 'x@exemplo.org');
-  assert.equal(id.daRequisicao({ cookie: 'docfirst_sessao=made-up' }), null);
-  assert.equal(id.daRequisicao({}), null);
-  p.fecharSessao(r.sessao);
-  assert.equal(id.daRequisicao({ cookie: `docfirst_sessao=${r.sessao}` }), null, 'a closed session is worth nothing');
+  assert.equal((await id.daRequisicao({ cookie: `docfirst_sessao=${r.sessao}` }))?.email, 'x@example.org');
+  assert.equal(await id.daRequisicao({ cookie: 'docfirst_sessao=made-up' }), null);
+  assert.equal(await id.daRequisicao({}), null);
+  await p.closeSession(r.sessao);
+  assert.equal(await id.daRequisicao({ cookie: `docfirst_sessao=${r.sessao}` }), null, 'a closed session is worth nothing');
 });
 
 test('the session cookie is not readable by JavaScript and does not travel to another site', () => {
-  const id = new IdentidadeSenha(new Pessoas(':memory:'), { seguro: true });
+  const id = new IdentidadeSenha(new UsersSqlite(':memory:'), { seguro: true });
   const cab = id.cabecalhoDeSessao('abc');
   assert.match(cab, /HttpOnly/, 'without HttpOnly, an XSS steals the session');
   assert.match(cab, /SameSite=Strict/, 'without SameSite, navigation brings CSRF');
@@ -73,7 +54,7 @@ test('the session cookie is not readable by JavaScript and does not travel to an
 });
 
 test('the first access is created only once', async () => {
-  const id = new IdentidadeSenha(new Pessoas(':memory:'), { seguro: false });
+  const id = new IdentidadeSenha(new UsersSqlite(':memory:'), { seguro: false });
   assert.ok(await id.primeiroAcesso('dono@exemplo.org'));
   assert.equal(await id.primeiroAcesso('outro@exemplo.org'), null, 'it does not recreate when someone is already there');
 });
@@ -152,5 +133,53 @@ test('a database written in Portuguese still opens, and nothing is lost', async 
     rmSync(caminho, { force: true });
     rmSync(`${caminho}-wal`, { force: true });
     rmSync(`${caminho}-shm`, { force: true });
+  }
+});
+
+/**
+ * The other migration that only gets one chance.
+ *
+ * Before 2026-09-20 people lived in `pessoas`, with Portuguese columns. Losing that table is not
+ * losing a cache: it is everyone locked out of their own documentation, with no way back, because
+ * a password hash cannot be reconstructed from anything.
+ *
+ * The old database is built HERE by writing with today's code and then renaming the table back,
+ * rather than by hashing a password inside the test. A test that reimplemented scrypt would keep
+ * passing on the day production changed its parameters — which is exactly the day it should shout.
+ */
+test('a user database written in Portuguese still opens, and the password still works', async () => {
+  const path = `/tmp/teste-usuarios-migracao-${process.pid}.db`;
+  for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
+  try {
+    const before = new UsersSqlite(path);
+    await before.create('owner@example.org', 'Owner', 'a-long-enough-password');
+    await before.close();
+
+    // put the file back in the shape it had before the rename
+    const raw = new DatabaseSync(path);
+    raw.exec(`
+      CREATE TABLE pessoas (
+        email TEXT PRIMARY KEY, nome TEXT NOT NULL, sal BLOB NOT NULL, hash BLOB NOT NULL,
+        trocar INTEGER NOT NULL DEFAULT 0, criada_em TEXT NOT NULL);
+      INSERT INTO pessoas SELECT email, name, salt, hash, must_change, created_at FROM users;
+      DROP TABLE sessions;
+      DROP TABLE users;
+    `);
+    raw.close();
+
+    const after = new UsersSqlite(path);
+    const person = await after.check('owner@example.org', 'a-long-enough-password');
+    assert.ok(person, 'the password has to keep working: it cannot be reconstructed');
+    assert.equal(person.name, 'Owner');
+    assert.equal(person.mustChangePassword, true, 'the first-access flag travels too');
+    assert.ok(await after.openSession('owner@example.org'), 'sessions work again after the move');
+    await after.close();
+
+    // copy, never move: the old table stays in the file for whoever wants to check it
+    const checking = new DatabaseSync(path);
+    assert.equal(checking.prepare('SELECT COUNT(*) c FROM pessoas').get().c, 1);
+    checking.close();
+  } finally {
+    for (const suffix of ['', '-wal', '-shm']) rmSync(path + suffix, { force: true });
   }
 });

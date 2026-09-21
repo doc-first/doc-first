@@ -113,6 +113,36 @@ There is also an **index** — blocks, kinds, dependencies, issues — rebuilt o
 *not* truth and can be deleted without loss: the truth is the file, versioned in git, which is what
 has diffs, history and authorship.
 
+## Where the users live
+
+The people who log in are stored separately from the events, and the storage is **pluggable**, the
+way Keycloak's is: a file to run it on a laptop, a real database for a deployment whose instances
+come and go. One variable, `REVISAO_USERS`:
+
+| `REVISAO_USERS` | Where people and sessions go |
+|---|---|
+| *(not set)* | SQLite, at `REVISAO_PESSOAS` or `./dados/pessoas.db` |
+| `sqlite:/data/users.db` | SQLite in that file |
+| `firestore` | Firestore, in the project named by `REVISAO_PROJETO` |
+| `postgres://user:pass@host/db` | Postgres. `postgresql://…` works too |
+
+`REVISAO_PESSOAS` still names the SQLite file and will keep doing so — it is published, it is in
+the compose file people copied, and breaking it would lock someone out of their own tool.
+
+Postgres needs the `pg` package, which is an **optional** dependency: it is not downloaded unless
+you ask for it, and it is imported only when a `postgres://` URL is configured. Nobody running on
+SQLite pays for a driver they will never open.
+
+> ⚠️ **On Cloud Run, do not leave this on SQLite.** The disk there is ephemeral and per instance:
+> an access created today disappears when the platform recycles the instance, with **no error and
+> no log**. The person whose account was created simply stops getting in, and nobody connects the
+> two events. Use `firestore` or `postgres://…`.
+
+All three implementations are checked by **the same suite**,
+`review/tests/users-conformance.test.js`. A store that does not pass it is not supported. What that
+suite could not run, it says so in its own output rather than passing quietly — see
+[What does not work yet](#what-does-not-work-yet).
+
 ## The tool
 
 ```bash
@@ -162,6 +192,13 @@ Honest, as of `2026-09-20`:
   holds the place.
 - **Identity beyond password and an identity proxy.** OIDC, Google and LDAP are missing; the
   interface is there, the piece is not.
+- **SQLite loses users on Cloud Run.** Not a bug to fix — a property of the platform. The disk is
+  ephemeral and per instance, so `pessoas.db` goes away with the instance, silently. The fix is
+  configuration (`REVISAO_USERS=postgres://…` or `firestore`); what is missing is the service
+  refusing to start in that combination instead of trusting whoever deploys it to have read this.
+- **The Firestore user store is proved by code review, not by execution.** There is no emulator in
+  this project's test environment, so its conformance tests skip, loudly. Postgres and SQLite do
+  run for real.
 - **Some configuration keys are still Portuguese** (`conteudo`, `REVISAO_*`). The commands have
   been renamed already, and their old names still work.
 

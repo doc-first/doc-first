@@ -10,7 +10,7 @@ import { overLimit, validCommit } from '../core/limits.js';
 import { createI18n } from '../core/i18n.js';
 import { RegistroEmMemoria, RegistroFirestore } from './store.ts';
 import { RegistroSqlite } from './store-sqlite.ts';
-import { Pessoas } from './users.ts';
+import { openUserStore, DEFAULT_SQLITE_PATH } from './users.ts';
 import { IdentidadeSenha } from './identity-password.ts';
 import { Identidade } from './identity-iap.ts';
 import { TIPOS_DE_EVENTO, type Evento, type NovoEvento, type Registro } from './types.ts';
@@ -62,7 +62,7 @@ function log(nivel: string, evento: string, extra: Record<string, unknown> = {})
 
 // ---------------------------------------------------------------- configuration that fails at boot
 /**
- * Como as pessoas entram.
+ * How people get in.
  *   senha | user and password in the service itself. This is "start the image and use it".
  *   iap   | Google Cloud IAP. Exige REVISAO_AUDIENCIA.
  *   dev   | the X-Dev-Email header, Development only. Open the browser and work, with no login.
@@ -127,15 +127,48 @@ const registro: Registro = (() => {
   }
 })();
 
+/**
+ * Where the people and their sessions live. Same idea as Keycloak: a file to run it on a laptop, a
+ * real database for a deployment whose instances come and go.
+ *   (absent)      | SQLite, at REVISAO_PESSOAS or ./dados/pessoas.db
+ *   sqlite:<path> | SQLite in that file
+ *   firestore     | Google Cloud. Needs REVISAO_PROJETO
+ *   postgres://…  | Postgres. `postgresql://…` works too
+ *
+ * ⚠️ SQLite on Cloud Run loses people. The disk there is ephemeral and per instance, so an access
+ * created today is gone when the platform recycles the instance — with no error and no log. That
+ * failure is the reason this variable exists; see review/api/users.ts.
+ *
+ * REVISAO_PESSOAS still names the SQLite file, and keeps doing so: it is published contract, it is
+ * in the compose file people copied, and breaking it would lock someone out of their own tool.
+ */
+/** The kind of store a URL names, with nothing secret left in it. Safe to log. */
+const userStoreKind = (url: string | undefined): string => {
+  const u = (url ?? '').trim();
+  if (u === '' || u.startsWith('sqlite')) return 'sqlite';
+  if (u === 'firestore') return 'firestore';
+  if (u.startsWith('postgres')) return 'postgres';
+  return 'unknown';
+};
+
 let porSenha: IdentidadeSenha | null = null;
 if (comoEntrar === 'senha') {
-  const pessoas = new Pessoas(process.env.REVISAO_PESSOAS ?? './dados/pessoas.db');
-  porSenha = new IdentidadeSenha(pessoas, { seguro: cfg.ambiente !== 'Development' });
-  pessoas.limparSessoesVencidas();
+  let users;
+  try {
+    users = await openUserStore(process.env.REVISAO_USERS, {
+      projectId: cfg.projeto,
+      sqlitePath: process.env.REVISAO_PESSOAS ?? DEFAULT_SQLITE_PATH,
+    });
+  } catch (erro) {
+    console.error('configuração inválida: ' + (erro instanceof Error ? erro.message : String(erro)));
+    process.exit(1);
+  }
+  porSenha = new IdentidadeSenha(users, { seguro: cfg.ambiente !== 'Development' });
+  await users.purgeExpiredSessions();
 
   // First boot: creates the owner's access and shows the password ONCE. A fixed password like
   // "admin" is an invitation, and an internal tool stays up for years with nobody looking.
-  const senha = await porSenha.primeiroAcesso(cfg.owner!, 'Dono');
+  const senha = await porSenha.primeiroAcesso(cfg.owner!, 'Owner');
   if (senha) {
     console.log('\n' + '='.repeat(72));
     console.log('  PRIMEIRO ACESSO — anote agora, esta senha não será mostrada de novo:');
@@ -183,17 +216,17 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
 
   // ---------------------------------------------------------------- entrar e sair (identidade por senha)
   if (porSenha && req.method === 'POST' && rota === '/sair') {
-    porSenha.pessoas.fecharSessao(req.headers.cookie?.match(/docfirst_sessao=([^;]+)/)?.[1]);
+    await porSenha.users.closeSession(req.headers.cookie?.match(/docfirst_sessao=([^;]+)/)?.[1]);
     res.setHeader('set-cookie', porSenha.cabecalhoDeSaida());
     return json(res, 200, { ok: true });
   }
 
   if (porSenha && req.method === 'POST' && rota === '/trocar-senha') {
     const corpo = (await corpoJson(req)) as { atual?: string; nova?: string };
-    const conferida = await porSenha.pessoas.conferir(email, corpo.atual ?? '');
+    const conferida = await porSenha.users.check(email, corpo.atual ?? '');
     if (!conferida) return json(res, 403, { erro: 'a senha atual não confere' });
     try {
-      await porSenha.pessoas.trocarSenha(email, corpo.nova ?? '');
+      await porSenha.users.changePassword(email, corpo.nova ?? '');
     } catch (erro) {
       return json(res, 400, { erro: erro instanceof Error ? erro.message : 'senha inválida' });
     }
@@ -214,7 +247,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
       dono: papeis.isAdmin(email),          // ⚠️ compatibilidade; sai quando o front migrar de vez
       // Only exists with password login. Without it, reloading the page would forget the password
       // is still the first-access one — and the change screen would only appear at login.
-      ...(porSenha ? { precisaTrocarSenha: porSenha.daRequisicao(req.headers)?.precisaTrocarSenha ?? false } : {}),
+      ...(porSenha ? { precisaTrocarSenha: (await porSenha.daRequisicao(req.headers))?.mustChangePassword ?? false } : {}),
     });
   }
 
@@ -396,13 +429,14 @@ const servidor = createServer(async (req, res) => {
         return json(res, 401, { erro: 'e-mail ou senha não conferem' });
       }
       res.setHeader('set-cookie', porSenha.cabecalhoDeSessao(r.sessao));
-      log('INFO', 'entrou', { email: r.pessoa.email, precisaTrocarSenha: r.pessoa.precisaTrocarSenha });
-      return json(res, 200, { email: r.pessoa.email, nome: r.pessoa.nome, precisaTrocarSenha: r.pessoa.precisaTrocarSenha });
+      log('INFO', 'entrou', { email: r.pessoa.email, precisaTrocarSenha: r.pessoa.mustChangePassword });
+      // The response keys stay Portuguese: they are the published contract the login screen reads.
+      return json(res, 200, { email: r.pessoa.email, nome: r.pessoa.name, precisaTrocarSenha: r.pessoa.mustChangePassword });
     }
 
     if (url.pathname.startsWith('/api/')) {
       const email = porSenha
-        ? porSenha.daRequisicao(req.headers)?.email ?? null
+        ? (await porSenha.daRequisicao(req.headers))?.email ?? null
         : await identidade!.email(req.headers);
       if (!email) return json(res, 401, { erro: 'não autenticado' });
       return await api(req, res, url, email);
@@ -412,7 +446,7 @@ const servidor = createServer(async (req, res) => {
     // there is no edge at all: without this guard the entire documentation was open to anyone who
     // could reach the port — and whoever started the image believing they had configured a login
     // had no way to suspect otherwise. Found while testing.
-    if (porSenha && !porSenha.daRequisicao(req.headers)) {
+    if (porSenha && !(await porSenha.daRequisicao(req.headers))) {
       if (url.pathname === TELA_DE_ENTRADA) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
         return res.end(await readFile(new URL('./login.html', import.meta.url)));
@@ -436,6 +470,11 @@ const servidor = createServer(async (req, res) => {
 servidor.listen(cfg.porta, () => {
   log('INFO', 'servidor_no_ar', {
     porta: cfg.porta, ambiente: cfg.ambiente, identidade: comoEntrar, banco: ondeGuardar,
+    // Which user store is in play, said out loud at boot. Whoever is losing accounts on Cloud Run
+    // needs one grep to find out they are on a disk that does not survive the instance.
+    // ⚠️ The KIND, never the URL: `postgres://user:password@host/db` in a log line is the database
+    // password in the log collector, readable by everyone who can read logs.
+    usuarios: porSenha ? userStoreKind(process.env.REVISAO_USERS) : null,
     modoLocal: identidade?.modoLocal ?? false, site: cfg.site,
   });
 });
