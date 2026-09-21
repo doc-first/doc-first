@@ -35,6 +35,13 @@ jobs:
       - name: Types
         run: npx tsc --noEmit
 
+      # The authority on language, and the reason it is here and not only in a hook: a hook lives on
+      # one machine and is skipped with --no-verify. A contributor who has never read CONTRIBUTING
+      # gets told here, once, by a machine — which is kinder than being told in review, a week later,
+      # after they wrote the whole thing.
+      - name: English
+        run: bash scripts/check-language.sh --comments=en $(git ls-files '*.ts' '*.js' '*.sh')
+
       - name: Unit
         run: npm test
 

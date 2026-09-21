@@ -30,7 +30,10 @@ if ss -ltn 2>/dev/null | grep -q ":$PORT "; then
 fi
 
 [ -d node_modules ] || { echo "installing dependencies..."; npm install --silent; }
-( cd front && python3 gerar_index.py >/dev/null )
+# ⚠️ There used to be a `( cd front && python3 gerar_index.py )` here. `front/` left with the
+# separation — it belonged to the project this engine grew in, not to the engine. With `set -e`,
+# that line made this script exit 1 before starting anything at all: the documented way to run
+# Doc First locally had been dead, silently, and no test noticed because no test runs this file.
 
 echo "Doc First local → http://localhost:$PORT   (you are acting as: $ACTING_AS · test data, disappears when you stop)"
 exec env REVISAO_MODO=local REVISAO_AMBIENTE=Development REVISAO_OWNER="$OWNER" \
