@@ -151,7 +151,9 @@
 
   // ⚠️ The request and response FIELDS stay in Portuguese (`senha`, `atual`, `nova`,
   // `precisaTrocarSenha`): they are the published contract of /api/entrar. Only what a person
-  // reads is translated.
+  // reads is translated. The error key is the one exception: every route now answers `error`,
+  // where the older ones used to answer `erro` and the newer ones `error` — two spellings of one
+  // field, which every caller had to discover the hard way.
   $('form').addEventListener('submit', async (event) => {
     event.preventDefault();
     warn('');
@@ -159,7 +161,7 @@
     try {
       if (!changing) {
         const { ok, data } = await ask('/api/entrar', { email: $('email').value, senha: $('password').value });
-        if (!ok) return warn(data.erro || say('login.error.signInFailed'));
+        if (!ok) return warn(data.error || say('login.error.signInFailed'));
         if (data.precisaTrocarSenha) return askForChange();
         return goToDestination();
       }
@@ -168,7 +170,7 @@
         return warn(say('login.error.passwordsDiffer'));
       }
       const { ok, data } = await ask('/api/trocar-senha', { atual: $('password').value, nova: $('new-password').value });
-      if (!ok) return warn(data.erro || say('login.error.changeFailed'));
+      if (!ok) return warn(data.error || say('login.error.changeFailed'));
       goToDestination();
     } catch {
       warn(say('login.error.noAnswer'));

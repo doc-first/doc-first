@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Evento, NovoEvento, Registro } from './types.ts';
+import { log } from './log.ts';
 
 /**
  * SQLite persistence on the built-in `node:sqlite` — **no external dependency**.
@@ -96,11 +97,13 @@ export class RegistroSqlite implements Registro {
       INSERT INTO events (id, type, page, block, fingerprint, text, snapshot, author, happened_at, data)
       SELECT id, tipo, pagina, caixa, digital, texto, foto, autor, quando, dados FROM eventos;
     `);
-    console.warn(JSON.stringify({
-      nivel: 'AVISO', evento: 'banco_migrado', de: 'eventos', para: 'events', linhas: linhas.n,
-      mensagem: 'A tabela antiga foi COPIADA, não movida. Ela continua no arquivo — confira os '
-        + 'dados e só então apague à mão, se quiser.',
-    }));
+    // `from` and `to` are TABLE names, so they stay exactly as they are on disk. Everything else
+    // on the line is English, like every other piece of evidence this service writes.
+    log('WARNING', 'database_migrated', {
+      from: 'eventos', to: 'events', rows: linhas.n,
+      message: 'The old table was COPIED, not moved. It is still in the file — check the data, '
+        + 'and only then drop it by hand if you want to.',
+    });
   }
 
   async incluir(novo: NovoEvento, autor: string): Promise<Evento> {

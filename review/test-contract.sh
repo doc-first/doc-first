@@ -96,6 +96,36 @@ expect "raw traversal doesn't leak"    404 "$(curl -s -o /dev/null -w '%{http_co
 # Answering here would invent a second, empty source of truth for who works at the company, and an
 # empty list of people is the kind of screen somebody believes.
 expect "no user store, no management → 405" 405 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/users)"
+
+# ----------------------------------------------------------------------------- what the person reads
+# Every refusal in this file used to be a Portuguese sentence typed at the place it was thrown. Two
+# things are asserted here, and neither is provable by unit test: that the field is called `error`
+# everywhere, and that the sentence inside it arrives in the language the reader asked for.
+echo "the answer speaks the reader's language:"
+say_it() { curl -s -H "X-Dev-Email: $OWNER" -H "Accept-Language: $1" "${@:2}"; }
+# One name for one field. It used to be `erro` on these routes and `error` on /api/users — two
+# spellings of the same thing, which every caller had to discover the hard way.
+expect "the error field is called error"  0 "$(say_it en $B/api/eventos/doesnotexist | grep -q '"error"'; echo $?)"
+expect "and nothing answers 'erro' any more" 1 "$(say_it en $B/api/eventos/doesnotexist | grep -q '"erro"'; echo $?)"
+expect "a nonexistent event, in English"  0 "$(say_it en    $B/api/eventos/doesnotexist | grep -q 'event not found'; echo $?)"
+expect "the same one, in Portuguese"      0 "$(say_it pt-BR $B/api/eventos/doesnotexist | grep -q 'evento não encontrado'; echo $?)"
+expect "the same one, in Spanish"         0 "$(say_it es    $B/api/eventos/doesnotexist | grep -q 'evento no encontrado'; echo $?)"
+# A route that does not exist: 405, and a sentence, not a stack trace.
+expect "a route nobody wrote, in English" 0 "$(say_it en -X DELETE $B/api/eventos | grep -q 'no such method or route'; echo $?)"
+expect "the same one, in Spanish"         0 "$(say_it es -X DELETE $B/api/eventos | grep -q 'ese método o esa ruta no existe'; echo $?)"
+# A page that is not on disk. Not JSON, and still translated: it is the plainest thing a person
+# can be shown, and showing it in the wrong language is a small way of saying nobody was thinking.
+expect "a page that isn't there, in Portuguese" "não encontrado" "$(curl -s -H 'Accept-Language: pt-BR' $B/nao-existe.html)"
+expect "the same one, in Spanish"         "no encontrado" "$(curl -s -H 'Accept-Language: es' $B/nao-existe.html)"
+# ⚠️ `pt-PT` has no dictionary. A near dialect lands on pt-BR rather than falling all the way to
+# English: slightly off is closer to right than the wrong language entirely.
+expect "pt-PT lands on Portuguese"        0 "$(say_it 'pt-PT,pt;q=0.9' $B/api/eventos/doesnotexist | grep -q 'evento não encontrado'; echo $?)"
+# A language nobody translated is not an error and not a blank page: it is English.
+expect "a language nobody has falls back" 0 "$(say_it 'ja-JP' $B/api/eventos/doesnotexist | grep -q 'event not found'; echo $?)"
+# The log is the other audience, and it does NOT follow the reader. Whoever operates greps one
+# spelling — so the event name stays English even when the answer above came out in Spanish.
+expect "but the log stays English"        0 "$(grep -q '"event":"event_recorded"' /tmp/node-tests.log; echo $?)"
+expect "with no level spelled in Portuguese" 0 "$(grep -c '"severity":"AVISO"\|"nivel"' /tmp/node-tests.log)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null
 
 echo "local mode does NOT turn on outside development:"
@@ -104,7 +134,10 @@ REVISAO_MODO=local REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_AUDI
   node review/api/server.ts >/tmp/node-prod.log 2>&1 & PID=$!
 for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 expect "X-Dev-Email ignored → 401"     401 "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Dev-Email: $OWNER" $B/api/eu)"
-expect "and warns in the log"          0 "$(grep -qi 'IGNORADO' /tmp/node-prod.log; echo $?)"
+# The EVENT NAME, not the prose: a log line is found by grepping one stable English token, and a
+# check that reads the sentence goes red the day somebody improves the wording.
+expect "and warns in the log"          0 "$(grep -q '"event":"local_mode_ignored"' /tmp/node-prod.log; echo $?)"
+expect "at a severity a collector reads" 0 "$(grep -q '"severity":"WARNING"' /tmp/node-prod.log; echo $?)"
 expect "forged email → 401"            401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-authenticated-user-email: accounts.google.com:x@y' $B/api/eu)"
 expect "forged JWT → 401"              401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'x-goog-iap-jwt-assertion: eyJhbGciOiJFUzI1NiJ9.eyJlbWFpbCI6ImhhY2tlckB4In0.abc' $B/api/eu)"
 kill $PID 2>/dev/null; wait $PID 2>/dev/null

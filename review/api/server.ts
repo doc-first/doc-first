@@ -14,6 +14,7 @@ import {
   openUserStore, ephemeralUserStoreWarning, DEFAULT_SQLITE_PATH, UserInputError,
   normalizeEmail, isEmailAddress, MAX_NAME_LENGTH, type UserStore,
 } from './users.ts';
+import { log } from './log.ts';
 import { renderLoginPage } from './login-page.ts';
 import { LANGUAGE_ROUTE, chosenLanguage, languageSwitch } from './language.ts';
 import { IdentidadeSenha } from './identity-password.ts';
@@ -63,17 +64,11 @@ const cfg = {
   ambiente: process.env.NODE_ENV === 'development' ? 'Development' : (process.env.REVISAO_AMBIENTE ?? 'Production'),
 };
 
-function log(nivel: string, evento: string, extra: Record<string, unknown> = {}) {
-  // One JSON line per fact: log collectors understand severity, and an event can be found by id.
-  // The previous API had three log calls in total, none of them on the write path.
-  console.log(JSON.stringify({ severity: nivel, evento, hora: new Date().toISOString(), ...extra }));
-}
-
 // ---------------------------------------------------------------- configuration that fails at boot
 /**
  * How people get in.
  *   senha | user and password in the service itself. This is "start the image and use it".
- *   iap   | Google Cloud IAP. Exige REVISAO_AUDIENCIA.
+ *   iap   | Google Cloud IAP. Needs REVISAO_AUDIENCIA.
  *   dev   | the X-Dev-Email header, Development only. Open the browser and work, with no login.
  *
  * The default is never `dev` outside Development: a service that accepts "I am whoever I say I
@@ -107,10 +102,14 @@ try {
       emailDeDev: process.env.REVISAO_DEV_EMAIL !== undefined ? process.env.REVISAO_DEV_EMAIL || undefined : (doProjeto.actAs ?? undefined),
     });
   } else if (comoEntrar !== 'senha') {
-    throw new Error(`REVISAO_IDENTIDADE="${comoEntrar}" não existe (use senha, iap ou dev)`);
+    // The three values stay as they are: they are what someone already wrote in a compose file.
+    throw new Error(`REVISAO_IDENTIDADE="${comoEntrar}" does not exist (use senha, iap or dev)`);
   }
 } catch (erro) {
-  console.error('configuração inválida: ' + (erro instanceof Error ? erro.message : String(erro)));
+  // ⚠️ English, hard-coded, and NOT through i18n. This prints before the server listens, so there
+  // is no request, no session and nobody whose language we could have chosen — the same reason the
+  // first-access banner below stays English. See the comment at the top of review/core/i18n.js.
+  console.error('invalid configuration: ' + (erro instanceof Error ? erro.message : String(erro)));
   process.exit(1);
 }
 
@@ -118,9 +117,9 @@ try {
  * Where events live. `sqlite` is the default for running the tool without a cloud: one file, no
  * external dependency, and the database REFUSING update and delete — "nothing is erased" stops
  * being a promise and becomes a guarantee.
- *   memoria  | some ao parar. Para desenvolver e testar.
+ *   memoria  | gone when it stops. For developing and testing.
  *   sqlite   | a file on disk. The "start it and use it" mode.
- *   firestore| Google Cloud. Exige REVISAO_PROJETO.
+ *   firestore| Google Cloud. Needs REVISAO_PROJETO.
  */
 const ondeGuardar = process.env.REVISAO_BANCO ?? (cfg.modo === 'local' ? 'memoria' : 'sqlite');
 const registro: Registro = (() => {
@@ -128,10 +127,10 @@ const registro: Registro = (() => {
     case 'memoria': return new RegistroEmMemoria();
     case 'sqlite': return new RegistroSqlite(process.env.REVISAO_SQLITE ?? './dados/eventos.db');
     case 'firestore':
-      if (!cfg.projeto) { console.error('configuração inválida: firestore exige REVISAO_PROJETO'); process.exit(1); }
+      if (!cfg.projeto) { console.error('invalid configuration: firestore needs REVISAO_PROJETO'); process.exit(1); }
       return new RegistroFirestore(cfg.projeto);
     default:
-      console.error(`configuração inválida: REVISAO_BANCO="${ondeGuardar}" (use memoria, sqlite ou firestore)`);
+      console.error(`invalid configuration: REVISAO_BANCO="${ondeGuardar}" (use memoria, sqlite or firestore)`);
       process.exit(1);
   }
 })();
@@ -169,7 +168,7 @@ if (comoEntrar === 'senha') {
       sqlitePath: process.env.REVISAO_PESSOAS ?? DEFAULT_SQLITE_PATH,
     });
   } catch (erro) {
-    console.error('configuração inválida: ' + (erro instanceof Error ? erro.message : String(erro)));
+    console.error('invalid configuration: ' + (erro instanceof Error ? erro.message : String(erro)));
     process.exit(1);
   }
   porSenha = new IdentidadeSenha(users, { seguro: cfg.ambiente !== 'Development' });
@@ -207,7 +206,7 @@ if (comoEntrar === 'senha') {
   }
 }
 
-// ---------------------------------------------------------------- utilidades
+// ---------------------------------------------------------------- helpers
 const json = (res: ServerResponse, codigo: number, corpo: unknown) => {
   const texto = JSON.stringify(corpo);
   res.writeHead(codigo, { 'content-type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
@@ -226,7 +225,10 @@ async function corpoJson(req: IncomingMessage): Promise<unknown> {
   let tamanho = 0;
   for await (const p of req) {
     tamanho += p.length;
-    if (tamanho > 1_000_000) throw new Error('corpo grande demais');   // teto antes de parsear
+    // A ceiling BEFORE parsing, and the message goes to the log, not to the person: the reply is
+    // the unhandled-error 500 below, which says only `api.internal` plus an id. Whoever operates
+    // greps this line by that id, so it is English like every other piece of evidence.
+    if (tamanho > 1_000_000) throw new Error('request body larger than 1 MB');
     partes.push(p);
   }
   return partes.length ? JSON.parse(Buffer.concat(partes).toString('utf8')) : {};
@@ -238,11 +240,11 @@ const comSituacao = (e: Evento, todos: Evento[]) => ({
   situacao: paraOContrato(ciclo.status(ciclo.currentState(e.id, paraONucleo(todos), papeis.isAdmin(e.autor)))),
 });
 
-// ---------------------------------------------------------------- rotas da API
+// ---------------------------------------------------------------- the API routes
 async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: string) {
   const rota = url.pathname.replace(/^\/api/, '');
 
-  // ---------------------------------------------------------------- entrar e sair (identidade por senha)
+  // ---------------------------------------------------------------- in and out (password identity)
   if (porSenha && req.method === 'POST' && rota === '/sair') {
     await porSenha.users.closeSession(req.headers.cookie?.match(/docfirst_sessao=([^;]+)/)?.[1]);
     res.setHeader('set-cookie', porSenha.cabecalhoDeSaida());
@@ -252,15 +254,15 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   if (porSenha && req.method === 'POST' && rota === '/trocar-senha') {
     const corpo = (await corpoJson(req)) as { atual?: string; nova?: string };
     const conferida = await porSenha.users.check(email, corpo.atual ?? '');
-    if (!conferida) return json(res, 403, { erro: i18n.t(idioma(req), 'api.password.currentWrong') });
+    if (!conferida) return json(res, 403, { error: i18n.t(idioma(req), 'api.password.currentWrong') });
     try {
       await porSenha.users.changePassword(email, corpo.nova ?? '');
     } catch (erro) {
       // Translated HERE, at the edge, and only here: the store throws a key, never a sentence.
       const falha = UserInputError.from(erro, 'api.password.invalid');
-      return json(res, 400, { erro: i18n.t(idioma(req), falha.key, falha.params) });
+      return json(res, 400, { error: i18n.t(idioma(req), falha.key, falha.params) });
     }
-    log('INFO', 'senha_trocada', { email });
+    log('INFO', 'password_changed', { email });
     return json(res, 200, { ok: true });
   }
 
@@ -274,7 +276,7 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
       podeTriar: papeis.canTriage(email),
       owner: papeis.isOwner(email),
       admins: papeis.admins,
-      dono: papeis.isAdmin(email),          // ⚠️ compatibilidade; sai quando o front migrar de vez
+      dono: papeis.isAdmin(email),          // ⚠️ kept for compatibility; goes when the front end migrates
       // Only exists with password login. Without it, reloading the page would forget the password
       // is still the first-access one — and the change screen would only appear at login.
       ...(porSenha ? { precisaTrocarSenha: (await porSenha.daRequisicao(req.headers))?.mustChangePassword ?? false } : {}),
@@ -288,9 +290,10 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   // answering here would be inventing a second, empty source of truth for who works at the
   // company. Without a store they fall through to the 405 at the bottom.
   //
-  // ⚠️ The names, the fields and the error key are ENGLISH, unlike every route above. Those are
-  // published contract and stay Portuguese for as long as somebody depends on them; nothing NEW is
-  // added in Portuguese. So the body here says `error`, not `erro`.
+  // ⚠️ The route names and the field names are ENGLISH here and Portuguese above. Those older
+  // names are published contract and stay as they are for as long as somebody depends on them;
+  // nothing NEW is added in Portuguese. The error key is no longer one of the differences — every
+  // route in this file now answers `error`, including the older ones.
   //
   // ⚠️ Who may do this comes from `papeis`, which reads REVISAO_OWNER and REVISAO_ADMINS — NOT
   // from the user store. The two are different questions: the store answers "does this person have
@@ -309,7 +312,9 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   const umEvento = rota.match(/^\/eventos\/([A-Za-z0-9_-]+)$/);
   if (req.method === 'GET' && umEvento) {
     const achado = (await registro.listar(null)).find((e) => e.id === umEvento[1]);
-    return achado ? json(res, 200, achado) : json(res, 404, { erro: 'evento não encontrado', id: umEvento[1] });
+    return achado
+      ? json(res, 200, achado)
+      : json(res, 404, { error: i18n.t(idioma(req), 'api.event.notFound'), id: umEvento[1] });
   }
 
   if (req.method === 'GET' && rota === '/pedidos/abertos') {
@@ -327,30 +332,37 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
   if (req.method === 'POST' && rota === '/eventos') {
     const novo = (await corpoJson(req)) as NovoEvento;
     const podeAprovar = papeis.canApprove(email);
+    // The sentences on this path are for the person looking at the panel, so they come out of the
+    // dictionaries in the language they chose. `tipo` and the state values below do NOT: those are
+    // contract, and a value that changes with the reader's locale is a value nobody can match on.
+    const say = (key: string, params?: Record<string, string | number>) =>
+      i18n.t(idioma(req), key, params);
 
-    if (!TIPOS_DE_EVENTO.has(novo.tipo)) return json(res, 400, { erro: 'tipo desconhecido', tipo: novo.tipo });
+    if (!TIPOS_DE_EVENTO.has(novo.tipo)) {
+      return json(res, 400, { error: say('api.event.unknownType'), tipo: novo.tipo });
+    }
     if (novo.tipo === 'aprovacao' && (!novo.caixa || !novo.digital)) {
-      return json(res, 400, { erro: 'aprovação precisa de caixa e digital' });
+      return json(res, 400, { error: say('api.approval.needsBlockAndFingerprint') });
     }
     // Approving belongs to owner and admin: their ✓ becomes a lock in the repository and tells
     // the agent to apply.
     if (novo.tipo === 'aprovacao' && !podeAprovar) {
-      return json(res, 403, { erro: 'só owner e admin aprovam; use pedir alteração ou comentar' });
+      return json(res, 403, { error: say('api.approval.ownerOnly') });
     }
     if (['pedido', 'comentario', 'complemento'].includes(novo.tipo) && !novo.texto?.trim()) {
-      return json(res, 400, { erro: 'escreva o texto' });
+      return json(res, 400, { error: say('api.text.required') });
     }
     // The core reads the event with its own field names; the API still speaks Portuguese.
     // Translate on the way in, here.
     const limite = overLimit(doHistorico(novo), doProjeto.pageExamples);
-    if (limite) return json(res, 400, { erro: i18n.t(idioma(req), limite.key, limite.params) });
+    if (limite) return json(res, 400, { error: say(limite.key, limite.params) });
 
     if (novo.tipo === 'pedido_estado' || novo.tipo === 'complemento') {
       const pedidoId = novo.dados?.pedido;
-      if (!pedidoId) return json(res, 400, { erro: 'informe dados.pedido' });
+      if (!pedidoId) return json(res, 400, { error: say('api.request.needsRequestId') });
       const daPagina = await registro.listar(novo.pagina);
       const pedido = daPagina.find((e) => e.id === pedidoId && e.tipo === 'pedido');
-      if (!pedido) return json(res, 404, { erro: 'pedido não encontrado nesta página' });
+      if (!pedido) return json(res, 404, { error: say('api.request.notFound') });
       // `atual` is the core's language; `atualPt` is the contract's, still Portuguese, and it
       // travels to the front end and into the record. Two variables instead of converting midway:
       // the bug this avoids is comparing one language against the other and never matching.
@@ -359,28 +371,30 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
 
       if (novo.tipo === 'complemento') {
         if (email !== pedido.autor && !podeAprovar) {
-          return json(res, 403, { erro: 'só quem pediu, ou um admin, acrescenta detalhes' });
+          return json(res, 403, { error: say('api.supplement.ownerOrAuthor') });
         }
         if (!ciclo.acceptsSupplement(atual)) {
-          return json(res, 409, { erro: `pedido ${atualPt}: para mudar algo já aprovado, faça um novo pedido`, estado: atualPt });
+          // The state travels into the sentence as the contract value, untranslated, because it is
+          // also the `estado` field next to it — one name for one thing, in both places.
+          return json(res, 409, { error: say('api.supplement.tooLate', { state: atualPt }), estado: atualPt });
         }
       } else {
         const paraPt = novo.dados?.estado as string | undefined;
-        if (!paraPt) return json(res, 400, { erro: 'informe dados.estado' });
+        if (!paraPt) return json(res, 400, { error: say('api.state.required') });
         const para = estadoAtual(paraPt);
-        if (!ciclo.exists(para)) return json(res, 400, { erro: 'estado desconhecido' });
+        if (!ciclo.exists(para)) return json(res, 400, { error: say('api.state.unknown') });
         const doAgente = ciclo.agentStates.includes(para);
         if (!podeAprovar && !(identidade?.modoLocal && doAgente)) {
-          return json(res, 403, { erro: 'só owner e admin fazem a triagem' });
+          return json(res, 403, { error: say('api.triage.ownerOnly') });
         }
         if (ciclo.requiresReason(para) && !novo.texto?.trim()) {
-          return json(res, 400, { erro: 'diga o motivo ou a pergunta' });
+          return json(res, 400, { error: say('api.reason.required') });
         }
         if (ciclo.requiresCommit(para) && !validCommit(novo.dados)) {
-          return json(res, 400, { erro: 'aplicado precisa do commit (7 a 40 caracteres hexadecimais)' });
+          return json(res, 400, { error: say('api.commit.required') });
         }
         if (!ciclo.canGo(atual, para)) {
-          return json(res, 409, { erro: `não dá para ir de ${atualPt} para ${paraPt}`, estado: atualPt });
+          return json(res, 409, { error: say('api.state.cannotGo', { from: atualPt, to: paraPt }), estado: atualPt });
         }
         // Race guard: recording where the change departed from makes the history itself the
         // guard. Written in Portuguese, like the rest of the record: readers translate
@@ -390,15 +404,18 @@ async function api(req: IncomingMessage, res: ServerResponse, url: URL, email: s
     }
 
     const e = await registro.incluir(novo, email);
-    log('INFO', 'evento_incluido', {
-      id: e.id, tipo: e.tipo, pagina: e.pagina, caixa: e.caixa, autor: e.autor,
-      de: e.dados?.de, para: e.dados?.estado,
+    // The field names are English, the VALUES are the contract's: `tipo` and the states still
+    // travel in Portuguese everywhere else, and a log that renamed them would no longer match the
+    // record it is evidence about.
+    log('INFO', 'event_recorded', {
+      id: e.id, kind: e.tipo, page: e.pagina, block: e.caixa, author: e.autor,
+      from: e.dados?.de, to: e.dados?.estado,
     });
     res.setHeader('location', `/api/eventos/${e.id}`);
     return json(res, 201, e);
   }
 
-  return json(res, 405, { erro: 'método ou rota não existe', rota });
+  return json(res, 405, { error: i18n.t(idioma(req), 'api.route.notFound'), rota });
 }
 
 /**
@@ -588,7 +605,9 @@ async function userRoutes(
 const TELA_DE_ENTRADA = '/entrar';
 
 // ---------------------------------------------------------------- static site
-async function estatico(url: URL, res: ServerResponse) {
+// `lang` is carried in rather than read from the request because this function recurses on the
+// index page and never sees the headers again. Both answers it can give are read by a person.
+async function estatico(url: URL, res: ServerResponse, lang: string) {
   let caminho = decodeURIComponent(url.pathname);
   // Where the root leads comes from doc-first.json (`conteudo.inicio`). It used to be hard-coded
   // to one project's home page, which is that project's, not the method's.
@@ -615,15 +634,15 @@ async function estatico(url: URL, res: ServerResponse) {
   // normalize plus a prefix check: without it, `/../../etc/passwd` would escape the site folder.
   const alvo = normalize(join(cfg.site, caminho));
   if (!alvo.startsWith(normalize(cfg.site) + sep)) {
-    return json(res, 403, { erro: 'caminho fora do site' });
+    return json(res, 403, { error: i18n.t(lang, 'site.pathOutside') });
   }
   try {
     const info = await stat(alvo);
-    if (info.isDirectory()) return estatico(new URL(url.href.replace(/\/?$/, '/index.html')), res);
+    if (info.isDirectory()) return estatico(new URL(url.href.replace(/\/?$/, '/index.html')), res, lang);
     return servirArquivo(alvo, res, caminho);
   } catch {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS });
-    res.end('não encontrado');
+    res.end(i18n.t(lang, 'site.notFound'));
   }
 }
 
@@ -664,7 +683,7 @@ async function servirArquivo(alvo: string, res: ServerResponse, urlPath = '') {
   res.end(await readFile(alvo));
 }
 
-// ---------------------------------------------------------------- servidor
+// ---------------------------------------------------------------- the server
 const servidor = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
   try {
@@ -684,11 +703,11 @@ const servidor = createServer(async (req, res) => {
       if (!r) {
         // The same answer for an unknown e-mail and a wrong password: saying which of the two
         // failed hands over who has an account. The response time matches too (see users.ts).
-        log('AVISO', 'entrada_recusada', { email: corpo.email });
-        return json(res, 401, { erro: i18n.t(idioma(req), 'api.credentials.invalid') });
+        log('WARNING', 'sign_in_refused', { email: corpo.email });
+        return json(res, 401, { error: i18n.t(idioma(req), 'api.credentials.invalid') });
       }
       res.setHeader('set-cookie', porSenha.cabecalhoDeSessao(r.sessao));
-      log('INFO', 'entrou', { email: r.pessoa.email, precisaTrocarSenha: r.pessoa.mustChangePassword });
+      log('INFO', 'signed_in', { email: r.pessoa.email, mustChangePassword: r.pessoa.mustChangePassword });
       // The response keys stay Portuguese: they are the published contract the login screen reads.
       return json(res, 200, { email: r.pessoa.email, nome: r.pessoa.name, precisaTrocarSenha: r.pessoa.mustChangePassword });
     }
@@ -697,7 +716,7 @@ const servidor = createServer(async (req, res) => {
       const email = porSenha
         ? (await porSenha.daRequisicao(req.headers))?.email ?? null
         : await identidade!.email(req.headers);
-      if (!email) return json(res, 401, { erro: 'não autenticado' });
+      if (!email) return json(res, 401, { error: i18n.t(idioma(req), 'api.notAuthenticated') });
       return await api(req, res, url, email);
     }
 
@@ -727,22 +746,27 @@ const servidor = createServer(async (req, res) => {
       return (res.writeHead(302, { location: '/' }), res.end());
     }
 
-    return await estatico(url, res);
+    return await estatico(url, res, idioma(req));
   } catch (erro) {
     const id = crypto.randomUUID().slice(0, 8);
-    log('ERROR', 'erro_nao_tratado', { id, caminho: url.pathname, motivo: erro instanceof Error ? erro.message : String(erro) });
-    json(res, 500, { erro: 'erro interno', id });   // o id liga a tela ao log
+    log('ERROR', 'unhandled_error', {
+      id, path: url.pathname, reason: erro instanceof Error ? erro.message : String(erro),
+    });
+    // The reason is in the log and NOT in the reply: a stack trace or a database message handed to
+    // whoever asked is free reconnaissance. The id is what ties the screen to the log line — the
+    // person quotes eight characters and whoever operates greps for them.
+    json(res, 500, { error: i18n.t(idioma(req), 'api.internal'), id });
   }
 });
 
 servidor.listen(cfg.porta, () => {
-  log('INFO', 'servidor_no_ar', {
-    porta: cfg.porta, ambiente: cfg.ambiente, identidade: comoEntrar, banco: ondeGuardar,
+  log('INFO', 'server_listening', {
+    port: cfg.porta, environment: cfg.ambiente, identity: comoEntrar, database: ondeGuardar,
     // Which user store is in play, said out loud at boot. Whoever is losing accounts on Cloud Run
     // needs one grep to find out they are on a disk that does not survive the instance.
     // ⚠️ The KIND, never the URL: `postgres://user:password@host/db` in a log line is the database
     // password in the log collector, readable by everyone who can read logs.
-    usuarios: porSenha ? userStoreKind(process.env.REVISAO_USERS) : null,
-    modoLocal: identidade?.modoLocal ?? false, site: cfg.site,
+    users: porSenha ? userStoreKind(process.env.REVISAO_USERS) : null,
+    localMode: identidade?.modoLocal ?? false, site: cfg.site,
   });
 });

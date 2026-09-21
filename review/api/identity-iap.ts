@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { log } from './log.ts';
 
 /**
  * Who is using it comes from IAP: the `x-goog-iap-jwt-assertion` header is signed by Google
@@ -31,15 +32,21 @@ export class Identidade {
     this.#emailDeDev = cfg.emailDeDev;
 
     if (pediuLocal && !this.#local) {
-      console.warn(JSON.stringify({
-        nivel: 'AVISO', evento: 'modo_local_ignorado', ambiente: cfg.ambiente,
-        mensagem: 'REVISAO_MODO=local pedido fora de Development: IGNORADO. A identidade continua vindo do JWT do IAP.',
-      }));
+      // Through the shared logger, in English: this line used to carry its own envelope, with the
+      // severity under `nivel` — a field no collector reads, so the warning arrived with no
+      // severity and matched no alert rule.
+      log('WARNING', 'local_mode_ignored', {
+        environment: cfg.ambiente,
+        message: 'REVISAO_MODO=local asked for outside Development: IGNORED. '
+          + 'Identity still comes from the IAP JWT.',
+      });
     }
     if (!this.#local && !this.#audiencia) {
+      // English, hard-coded: this refuses the boot, so there is no request and nobody whose
+      // language could have been chosen. Same rule as every other configuration error.
       throw new Error(
-        'REVISAO_AUDIENCIA é obrigatória fora de desenvolvimento: é ela que amarra o JWT do IAP a ESTE ' +
-        'serviço. Formato: /projects/<numero>/locations/<regiao>/services/<servico>.');
+        'REVISAO_AUDIENCIA is required outside development: it is what ties the IAP JWT to THIS ' +
+        'service. Format: /projects/<number>/locations/<region>/services/<service>.');
     }
   }
 
