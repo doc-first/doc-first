@@ -25,6 +25,7 @@
   "api.users.enabledMissing": "diga enabled: true ou enabled: false",
   "api.users.notFound": "ninguém aqui entra como {email}",
   "api.users.ownerCannotBeDisabled": "{email} é o dono e não pode ser desativado, nem por ele mesmo: o serviço precisa de exatamente um dono para subir, e sem nenhum não sobraria quem aprovasse. Para passar o papel adiante, troque REVISAO_OWNER e reinicie.",
+  "api.users.ownerIsProvisionedAtBoot": "{email} é o dono: essa conta é criada pelo próprio serviço no primeiro boot, nunca por aqui. Reinicie com REVISAO_OWNER apontando para ela.",
   "api.users.ownerPasswordIsOwnTo": "só o dono pode trocar a senha do dono",
   "block.state.broken": "o texto está igual, mas mudou aquilo de que ele depende: {blame}",
   "block.state.none": "ninguém validou isto ainda",

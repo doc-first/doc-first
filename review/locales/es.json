@@ -30,6 +30,7 @@
   "api.users.enabledMissing": "indica enabled: true o enabled: false",
   "api.users.notFound": "nadie entra aquí como {email}",
   "api.users.ownerCannotBeDisabled": "{email} es el propietario y no se puede desactivar, ni siquiera por sí mismo: el servicio necesita exactamente un propietario para arrancar, y sin ninguno no quedaría nadie que aprobara. Para ceder el papel, cambia REVISAO_OWNER y reinicia.",
+  "api.users.ownerIsProvisionedAtBoot": "{email} es el propietario: esa cuenta la crea el propio servicio al arrancar, nunca desde aquí. Reinicia con REVISAO_OWNER apuntando a ella.",
   "api.users.ownerPasswordIsOwnTo": "solo el propietario puede cambiar la contraseña del propietario",
   "block.state.broken": "el texto sigue igual, pero cambió aquello de lo que depende: {blame}",
   "block.state.none": "todavía nadie ha validado esto",

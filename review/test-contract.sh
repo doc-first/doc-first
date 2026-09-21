@@ -238,6 +238,13 @@ APASS=$(as_owner -d "{\"email\":\"$ADMIN\",\"name\":\"An Admin\"}" $B/api/users 
 expect "the admin signs in → 200"       200 "$(alogin "$APASS")"
 expect "an admin manages people → 200"  200 "$(code_admin $B/api/users)"
 expect "an admin cannot reset the owner → 409" 409 "$(code_admin -X POST $B/api/users/$OWNER/password)"
+# ⚠️ The twin of the guard above, and the one that was missing. Who the owner IS comes from
+# REVISAO_OWNER, not from a column, so the row can legitimately be absent — handing the role over
+# leaves it missing, because first-access only runs while the store is empty. In that window an
+# admin could CREATE the owner's account, read the generated password from the response, and be
+# the owner from then on, never touching the reset route the other guard protects.
+expect "an admin cannot create the owner → 409" 409 "$(code_admin -d "{\"email\":\"$OWNER\",\"name\":\"Not Me\"}" $B/api/users)"
+expect "and the message says it is provisioned at boot" 0 "$(as_admin -d "{\"email\":\"$OWNER\",\"name\":\"Not Me\"}" $B/api/users | grep -q 'REVISAO_OWNER'; echo $?)"
 expect "the owner still can, on themselves" 200 "$(code_owner -X POST $B/api/users/$OWNER/password)"
 
 expect "disabling somebody → 200"       200 "$(code_owner -d '{"enabled":false}' $B/api/users/$MEMBER/enabled)"
@@ -267,6 +274,34 @@ expect "the new one gets in → 200"      200 "$(mlogin "$NEW_PASSWORD")"
 expect "and it is not in the listing"   0 "$(as_owner $B/api/users | grep -Fc -e "$NEW_PASSWORD")"
 expect "nor in the log"                 0 "$(grep -Fc -e "$NEW_PASSWORD" /tmp/node-password.log)"
 rm -f $MCOOKIES
+
+# ------------------------------------------------------------------ handing the owner role over
+# ⚠️ THE window, and the one the guard above exists for. Who the owner IS comes from
+# REVISAO_OWNER, not from a column, and first access only provisions a row while the store is
+# EMPTY. So restarting with a NEW owner address over a store that already has people leaves the
+# owner's row missing — and an admin who was already there could create it, read the generated
+# password out of the response, and be the owner from then on.
+#
+# The check above the reset route never sees this path: the attacker never resets anything.
+HANDOVER=newowner@example.org
+kill $PID 2>/dev/null; wait $PID 2>/dev/null
+REVISAO_AMBIENTE=Production REVISAO_OWNER=$HANDOVER REVISAO_ADMINS=$ADMIN REVISAO_IDENTIDADE=senha \
+  REVISAO_BANCO=sqlite REVISAO_PESSOAS=$DATA_DIR/people.db REVISAO_SQLITE=$DATA_DIR/events.db \
+  PORT=$PORT REVISAO_SITE="$PWD/examples/ola-mundo" \
+  node review/api/server.ts >/tmp/node-handover.log 2>&1 & PID=$!
+for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
+
+expect "the new owner has no account yet" 0 "$(as_admin $B/api/users | grep -Fvc "$HANDOVER" >/dev/null; as_admin $B/api/users | grep -Fq "$HANDOVER"; [ $? -ne 0 ]; echo $?)"
+expect "and no first-access was printed" 0 "$(grep -c 'FIRST ACCESS' /tmp/node-handover.log)"
+expect "an admin still cannot create it → 409" 409 "$(code_admin -d "{\"email\":\"$HANDOVER\",\"name\":\"Taking Over\"}" $B/api/users)"
+expect "so nobody signed in as the new owner" 401 "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "{\"email\":\"$HANDOVER\",\"senha\":\"anything-at-all\"}" $B/api/entrar)"
+kill $PID 2>/dev/null; wait $PID 2>/dev/null
+
+REVISAO_AMBIENTE=Production REVISAO_OWNER=$OWNER REVISAO_ADMINS=$ADMIN REVISAO_IDENTIDADE=senha \
+  REVISAO_BANCO=sqlite REVISAO_PESSOAS=$DATA_DIR/people.db REVISAO_SQLITE=$DATA_DIR/events.db \
+  PORT=$PORT REVISAO_SITE="$PWD/examples/ola-mundo" \
+  node review/api/server.ts >>/tmp/node-password.log 2>&1 & PID=$!
+for i in $(seq 40); do curl -s $B/api/saude >/dev/null 2>&1 && break; sleep 0.5; done
 
 expect "logout → 200"                  200 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' -X POST $B/api/sair)"
 expect "and after logging out → 401"   401 "$(curl -s -b $COOKIES -o /dev/null -w '%{http_code}' $B/api/eu)"

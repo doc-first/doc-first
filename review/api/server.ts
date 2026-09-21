@@ -454,6 +454,20 @@ async function userRoutes(
     // ⚠️ Checked, AND caught below. The check is what produces a message worth reading; the catch
     // is what covers two admins creating the same address at the same moment, where the check
     // passes twice and the database is the only thing that can still say no.
+    // ⚠️ Nobody but the owner creates the OWNER's account, and this guard is the twin of the one
+    // on the reset route — I wrote that one and left this door open, which is the whole lesson:
+    // a rule enforced on one path is not enforced.
+    //
+    // Being the owner is decided by REVISAO_OWNER, not by a column, so the account can legitimately
+    // not exist yet: `primeiroAcesso` only runs while the store is EMPTY, so handing the role over
+    // — new address in the variable, store already full — leaves the owner's row missing. In that
+    // window any admin could create it, read the generated password from this very response, sign
+    // in, and from then on be the owner for every purpose: their ✓ locks, and nobody can disable
+    // them. They never needed the reset route at all.
+    if (papeis.isOwner(novo) && !papeis.isOwner(email)) {
+      json(res, 409, { error: say('api.users.ownerIsProvisionedAtBoot', { email: novo }) });
+      return true;
+    }
     if (await users.find(novo)) {
       json(res, 400, { error: say('api.users.emailTaken', { email: novo }) });
       return true;
