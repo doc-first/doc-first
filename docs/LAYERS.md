@@ -68,11 +68,12 @@ bottom: reading down from the rule into the screen, the screen's own dependencie
 toward the rule that started the chain. There would be no fixed place to start reading, only a
 graph.
 
-This is checkable the way the fingerprint and traffic light are: `doc-first check` could walk every
-`data-depende` edge, ask each endpoint's kind for its `layer`, and refuse an edge from
-`fundamental` to `application`, naming both blocks. Nothing does that today — no `layer` property
-exists, and no code in `review/core` or `review/cli` mentions layer. The check follows directly from
-declaring `layer` in section 2.
+This is checkable the way the fingerprint and traffic light are, and since `2026-09-22` it is
+checked: `doc-first check` walks every `data-depende` edge, asks each endpoint's kind for its
+`layer`, and refuses an edge from `fundamental` to `application`, naming both blocks
+(`upwardDependencies`, in `review/cli/validation.ts`). It stays quiet when either kind is
+undeclared, because `layerOf` returns `null` rather than a default and an unknown kind must not be
+judged by a rule nobody declared for it.
 
 ## 4. What the layers change in the traffic light: nothing
 
@@ -136,8 +137,8 @@ route, which `check` does not do today: a new capability, not an extension of th
 | ✅ | fifteen kinds with `gravity` and `sensitivity`, `review/core/kinds.js` |
 | ✅ | matrix routing a `binding` change to `person`, `review/core/impact.js` |
 | ✅ | dependency declared by block id (`data-depende`) |
-| ⬜ | `layer: 'fundamental' \| 'application'` on the kind |
-| ⬜ | the downward-only edge check — no code mentions layer today |
+| ✅ | `layer: 'fundamental' \| 'application'` declared on all fifteen kinds, `review/core/kinds.js` |
+| ✅ | the downward-only edge check, `upwardDependencies` in `review/cli/validation.ts`, wired into `check` |
 | ⬜ | the release baseline — ids, fingerprints, lights and Fundamental version, frozen at deploy |
 | ⬜ | the hedging lint on the Fundamental layer |
 | 🟡 | `data-prova`: `check` accuses a missing path; fetching a route is not built |
