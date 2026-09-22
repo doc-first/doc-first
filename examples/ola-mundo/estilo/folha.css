@@ -5,17 +5,17 @@ body.doc { font: 16px/1.6 system-ui, sans-serif; color: #222; margin: 0; backgro
 .doc-pagina { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; background: #fff;
               min-height: 100vh; box-shadow: 0 0 2rem rgba(0,0,0,.06); }
 .doc-titulo { font-size: 1.6rem; line-height: 1.25; margin: 0 0 1.5rem; }
-.doc-titulo__cod { display: inline-block; background: #0883C5; color: #fff; border-radius: .3rem;
+.doc-titulo__cod { display: inline-block; background: #2E6E5B; color: #fff; border-radius: .3rem;
                    padding: .1em .45em; margin-right: .4em; font-size: .8em; }
 h2 { font-size: 1.15rem; margin: 2.5rem 0 .75rem; }
-h2 .n { color: #0883C5; margin-right: .3em; }
+h2 .n { color: #2E6E5B; margin-right: .3em; }
 code { background: #eef1f4; border-radius: .2rem; padding: .1em .35em; font-size: .9em; }
 
 /* ⚠️ position: relative is a REQUIREMENT of the engine, not a matter of taste. The review button
    is placed inside the block; without this it escapes to the corner of the page. */
 .frase, .bloco { position: relative; margin: 0 0 1rem; padding: .85rem 1rem;
                  border: 1px solid #e3e6ea; border-radius: .4rem; background: #fff; }
-.frase { border-left: 3px solid #0883C5; }
+.frase { border-left: 3px solid #2E6E5B; }
 .bloco p { margin: 0; }
 
 /* The block's stamp, for when the panel is NOT on (no server, file opened straight from disk). */
