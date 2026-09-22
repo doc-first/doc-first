@@ -93,7 +93,7 @@ Every reviewable piece is of one kind, and each kind knows what it demands of it
 | `diagram` | to be text, not an image | a PNG has no useful fingerprint: recompressing changes the bytes without changing the meaning |
 | `table` | a header row | without `<th>` the table is unreadable by a screen reader |
 | `decision` | an owner and a deadline | without them it is not a pending decision, it is a lost one |
-| `colors` | the value | "primary blue" is not a value; `#0883C5` is |
+| `colors` | the value | "primary blue" is not a value; `#2E6E5B` is |
 | `list` | two items | a one-item list is a paragraph in bad clothing |
 | `rule` | the test that defends it (`data-prova`) | a rule nobody proved is a rule nobody can check |
 

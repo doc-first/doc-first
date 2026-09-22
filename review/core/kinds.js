@@ -189,7 +189,7 @@ export const KINDS = {
   colors: {
     name: 'palette',
     description: 'brand colours, with the value next to them. "Primary blue" is not a value; '
-      + '"#0883C5" is.',
+      + '"#2E6E5B" is.',
     numbered: true,
     gravity: 'cosmetic',
     sensitivity: 'robust',

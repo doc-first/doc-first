@@ -56,7 +56,7 @@ test('a decision with no owner and no deadline is not pending, it is lost', () =
 
 test('a palette with no colour value is reported', () => {
   assert.equal(whatIsMissing('colors', t({ text: 'primary blue and grey' })).length, 1);
-  assert.deepEqual(whatIsMissing('colors', t({ text: 'azul #0883C5' })), []);
+  assert.deepEqual(whatIsMissing('colors', t({ text: 'primary blue #2E6E5B' })), []);
 });
 
 test('a one-item list is a paragraph in bad clothing', () => {

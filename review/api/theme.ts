@@ -15,7 +15,7 @@ import { normalize, join, sep, extname } from 'node:path';
  * file that already says where the content lives and who approves it — one file to edit, which is
  * the promise readConfig already makes.
  *
- *     "tema": { "marca": "#0883C5", "logo": "tema/logo.svg", "nome": "Arautos · Fundamental" }
+ *     "tema": { "marca": "#2E6E5B", "logo": "tema/logo.svg", "nome": "Template · Handbook" }
  *
  * All three are optional. With no theme at all the engine looks like the engine.
  *
