@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lerTrechos, arquivosDeFolhas } from '../cli/pages.ts';
-import { orphanMarks, loadRegistry, missingProofs } from '../cli/validation.ts';
+import { orphanMarks, loadRegistry, missingProofs, upwardDependencies } from '../cli/validation.ts';
 
 const RAIZ = new URL('../../', import.meta.url).pathname;
 const EXEMPLO = join(RAIZ, 'examples', 'ola-mundo');
@@ -115,6 +115,59 @@ test('check catches a data-prova whose file is gone', async () => {
     // is already reported by the kind, and any other kind never had a proof to lose.
     writeFileSync(folha, '<main><div data-id="X01.1.1" data-cod="1.1">plain text</div></main>');
     assert.equal(missingProofs(tmp, await lerTrechos(tmp)), 0, 'no data-prova, nothing to check');
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/**
+ * The Fundamental is the bottom an agent reads down to when it implements. An edge pointing the
+ * other way — a rule depending on a screen — means there is no bottom, and nothing else catches
+ * it: the fingerprint and the traffic light both compute fine on either endpoint alone.
+ */
+test('check catches a Fundamental block depending on an Application one', async () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'docfirst-layers-'));
+  try {
+    mkdirSync(join(tmp, 'p'));
+    writeFileSync(join(tmp, 'doc-first.json'),
+      JSON.stringify({ owner: 'x@y.org', conteudo: { pastas: ['p'], registro: 'r.json' } }));
+    const folha = join(tmp, 'p', 'X01.html');
+    const block = (id, kind, dependsOn) => `<div data-id="${id}" data-cod="1.1" data-tipo="${kind}"`
+      + (dependsOn ? ` data-depende="${dependsOn}"` : '') + `>text of ${id}</div>`;
+
+    // Fundamental (rule) depending on Application (text): the violation this check exists for.
+    writeFileSync(folha, '<main>'
+      + block('F01.1.1', 'rule', 'A01.1.1')
+      + block('A01.1.1', 'text')
+      + '</main>');
+    let blocks = await lerTrechos(tmp);
+    assert.equal(upwardDependencies(blocks), 1,
+      'a Fundamental block depending on an Application one is a defect');
+
+    // Application (decision) depending on Fundamental (config): the allowed direction, silent.
+    writeFileSync(folha, '<main>'
+      + block('A01.1.1', 'decision', 'F01.1.1')
+      + block('F01.1.1', 'config')
+      + '</main>');
+    blocks = await lerTrechos(tmp);
+    assert.equal(upwardDependencies(blocks), 0,
+      'the Application may depend on the Fundamental — that is the whole point of the layers');
+
+    // Within the same layer, either direction, is fine.
+    writeFileSync(folha, '<main>'
+      + block('F01.1.1', 'contract', 'F02.1.1')
+      + block('F02.1.1', 'model')
+      + '</main>');
+    blocks = await lerTrechos(tmp);
+    assert.equal(upwardDependencies(blocks), 0, 'a within-layer edge is nobody\'s business here');
+
+    // A dangling data-depende — the target does not exist at all — is missingProofs'/orphanMarks'
+    // kind of defect elsewhere in the funnel, reported once, not accused twice here.
+    writeFileSync(folha, '<main>'
+      + block('F01.1.1', 'rule', 'GHOST.1.1')
+      + '</main>');
+    blocks = await lerTrechos(tmp);
+    assert.equal(upwardDependencies(blocks), 0, 'a dangling target is not this function\'s business');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

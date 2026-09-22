@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { kindOf, whatIsMissing, KINDS, catalogue } from '../core/kinds.js';
+import { kindOf, whatIsMissing, KINDS, catalogue, LAYERS, layerOf } from '../core/kinds.js';
 
 const t = (o) => ({ attributes: {}, classes: [], tag: 'div', html: '', text: '', ...o });
 
@@ -76,4 +76,30 @@ test('every kind in the catalogue has a name and a description — that is what 
     assert.equal(typeof kind.numbered, 'boolean', `${id} must say whether it shows a number`);
   }
   assert.ok(catalogue().length >= 12, 'the catalogue has to cover what documentation is made of');
+});
+
+test('every kind declares a layer, and it is one of LAYERS', () => {
+  for (const [id, kind] of Object.entries(KINDS)) {
+    assert.ok(LAYERS.includes(kind.layer), `${id} has no valid layer`);
+  }
+});
+
+test('exactly config, contract, model and rule are Fundamental', () => {
+  const fundamental = Object.entries(KINDS)
+    .filter(([, kind]) => kind.layer === 'fundamental')
+    .map(([id]) => id)
+    .sort();
+  assert.deepEqual(fundamental, ['config', 'contract', 'model', 'rule']);
+});
+
+test('decision is binding but Application: a decision is a placeholder for a blueprint fact, not one', () => {
+  // The whole reason `layer` is declared instead of computed from `gravity === 'binding'`. See the
+  // comment above `KINDS` in review/core/kinds.js and docs/LAYERS.md, section 2.
+  assert.equal(KINDS.decision.gravity, 'binding');
+  assert.equal(KINDS.decision.layer, 'application');
+});
+
+test('layerOf returns null for a kind that does not exist, not a default', () => {
+  assert.equal(layerOf('invented'), null);
+  assert.equal(layerOf('rule'), 'fundamental');
 });

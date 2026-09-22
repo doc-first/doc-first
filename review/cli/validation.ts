@@ -5,6 +5,7 @@ import { fingerprintOfText } from '../core/fingerprint.js';
 import { lerTrechos, arquivosDeFolhas, acharArquivoDoTrecho, nomeCurto, type Trecho } from './pages.ts';
 import { readConfig } from '../core/config.js';
 import { trafficLight, dependentsOf, COLOURS } from '../core/validity.js';
+import { layerOf } from '../core/kinds.js';
 import { Source } from './remote.ts';
 
 /**
@@ -70,6 +71,7 @@ export async function check(root: string): Promise<number> {
   }
   problems += await orphanMarks(root, registry);
   problems += missingProofs(root, blocks);
+  problems += upwardDependencies(blocks);
   console.log(`${Object.keys(registry).length} validated · ${problems ? `${problems} problem(s)` : 'all intact'}`);
   return problems;
 }
@@ -116,6 +118,44 @@ export function missingProofs(root: string, blocks: Map<string, Trecho>): number
     console.log(`  ✗ ${id}: data-prova points at ${path}, and there is no such file — `
       + `point it at the test that defends this rule, or the rule is not defended`);
     found++;
+  }
+  return found;
+}
+
+/**
+ * A `data-depende` edge running from the Fundamental layer into the Application layer.
+ *
+ * Why this is a defect and not a shrug: the Fundamental is the bottom an agent reads down to when
+ * it implements — the blueprint fact that does not itself depend on how the system was built. An
+ * edge pointing the other way means there is no bottom: resolving a `rule` by following its
+ * dependencies could lead into a screen, whose own dependencies could lead back toward the rule
+ * that started the chain, and "implement from the documentation" has nowhere fixed to start
+ * reading. Nothing else surfaces this: the fingerprint and the traffic light both compute fine on
+ * either endpoint, on its own the block looks ready for approval, and only the direction of the
+ * edge is wrong. See `docs/LAYERS.md`, section 3.
+ */
+export function upwardDependencies(blocks: Map<string, Trecho>): number {
+  let found = 0;
+  for (const [id, block] of [...blocks].sort(([a], [b]) => a.localeCompare(b))) {
+    for (const other of [...block.depende].sort()) {
+      const target = blocks.get(other);
+      // A target that is not there has no kind, so it has no layer, so this sweep has nothing to
+      // judge. ⚠️ Nor does anything else in `check` sweep for it: the "declares a dependency on X,
+      // which does not exist" line lives in `mark`, and only fires when somebody approves that
+      // block. A dangling edge on a block nobody has approved is invisible today.
+      if (!target) continue;
+
+      const fromLayer = layerOf(block.tipo);
+      const toLayer = layerOf(target.tipo);
+      if (fromLayer === null || toLayer === null) continue; // an undeclared kind on either side: no rule to check it against.
+
+      if (fromLayer === 'fundamental' && toLayer === 'application') {
+        console.log(`  ✗ ${id} (${block.tipo}, Fundamental) depends on ${other} (${target.tipo}, `
+          + `Application) — a Fundamental block cannot depend on the Application; point the `
+          + `dependency the other way, or move ${id} out of the Fundamental`);
+        found++;
+      }
+    }
   }
   return found;
 }
