@@ -216,6 +216,21 @@ two breakpoints — and every engine screen composes them. What goes *on* the br
 measured, not assumed: a light brand gets dark text instead of the white that would have made the
 button unreadable.
 
+## Design documents
+
+The design behind the engine, not repeated here:
+
+| Document | What is in it |
+|---|---|
+| `docs/METHOD.md` | what exists today — the method, written down straight |
+| `docs/IMPACT.md` | the funnel that decides who has to look at a change: silent, agent, or person |
+| `docs/BUGS.md` | a bug report treated as documentation catching up with behaviour, not a ticket |
+| `docs/PRIOR-ART.md` | the field this belongs to — DOORS, Jama, Polarion, Swimm — and what is actually new here |
+| `docs/LAYERS.md` | the Fundamental and the Application, and why one lock covers both |
+
+Each opens with a design date and closes with an honest built / not-built table — read those before
+assuming a section describes running code.
+
 ## What does not work yet
 
 Honest, as of `2026-09-20`:
