@@ -26,12 +26,21 @@
  */
 
 /**
+ * Which of the two documentations a kind belongs to. See `docs/LAYERS.md`: the Fundamental is the
+ * blueprint — rules, contracts, the data model, configuration — and the Application is the house
+ * built from it. A `data-depende` edge may run from the Application into the Fundamental, or
+ * within a layer, but never from the Fundamental into the Application.
+ * @typedef {'fundamental'|'application'} Layer
+ */
+
+/**
  * @typedef {{
  *   name: string,
  *   description: string,
  *   numbered: boolean,
  *   gravity: Gravity,
  *   sensitivity: Sensitivity,
+ *   layer: Layer,
  *   entails: string[],
  *   demands?: (block: {text: string, html: string, attributes: Record<string,string>}) => string[],
  * }} Kind
@@ -45,6 +54,7 @@
  */
 export const GRAVITIES = /** @type {Gravity[]} */ (['cosmetic', 'substantive', 'binding']);
 export const SENSITIVITIES = /** @type {Sensitivity[]} */ (['robust', 'normal', 'brittle']);
+export const LAYERS = /** @type {Layer[]} */ (['fundamental', 'application']);
 
 /**
  * `gravity` and `sensitivity` are NOT the same property, and reading them as one is the mistake
@@ -57,6 +67,14 @@ export const SENSITIVITIES = /** @type {Sensitivity[]} */ (['robust', 'normal', 
  * `model` changing means a migration whether or not anyone is disturbed by it. It stays on the
  * kind for the same reason `demands` does — the kind declares it, nobody guesses it, and it is one
  * file to argue about instead of a convention that dies with the third person to join.
+ *
+ * `layer` looks redundant next to `gravity`: fourteen of the fifteen kinds below have `layer:
+ * 'fundamental'` exactly where `gravity === 'binding'`, and it is tempting to compute one from the
+ * other and delete a field. Do not — `decision` is `binding` (an open decision binds the project's
+ * future once it lands) but `layer: 'application'`, because a decision is a placeholder for a
+ * blueprint fact, not one itself. Fourteen right answers out of fifteen are worse than a flat
+ * declaration: they make the fifteenth look checked when it was only guessed. See
+ * `docs/LAYERS.md`, section 2.
  */
 
 /** A failed demand returns the sentence of what to do, not the name of the rule. */
@@ -72,6 +90,7 @@ export const KINDS = {
     numbered: false,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ text }) => text.trim().length > 80
       ? ['heading longer than 80 characters — probably a paragraph in disguise'] : [],
@@ -82,6 +101,7 @@ export const KINDS = {
     numbered: false,
     gravity: 'cosmetic',
     sensitivity: 'robust',
+    layer: 'application',
     entails: [],
     demands: nothing,
   },
@@ -93,6 +113,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: nothing,
   },
@@ -102,6 +123,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ html }) => (html.match(/<li\b/g) ?? []).length < 2
       ? ['list with fewer than two items — either make it a paragraph, or add the rest'] : [],
@@ -113,6 +135,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ attributes }) => attributes['data-box'] ? []
       : ['callout without data-box: say whether it is info, warning, ok or forbidden'],
@@ -124,6 +147,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ html }) => /<th\b/.test(html) ? []
       : ['table without <th>: with no header, the table is unreadable by a screen reader'],
@@ -138,6 +162,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'cosmetic',
     sensitivity: 'robust',
+    layer: 'application',
     entails: [],
     demands: ({ html }) => {
       const missing = [];
@@ -155,6 +180,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ html }) => /<img\b/.test(html)
       ? ['diagram as an image: use Mermaid or PlantUML inside <code>, so it comes under the lock']
@@ -167,6 +193,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'cosmetic',
     sensitivity: 'robust',
+    layer: 'application',
     entails: [],
     demands: ({ text }) => /#[0-9a-fA-F]{3,8}\b|\b(rgb|hsl|oklch)\(/.test(text) ? []
       : ['palette with no colour value: write the hex, not just the name'],
@@ -179,6 +206,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'binding',
     sensitivity: 'brittle',
+    layer: 'fundamental',
     entails: ['a deploy'],
     demands: nothing,
   },
@@ -189,6 +217,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'binding',
     sensitivity: 'brittle',
+    layer: 'fundamental',
     entails: ['whoever consumes it has to be told', 'a version'],
     demands: nothing,
   },
@@ -198,6 +227,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'binding',
     sensitivity: 'brittle',
+    layer: 'fundamental',
     entails: ['a migration'],
     demands: nothing,
   },
@@ -217,6 +247,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'binding',
     sensitivity: 'brittle',
+    layer: 'fundamental',
     entails: ['the tests that prove it have to be re-run, and probably rewritten'],
     // A rule nobody proved is a rule nobody can check. `data-prova` points at the test that
     // defends it, which is what turns "this may mean redoing the tests" from a warning into a
@@ -233,6 +264,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'substantive',
     sensitivity: 'robust',
+    layer: 'application',
     entails: [],
     demands: nothing,
   },
@@ -243,6 +275,7 @@ export const KINDS = {
     numbered: true,
     gravity: 'binding',
     sensitivity: 'normal',
+    layer: 'application',
     entails: [],
     demands: ({ attributes }) => {
       const missing = [];
@@ -292,6 +325,19 @@ export function whatIsMissing(kind, block) {
   const k = KINDS[kind];
   if (!k) return [`unknown kind: "${kind}" — see review/core/kinds.js`];
   return k.demands ? k.demands(block) : [];
+}
+
+/**
+ * The layer of a kind, or `null` for one that is not in the catalogue.
+ *
+ * `null` and not a default: a made-up or newer-engine kind has no declared layer, and guessing one
+ * — say, `application`, the larger group — would let it silently pass or fail the downward-edge
+ * check on a rule nobody wrote for it. `null` pushes that decision to the caller, and the only
+ * caller (`upwardDependencies` in `review/cli/validation.ts`) refuses to accuse when either side
+ * is `null`, the same posture `whatIsMissing` takes towards an unknown kind's demands.
+ */
+export function layerOf(kind) {
+  return KINDS[kind]?.layer ?? null;
 }
 
 /** Every kind there is, for the catalogue and for `doc-first kinds`. */
